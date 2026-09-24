@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Doma Criolla — Stock y Producción</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#EAE5D8;
+    --panel:#F6F3EA;
+    --ink:#242017;
+    --ink-soft:#5B5648;
+    --line:#D8D1BE;
+    --crust:#8B5E34;
+    --crust-dark:#6E4A29;
+    --herb:#3F5B43;
+    --herb-bg:#DDE6DC;
+    --alert:#9A3B2E;
+    --alert-bg:#F3DBD4;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',system-ui,sans-serif;
+    -webkit-font-smoothing:antialiased;
+  }
+  h1,h2,h3{font-family:'Fraunces',serif;font-weight:600;margin:0;}
+  .wrap{max-width:920px;margin:0 auto;padding:28px 20px 80px;}
+  header.top{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:8px;}
+  header.top h1{font-size:26px;color:var(--crust-dark);}
+  header.top .sub{color:var(--ink-soft);font-size:14px;}
+
+  .home-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px;}
+  @media (max-width:640px){.home-grid{grid-template-columns:1fr;}}
+  .home-card{
+    background:var(--panel);border:1px solid var(--line);border-radius:4px;
+    padding:26px 22px;cursor:pointer;text-align:left;
+  }
+  .home-card h2{font-size:20px;margin-bottom:6px;}
+  .home-card p{color:var(--ink-soft);font-size:14px;margin:0;line-height:1.5;}
+  .home-card .tag{display:inline-block;font-size:12px;color:var(--crust-dark);margin-bottom:10px;letter-spacing:.02em;}
+
+  button{font-family:inherit;cursor:pointer;}
+  .btn{
+    background:var(--crust);color:#fff;border:none;border-radius:3px;
+    padding:11px 18px;font-size:14px;font-weight:600;
+  }
+  .btn:hover{background:var(--crust-dark);}
+  .btn.secondary{background:transparent;color:var(--ink-soft);border:1px solid var(--line);}
+  .btn.secondary:hover{border-color:var(--ink-soft);}
+  .btn:disabled{opacity:.5;cursor:default;}
+
+  .back{display:inline-flex;align-items:center;gap:6px;color:var(--ink-soft);font-size:13px;background:none;border:none;padding:0;margin-bottom:18px;}
+  .back:hover{color:var(--ink);}
+
+  select,input[type=text],input[type=number],input[type=date]{
+    font-family:inherit;font-size:14px;padding:9px 10px;border:1px solid var(--line);
+    border-radius:3px;background:#fff;color:var(--ink);
+  }
+  label{font-size:12px;color:var(--ink-soft);display:block;margin-bottom:4px;}
+
+  .field-row{margin-bottom:18px;max-width:320px;}
+
+  table.lotes{width:100%;border-collapse:collapse;margin-top:10px;}
+  table.lotes th{
+    text-align:left;font-size:11px;text-transform:none;color:var(--ink-soft);
+    border-bottom:1px solid var(--line);padding:6px 8px;font-weight:600;
+  }
+  table.lotes td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  table.lotes select{width:100%;}
+  table.lotes input{width:100%;}
+  .col-cant{width:90px;}
+  .col-venc{width:150px;}
+  .col-del{width:34px;text-align:center;}
+  .del-btn{background:none;border:none;color:var(--alert);font-size:16px;line-height:1;padding:4px;}
+
+  .add-row{margin-top:10px;background:none;border:1px dashed var(--line);color:var(--ink-soft);
+    padding:8px 14px;border-radius:3px;font-size:13px;}
+  .add-row:hover{border-color:var(--crust);color:var(--crust-dark);}
+
+  .actions{margin-top:22px;display:flex;gap:10px;align-items:center;}
+  .msg{font-size:13px;margin-top:14px;padding:10px 12px;border-radius:3px;display:none;}
+  .msg.ok{display:block;background:var(--herb-bg);color:var(--herb);}
+  .msg.err{display:block;background:var(--alert-bg);color:var(--alert);}
+
+  .fab-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+  .fab-toolbar .field-row{margin:0;max-width:180px;}
+
+  table.prod{width:100%;border-collapse:collapse;font-size:13.5px;}
+  table.prod th{
+    text-align:left;font-size:11px;color:var(--ink-soft);border-bottom:1px solid var(--ink-soft);
+    padding:7px 8px;font-weight:600;
+  }
+  table.prod td{padding:7px 8px;border-bottom:1px solid var(--line);}
+  table.prod tr:hover td{background:rgba(0,0,0,.02);}
+  .num{text-align:right;font-variant-numeric:tabular-nums;}
+  .badge{font-size:11px;padding:2px 7px;border-radius:10px;background:var(--herb-bg);color:var(--herb);}
+  .badge.reposo{background:#EADFC7;color:var(--crust-dark);}
+
+  .alert-box{background:var(--alert-bg);border-radius:4px;padding:14px 16px;margin-bottom:18px;}
+  .alert-box h3{color:var(--alert);font-size:15px;margin-bottom:8px;}
+  .alert-box ul{margin:0;padding-left:18px;font-size:13.5px;color:#5c2b23;}
+
+  .empty{color:var(--ink-soft);font-size:14px;padding:30px 0;text-align:center;}
+  .loading{color:var(--ink-soft);font-size:14px;}
+  footer.note{margin-top:40px;font-size:12px;color:var(--ink-soft);border-top:1px solid var(--line);padding-top:14px;}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+
+<script>
+/* ======================================================================
+   CONFIGURACIÓN — completar después de publicar el Apps Script
+   ====================================================================== */
+const APPS_SCRIPT_URL = 'PEGAR_ACA_LA_URL_DEL_APPS_SCRIPT';
+
+const LOCALES = ['Centro', 'Patagonia', 'Zelarrayan', 'Fábrica'];
+let SABORES_CACHE = null;
+
+const app = document.getElementById('app');
+
+/* ---------------------------------------------------------------------
+   Router muy simple (sin librerías) — 3 pantallas
+   --------------------------------------------------------------------- */
+function irA(pantalla){
+  if(pantalla === 'home') renderHome();
+  if(pantalla === 'local') renderLocal();
+  if(pantalla === 'fabrica') renderFabrica();
+  if(pantalla === 'planificacion') renderPlanificacion();
+}
+
+function renderHome(){
+  app.innerHTML = `
+    <header class="top">
+      <h1>Doma Criolla</h1>
+      <div class="sub">Stock y producción</div>
+    </header>
+    <div class="home-grid">
+      <button class="home-card" onclick="irA('local')">
+        <div class="tag">LOCAL / FÁBRICA</div>
+        <h2>Cargar stock de hoy</h2>
+        <p>Registrar cuánto queda de cada sabor, con su fecha de vencimiento.</p>
+      </button>
+      <button class="home-card" onclick="irA('fabrica')">
+        <div class="tag">FÁBRICA</div>
+        <h2>Ver qué producir hoy</h2>
+        <p>Calculado a partir del stock cargado y la venta estimada de cada sabor.</p>
+      </button>
+      <button class="home-card" onclick="irA('planificacion')">
+        <div class="tag">PLANIFICACIÓN</div>
+        <h2>Editar venta proyectada</h2>
+        <p>Actualizar, por local, cuánto se espera vender de cada sabor cada día de la semana.</p>
+      </button>
+    </div>
+    <footer class="note">Doma Criolla — herramienta interna de planificación de producción.</footer>
+  `;
+}
+
+/* ---------------------------------------------------------------------
+   Pantalla LOCAL: cargar lotes de stock
+   --------------------------------------------------------------------- */
+async function obtenerCategorias(){
+  if(SABORES_CACHE) return SABORES_CACHE;
+  const r = await fetch(`${APPS_SCRIPT_URL}?action=listarSabores`);
+  const data = await r.json();
+  SABORES_CACHE = data.categorias || {};
+  return SABORES_CACHE;
+}
+
+async function renderLocal(){
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <header class="top"><h1>Cargar stock</h1></header>
+
+    <div class="field-row">
+      <label>¿Dónde estás cargando este stock?</label>
+      <select id="selLocal">
+        ${LOCALES.map(l => `<option value="${l}">${l}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field-row">
+      <label>Fecha (por si cargás con atraso)</label>
+      <input type="date" id="fechaCarga" value="${hoyISO()}">
+    </div>
+
+    <table class="lotes" id="tablaLotes">
+      <thead>
+        <tr>
+          <th style="width:22%">Rubro</th>
+          <th style="width:28%">Sabor / ítem</th>
+          <th class="col-cant">Cantidad</th>
+          <th class="col-venc">Vencimiento</th>
+          <th class="col-del"></th>
+        </tr>
+      </thead>
+      <tbody id="filasLotes"></tbody>
+    </table>
+    <button class="add-row" id="btnAgregar">+ Agregar lote</button>
+
+    <div class="actions">
+      <button class="btn" id="btnGuardar">Guardar stock cargado</button>
+    </div>
+    <div class="msg" id="msg"></div>
+  `;
+
+  const categorias = await obtenerCategorias();
+  const nombresCategorias = Object.keys(categorias);
+  const filas = document.getElementById('filasLotes');
+
+  function agregarFila(){
+    const tr = document.createElement('tr');
+    const primeraCategoria = nombresCategorias[0];
+    tr.innerHTML = `
+      <td>
+        <select class="sel-categoria">
+          ${nombresCategorias.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </select>
+      </td>
+      <td>
+        <select class="sel-sabor">
+          ${categorias[primeraCategoria].map(s => `<option value="${s}">${s}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0"></td>
+      <td><input type="date" class="inp-venc"></td>
+      <td class="col-del"><button class="del-btn" title="Quitar">✕</button></td>
+    `;
+    tr.querySelector('.sel-categoria').onchange = (ev) => {
+      const cat = ev.target.value;
+      const selSabor = tr.querySelector('.sel-sabor');
+      selSabor.innerHTML = categorias[cat].map(s => `<option value="${s}">${s}</option>`).join('');
+    };
+    tr.querySelector('.del-btn').onclick = () => tr.remove();
+    filas.appendChild(tr);
+  }
+  document.getElementById('btnAgregar').onclick = agregarFila;
+  agregarFila(); // arranca con una fila lista
+
+  document.getElementById('btnGuardar').onclick = async () => {
+    const local = document.getElementById('selLocal').value;
+    const fecha = document.getElementById('fechaCarga').value;
+    const items = [...filas.querySelectorAll('tr')].map(tr => ({
+      sabor: tr.querySelector('.sel-sabor').value,
+      cantidad: tr.querySelector('.inp-cant').value,
+      vencimiento: tr.querySelector('.inp-venc').value
+    })).filter(it => it.cantidad && it.vencimiento);
+
+    const msg = document.getElementById('msg');
+    if(items.length === 0){
+      msg.className = 'msg err'; msg.textContent = 'Cargá al menos un lote con cantidad y vencimiento.'; return;
+    }
+    const btn = document.getElementById('btnGuardar');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    try{
+      const r = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'registrarStock', local, fecha, items })
+      });
+      const data = await r.json();
+      if(data.error) throw new Error(data.error);
+      msg.className = 'msg ok';
+      msg.textContent = `Guardado: ${data.registros_guardados} lote(s) para ${local}.`;
+      filas.innerHTML = ''; agregarFila();
+    }catch(err){
+      msg.className = 'msg err'; msg.textContent = 'No se pudo guardar: ' + err.message;
+    }finally{
+      btn.disabled = false; btn.textContent = 'Guardar stock cargado';
+    }
+  };
+}
+
+/* ---------------------------------------------------------------------
+   Pantalla FÁBRICA: qué producir hoy
+   --------------------------------------------------------------------- */
+async function renderFabrica(){
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <div class="fab-toolbar">
+      <header class="top" style="margin:0;"><h1>Producción de hoy</h1></header>
+      <div class="field-row">
+        <label>Ver para el día</label>
+        <input type="date" id="fechaCalculo" value="${hoyISO()}">
+      </div>
+    </div>
+    <div id="contenidoFabrica" class="loading">Calculando…</div>
+  `;
+  document.getElementById('fechaCalculo').onchange = cargarCalculo;
+  cargarCalculo();
+}
+
+async function cargarCalculo(){
+  const fecha = document.getElementById('fechaCalculo').value;
+  const cont = document.getElementById('contenidoFabrica');
+  cont.className = 'loading'; cont.textContent = 'Calculando…';
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=calcularProduccion&fecha=${fecha}`);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    pintarResultado(data);
+  }catch(err){
+    cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo calcular: ${err.message}</div>`;
+  }
+}
+
+function pintarResultado(data){
+  const cont = document.getElementById('contenidoFabrica');
+  const todas = data.sabores;
+  // solo mostramos lo que realmente hace falta reponer hoy
+  const filas = todas.filter(f => f.aReponerUnidades > 0);
+
+  let alertaHtml = '';
+  if(data.alertasVencimiento && data.alertasVencimiento.length){
+    alertaHtml = `
+      <div class="alert-box">
+        <h3>Vender ya — no llega vivo a la próxima reposición</h3>
+        <ul>
+          ${data.alertasVencimiento.map(a => `<li>${a.sabor} — ${a.local}: ${a.cantidad} u. (vence ${a.vencimiento})</li>`).join('')}
+        </ul>
+      </div>`;
+  }
+
+  if(filas.length === 0){
+    cont.className = '';
+    cont.innerHTML = alertaHtml + `<div class="empty">Nada para reponer/producir el ${data.dia.toLowerCase()} — el stock cargado alcanza.</div>`;
+    return;
+  }
+
+  const totalKilos = filas.reduce((a,f) => a + (f.kilosDeRelleno || 0), 0);
+
+  // agrupar: todo lo que tiene calendario (empanadas) va junto, bajo "Empanadas";
+  // el resto se agrupa por su categoria real (Dip, Postre, Topping, etc.)
+  const grupoDe = f => f.tipoCalculo === 'Calendario' ? 'Empanadas' : f.categoria;
+  const categorias = [...new Set(filas.map(grupoDe))];
+  categorias.sort((a,b) => (a === 'Empanadas' ? -1 : b === 'Empanadas' ? 1 : a.localeCompare(b)));
+
+  const bloques = categorias.map(cat => {
+    const items = filas.filter(f => grupoDe(f) === cat);
+    const esEmpanada = cat === 'Empanadas';
+    return `
+      <h3 style="font-size:15px;margin:20px 0 8px;">${cat}</h3>
+      <table class="prod">
+        <thead>
+          <tr>
+            <th>Sabor / ítem</th>
+            ${esEmpanada ? '<th>Relleno</th><th>Se cocinó</th>' : ''}
+            <th class="num">Objetivo</th>
+            <th class="num">Stock disponible</th>
+            <th class="num">A ${esEmpanada ? 'producir' : 'reponer'} (u.)</th>
+            ${esEmpanada ? '<th class="num">Docenas</th><th class="num">Kg relleno</th>' : ''}
+          </tr>
+        </thead>
+        <tbody>
+          ${items.map(f => `
+            <tr>
+              <td>${f.sabor}</td>
+              ${esEmpanada ? `<td>${f.relleno}</td><td>${f.diaCocina}${f.diaCocina !== f.diaArmado ? ` <span class="badge reposo">reposo</span>` : ''}</td>` : ''}
+              <td class="num">${f.objetivoUnidades}</td>
+              <td class="num">${f.stockValidoUnidades}</td>
+              <td class="num"><strong>${f.aReponerUnidades}</strong></td>
+              ${esEmpanada ? `<td class="num">${f.aReponerDocenas}</td><td class="num">${f.kilosDeRelleno}</td>` : ''}
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }).join('');
+
+  cont.className = '';
+  cont.innerHTML = alertaHtml + `
+    <p style="color:var(--ink-soft);font-size:13px;">
+      ${data.dia}, ${data.fecha} — ${filas.length} ítem(s) con faltante · ${totalKilos.toFixed(1)} kg de relleno en total
+    </p>
+    ${bloques}
+  `;
+}
+
+/* ---------------------------------------------------------------------
+   Pantalla PLANIFICACIÓN: editar venta proyectada por local
+   --------------------------------------------------------------------- */
+const DIAS_SEMANA = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
+
+async function renderPlanificacion(){
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <header class="top"><h1>Planificación de ventas</h1></header>
+    <p style="color:var(--ink-soft);font-size:13px;margin-top:-8px;">
+      Cuánto se espera vender de cada sabor, cada día — esto es lo que usa el cálculo de "qué producir hoy".
+    </p>
+    <div class="field-row">
+      <label>Local</label>
+      <select id="selLocalPlan">
+        ${['Centro','Patagonia','Zelarrayan'].map(l => `<option value="${l}">${l}</option>`).join('')}
+      </select>
+    </div>
+    <div id="tablaPlanContainer" class="loading">Cargando…</div>
+  `;
+  document.getElementById('selLocalPlan').onchange = cargarPlanificacion;
+  cargarPlanificacion();
+}
+
+async function cargarPlanificacion(){
+  const local = document.getElementById('selLocalPlan').value;
+  const cont = document.getElementById('tablaPlanContainer');
+  cont.className = 'loading'; cont.textContent = 'Cargando…';
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=listarPlanificacion&local=${local}`);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    pintarPlanificacion(data);
+  }catch(err){
+    cont.className = '';
+    cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar: ${err.message}</div>`;
+  }
+}
+
+function pintarPlanificacion(data){
+  const cont = document.getElementById('tablaPlanContainer');
+  cont.className = '';
+  cont.innerHTML = `
+    <div style="overflow-x:auto;">
+      <table class="prod" id="tablaPlan">
+        <thead>
+          <tr>
+            <th>Rubro</th><th style="width:22%">Sabor / ítem</th>
+            ${DIAS_SEMANA.map(d => `<th class="num">${d.slice(0,3)}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${data.filas.map((f, idx) => `
+            <tr data-sabor="${f.Sabor}">
+              <td style="color:var(--ink-soft);font-size:12px;">${f.Categoria}</td>
+              <td>${f.Sabor}</td>
+              ${DIAS_SEMANA.map(d => `<td><input type="number" min="0" step="0.5" class="inp-plan" data-dia="${d}" value="${f[d] || 0}" style="width:56px;"></td>`).join('')}
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+    <div class="actions"><button class="btn" id="btnGuardarPlan">Guardar planificación de ${data.local}</button></div>
+    <div class="msg" id="msgPlan"></div>
+  `;
+
+  document.getElementById('btnGuardarPlan').onclick = async () => {
+    const filas = [...document.querySelectorAll('#tablaPlan tbody tr')].map(tr => {
+      const fila = { sabor: tr.dataset.sabor };
+      tr.querySelectorAll('.inp-plan').forEach(inp => { fila[inp.dataset.dia] = inp.value; });
+      return fila;
+    });
+    const msg = document.getElementById('msgPlan');
+    const btn = document.getElementById('btnGuardarPlan');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    try{
+      const r = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'actualizarPlanificacion', local: data.local, filas })
+      });
+      const resp = await r.json();
+      if(resp.error) throw new Error(resp.error);
+      msg.className = 'msg ok'; msg.textContent = `Guardado: ${resp.filas_actualizadas} ítem(s) actualizados.`;
+    }catch(err){
+      msg.className = 'msg err'; msg.textContent = 'No se pudo guardar: ' + err.message;
+    }finally{
+      btn.disabled = false; btn.textContent = `Guardar planificación de ${data.local}`;
+    }
+  };
+}
+
+/* ---------------------------------------------------------------------
+   utilidades
+   --------------------------------------------------------------------- */
+function hoyISO(){
+  const d = new Date();
+  return d.toISOString().slice(0,10);
+}
+
+irA('home');
+</script>
+</body>
+</html>
