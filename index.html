@@ -6,6 +6,7 @@
 <title>Doma Criolla — Stock y Producción</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   :root{
     --bg:#EAE5D8;
@@ -100,6 +101,11 @@
   .num{text-align:right;font-variant-numeric:tabular-nums;}
   .badge{font-size:11px;padding:2px 7px;border-radius:10px;background:var(--herb-bg);color:var(--herb);}
   .badge.reposo{background:#EADFC7;color:var(--crust-dark);}
+
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;}
+  .tab-btn{background:none;border:none;padding:9px 16px;font-size:14px;color:var(--ink-soft);border-bottom:2px solid transparent;margin-bottom:-1px;}
+  .tab-btn.active{color:var(--crust-dark);border-bottom-color:var(--crust);font-weight:600;}
+  .tab-btn:hover{color:var(--ink);}
 
   .alert-box{background:var(--alert-bg);border-radius:4px;padding:14px 16px;margin-bottom:18px;}
   .alert-box h3{color:var(--alert);font-size:15px;margin-bottom:8px;}
@@ -287,71 +293,91 @@ async function renderFabrica(){
         <input type="date" id="fechaCalculo" value="${hoyISO()}">
       </div>
     </div>
+    <div class="tabs" id="tabsFabrica" style="display:none;">
+      <button class="tab-btn active" data-tab="produccion">Producción</button>
+      <button class="tab-btn" data-tab="cocina">Cocina</button>
+      <button class="tab-btn" data-tab="discos">Discos</button>
+    </div>
     <div id="contenidoFabrica" class="loading">Calculando…</div>
   `;
   document.getElementById('fechaCalculo').onchange = cargarCalculo;
   cargarCalculo();
 }
 
+let ULTIMO_CALCULO = null;
+let TAB_ACTIVA = 'produccion';
+
 async function cargarCalculo(){
   const fecha = document.getElementById('fechaCalculo').value;
   const cont = document.getElementById('contenidoFabrica');
   cont.className = 'loading'; cont.textContent = 'Calculando…';
+  document.getElementById('tabsFabrica').style.display = 'none';
   try{
-    const r = await fetch(`${APPS_SCRIPT_URL}?action=calcularProduccion&fecha=${fecha}`);
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=calcularTodo&fecha=${fecha}`);
     const data = await r.json();
     if(data.error) throw new Error(data.error);
-    pintarResultado(data);
+    ULTIMO_CALCULO = data;
+    document.getElementById('tabsFabrica').style.display = 'flex';
+    [...document.querySelectorAll('.tab-btn')].forEach(b => {
+      b.onclick = () => { TAB_ACTIVA = b.dataset.tab; marcarTabActiva(); pintarTabActiva(); };
+    });
+    TAB_ACTIVA = 'produccion';
+    marcarTabActiva();
+    pintarTabActiva();
   }catch(err){
     cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo calcular: ${err.message}</div>`;
   }
 }
 
-function pintarResultado(data){
-  const cont = document.getElementById('contenidoFabrica');
-  const todas = data.sabores;
-  // solo mostramos lo que realmente hace falta reponer hoy
-  const filas = todas.filter(f => f.aReponerUnidades > 0);
+function marcarTabActiva(){
+  [...document.querySelectorAll('.tab-btn')].forEach(b => b.classList.toggle('active', b.dataset.tab === TAB_ACTIVA));
+}
 
-  let alertaHtml = '';
-  if(data.alertasVencimiento && data.alertasVencimiento.length){
-    alertaHtml = `
-      <div class="alert-box">
-        <h3>Vender ya — no llega vivo a la próxima reposición</h3>
-        <ul>
-          ${data.alertasVencimiento.map(a => `<li>${a.sabor} — ${a.local}: ${a.cantidad} u. (vence ${a.vencimiento})</li>`).join('')}
-        </ul>
-      </div>`;
-  }
+function pintarTabActiva(){
+  if(TAB_ACTIVA === 'produccion') pintarProduccion(ULTIMO_CALCULO);
+  if(TAB_ACTIVA === 'cocina') pintarCocina(ULTIMO_CALCULO);
+  if(TAB_ACTIVA === 'discos') pintarDiscos(ULTIMO_CALCULO);
+}
+
+function bloqueAlertas(data){
+  if(!data.alertasVencimiento || !data.alertasVencimiento.length) return '';
+  return `
+    <div class="alert-box">
+      <h3>Vender ya — no llega vivo a la próxima reposición</h3>
+      <ul>
+        ${data.alertasVencimiento.map(a => `<li>${a.sabor} — ${a.local}: ${a.cantidad} u. (vence ${a.vencimiento})</li>`).join('')}
+      </ul>
+    </div>`;
+}
+
+/* ---- Pestaña PRODUCCIÓN: qué armar hoy, por sabor (todos los rubros) ---- */
+function pintarProduccion(data){
+  const cont = document.getElementById('contenidoFabrica');
+  const filas = data.produccion.filter(f => f.aHacerUnidades > 0);
+  const alertaHtml = bloqueAlertas(data);
 
   if(filas.length === 0){
     cont.className = '';
-    cont.innerHTML = alertaHtml + `<div class="empty">Nada para reponer/producir el ${data.dia.toLowerCase()} — el stock cargado alcanza.</div>`;
+    cont.innerHTML = alertaHtml + `<div class="empty">Nada para armar/reponer el ${data.dia.toLowerCase()} — el stock cargado alcanza.</div>`;
     return;
   }
 
-  const totalKilos = filas.reduce((a,f) => a + (f.kilosDeRelleno || 0), 0);
+  const rubros = [...new Set(filas.map(f => f.rubro))];
+  rubros.sort((a,b) => (a.startsWith('Empanadas') ? -1 : b.startsWith('Empanadas') ? 1 : a.localeCompare(b)));
 
-  // agrupar: todo lo que tiene calendario (empanadas) va junto, bajo "Empanadas";
-  // el resto se agrupa por su categoria real (Dip, Postre, Topping, etc.)
-  const grupoDe = f => f.tipoCalculo === 'Calendario' ? 'Empanadas' : f.categoria;
-  const categorias = [...new Set(filas.map(grupoDe))];
-  categorias.sort((a,b) => (a === 'Empanadas' ? -1 : b === 'Empanadas' ? 1 : a.localeCompare(b)));
-
-  const bloques = categorias.map(cat => {
-    const items = filas.filter(f => grupoDe(f) === cat);
-    const esEmpanada = cat === 'Empanadas';
+  const bloques = rubros.map(rubro => {
+    const items = filas.filter(f => f.rubro === rubro);
+    const esEmpanada = rubro.startsWith('Empanadas');
     return `
-      <h3 style="font-size:15px;margin:20px 0 8px;">${cat}</h3>
+      <h3 style="font-size:15px;margin:20px 0 8px;">${rubro}</h3>
       <table class="prod">
         <thead>
           <tr>
             <th>Sabor / ítem</th>
             ${esEmpanada ? '<th>Relleno</th><th>Se cocinó</th>' : ''}
-            <th class="num">Objetivo</th>
-            <th class="num">Stock disponible</th>
-            <th class="num">A ${esEmpanada ? 'producir' : 'reponer'} (u.)</th>
-            ${esEmpanada ? '<th class="num">Docenas</th><th class="num">Kg relleno</th>' : ''}
+            <th class="num">Objetivo</th><th class="num">Stock disponible</th>
+            <th class="num">A ${esEmpanada ? 'armar' : 'reponer'} (u.)</th>
+            ${esEmpanada ? '<th class="num">Docenas</th>' : ''}
           </tr>
         </thead>
         <tbody>
@@ -361,8 +387,8 @@ function pintarResultado(data){
               ${esEmpanada ? `<td>${f.relleno}</td><td>${f.diaCocina}${f.diaCocina !== f.diaArmado ? ` <span class="badge reposo">reposo</span>` : ''}</td>` : ''}
               <td class="num">${f.objetivoUnidades}</td>
               <td class="num">${f.stockValidoUnidades}</td>
-              <td class="num"><strong>${f.aReponerUnidades}</strong></td>
-              ${esEmpanada ? `<td class="num">${f.aReponerDocenas}</td><td class="num">${f.kilosDeRelleno}</td>` : ''}
+              <td class="num"><strong>${f.aHacerUnidades}</strong></td>
+              ${esEmpanada ? `<td class="num">${f.aHacerDocenas}</td>` : ''}
             </tr>`).join('')}
         </tbody>
       </table>`;
@@ -370,10 +396,67 @@ function pintarResultado(data){
 
   cont.className = '';
   cont.innerHTML = alertaHtml + `
-    <p style="color:var(--ink-soft);font-size:13px;">
-      ${data.dia}, ${data.fecha} — ${filas.length} ítem(s) con faltante · ${totalKilos.toFixed(1)} kg de relleno en total
-    </p>
+    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${data.fecha} — ${filas.length} ítem(s) con faltante</p>
     ${bloques}
+  `;
+}
+
+/* ---- Pestaña COCINA: cuánto relleno cocinar hoy, por relleno ---- */
+function pintarCocina(data){
+  const cont = document.getElementById('contenidoFabrica');
+  const filas = data.cocina.filter(f => f.kilosDeRelleno > 0);
+
+  if(filas.length === 0){
+    cont.className = '';
+    cont.innerHTML = `<div class="empty">Cocina no elabora ningún relleno el ${data.dia.toLowerCase()}.</div>`;
+    return;
+  }
+  const totalKilos = filas.reduce((a,f) => a + f.kilosDeRelleno, 0);
+
+  cont.className = '';
+  cont.innerHTML = `
+    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${data.fecha} — ${totalKilos.toFixed(1)} kg de relleno en total</p>
+    <table class="prod">
+      <thead><tr><th>Relleno</th><th>Sabores que arma</th><th class="num">Kg de relleno</th></tr></thead>
+      <tbody>
+        ${filas.map(f => `
+          <tr>
+            <td><strong>${f.relleno}</strong></td>
+            <td style="color:var(--ink-soft);font-size:12.5px;">${f.sabores.map(s => s.sabor).join(', ')}</td>
+            <td class="num"><strong>${f.kilosDeRelleno}</strong></td>
+          </tr>`).join('')}
+      </tbody>
+    </table>
+  `;
+}
+
+/* ---- Pestaña DISCOS: discos que necesita la tanda de producción de hoy ---- */
+function pintarDiscos(data){
+  const cont = document.getElementById('contenidoFabrica');
+  const d = data.discos;
+  const fila = (nombre, obj) => {
+    const excede = obj.docenas > obj.capacidadDocenas;
+    return `
+      <tr>
+        <td>${nombre}</td>
+        <td class="num">${obj.docenas}</td>
+        <td class="num">${obj.unidades}</td>
+        <td class="num">${obj.capacidadDocenas}</td>
+        <td>${excede ? '<span class="badge" style="background:var(--alert-bg);color:var(--alert);">excede</span>' : '<span class="badge">OK</span>'}</td>
+      </tr>`;
+  };
+  cont.className = '';
+  cont.innerHTML = `
+    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${data.fecha} — discos necesarios según lo que producción arma hoy</p>
+    <table class="prod">
+      <thead><tr><th>Tipo de disco</th><th class="num">Docenas</th><th class="num">Unidades</th><th class="num">Capacidad/día</th><th>Estado</th></tr></thead>
+      <tbody>
+        ${fila('Horno', d.horno)}
+        ${fila('Horno con recorte', d.hornoConRecorte)}
+        ${fila('Frito', d.frito)}
+      </tbody>
+    </table>
+    <p style="color:var(--ink-soft);font-size:12px;margin-top:10px;">Horno + Horno con recorte comparten la misma máquina/capacidad (${d.totalHornoDocenas} docenas combinadas). Frito tiene su propia capacidad aparte.</p>
   `;
 }
 
@@ -389,8 +472,15 @@ async function renderPlanificacion(){
     <p style="color:var(--ink-soft);font-size:13px;margin-top:-8px;">
       Cuánto se espera vender de cada sabor, cada día — esto es lo que usa el cálculo de "qué producir hoy".
     </p>
+
+    <div style="border:1px dashed var(--line);border-radius:4px;padding:14px 16px;margin:16px 0;">
+      <label style="margin-bottom:8px;">Importar desde Excel (reemplaza los 3 locales de una)</label>
+      <input type="file" id="inputExcelPlan" accept=".xlsx,.xls">
+      <div id="msgImportPlan" class="msg" style="margin-top:10px;"></div>
+    </div>
+
     <div class="field-row">
-      <label>Local</label>
+      <label>O editar un local a la vez</label>
       <select id="selLocalPlan">
         ${['Centro','Patagonia','Zelarrayan'].map(l => `<option value="${l}">${l}</option>`).join('')}
       </select>
@@ -398,7 +488,97 @@ async function renderPlanificacion(){
     <div id="tablaPlanContainer" class="loading">Cargando…</div>
   `;
   document.getElementById('selLocalPlan').onchange = cargarPlanificacion;
+  document.getElementById('inputExcelPlan').onchange = importarExcelPlanificacion;
   cargarPlanificacion();
+}
+
+// nombres de sabor en la planilla que no calzan tal cual con el sistema
+// (por ambigüedad con otro ítem de igual nombre en otro rubro)
+const ALIAS_IMPORT = {
+  'DIPS|ED. LIMITADA': 'ED. LIMITADA (dip)',
+  'CAJITA CRIOLLA|JAMON Y QUESO': 'CAJITA JAMON Y QUESO',
+  'CAJITA CRIOLLA|HAMBURGUESA': 'CAJITA HAMBURGUESA',
+  'CAJITA CRIOLLA|CHOCLO': 'CAJITA CHOCLO',
+  'CAJITA CRIOLLA|POLLO Y CHEDDAR': 'CAJITA POLLO Y CHEDDAR',
+  'CAJITA CRIOLLA|COOKIES *2': 'BOLSA COOKIES X2',
+};
+const CATEGORIAS_EXCEL = ['EMPANADAS','TOPPINGS','DIPS','POSTRES','CAJITA CRIOLLA'];
+const HOJA_A_LOCAL = { CENTRO: 'Centro', PATAGONIA: 'Patagonia', ZELARRAYAN: 'Zelarrayan' };
+
+function normalizarNombre(s){
+  return String(s).trim().toUpperCase().replace(/\s+/g, ' ');
+}
+
+async function importarExcelPlanificacion(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const msg = document.getElementById('msgImportPlan');
+  msg.className = 'msg'; msg.style.display = 'block'; msg.textContent = 'Leyendo archivo…';
+
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+
+    // mapa Sabor (real, del sistema) -> normalizado, para matchear
+    const sabores = await obtenerSaboresPlanos();
+    const porNombreNormalizado = {};
+    sabores.forEach(s => { porNombreNormalizado[normalizarNombre(s)] = s; });
+
+    const sinMatch = [];
+    let totalActualizados = 0;
+
+    for(const hoja of Object.keys(HOJA_A_LOCAL)){
+      if(!wb.SheetNames.includes(hoja)){ continue; }
+      const local = HOJA_A_LOCAL[hoja];
+      const filasHoja = XLSX.utils.sheet_to_json(wb.Sheets[hoja], { header: 1, raw: true, defval: 0 });
+
+      let categoriaActual = null;
+      const filasParaGuardar = [];
+      filasHoja.forEach(fila => {
+        const primera = fila[0];
+        if(primera === undefined || primera === null || primera === '') return;
+        const texto = String(primera).trim();
+        if(CATEGORIAS_EXCEL.includes(texto.toUpperCase())){ categoriaActual = texto.toUpperCase(); return; }
+        if(texto.toUpperCase() === 'LUNES') return; // fila de encabezado de días
+
+        const alias = ALIAS_IMPORT[`${categoriaActual}|${normalizarNombre(texto)}`];
+        const saborReal = alias || porNombreNormalizado[normalizarNombre(texto)];
+        if(!saborReal){ sinMatch.push(texto); return; }
+
+        // columnas 1..7 = Lunes..Domingo
+        filasParaGuardar.push({
+          sabor: saborReal,
+          Lunes: fila[1]||0, Martes: fila[2]||0, Miércoles: fila[3]||0, Jueves: fila[4]||0,
+          Viernes: fila[5]||0, Sábado: fila[6]||0, Domingo: fila[7]||0
+        });
+      });
+
+      if(filasParaGuardar.length > 0){
+        const r = await fetch(APPS_SCRIPT_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action: 'actualizarPlanificacion', local, filas: filasParaGuardar })
+        });
+        const resp = await r.json();
+        if(resp.error) throw new Error(`${local}: ${resp.error}`);
+        totalActualizados += resp.filas_actualizadas;
+      }
+    }
+
+    const unicosSinMatch = [...new Set(sinMatch)];
+    msg.className = unicosSinMatch.length ? 'msg err' : 'msg ok';
+    msg.textContent = `Importado: ${totalActualizados} ítem(s) actualizados en los 3 locales.` +
+      (unicosSinMatch.length ? ` Sin encontrar en el sistema (se ignoraron): ${unicosSinMatch.join(', ')}` : '');
+
+    cargarPlanificacion(); // refresca la tabla del local que esté seleccionado
+  }catch(err){
+    msg.className = 'msg err'; msg.textContent = 'No se pudo importar: ' + err.message;
+  }
+  ev.target.value = ''; // permite volver a subir el mismo archivo si hace falta
+}
+
+async function obtenerSaboresPlanos(){
+  const categorias = await obtenerCategorias();
+  return Object.values(categorias).flat();
 }
 
 async function cargarPlanificacion(){
