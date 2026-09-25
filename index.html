@@ -82,12 +82,24 @@
   table.lotes input{width:100%;}
   .col-cant{width:90px;}
   .col-venc{width:150px;}
+  .col-add{width:30px;text-align:center;}
   .col-del{width:34px;text-align:center;}
   .del-btn{background:none;border:none;color:var(--alert);font-size:16px;line-height:1;padding:4px;}
 
   .add-row{margin-top:10px;background:none;border:1px dashed var(--line);color:var(--ink-soft);
     padding:8px 14px;border-radius:3px;font-size:13px;}
   .add-row:hover{border-color:var(--crust);color:var(--crust-dark);}
+
+  .add-lote-btn{background:none;border:1px solid var(--line);color:var(--ink-soft);
+    font-size:13px;line-height:1;padding:3px 8px;border-radius:3px;}
+  .add-lote-btn:hover{border-color:var(--crust);color:var(--crust-dark);}
+  .item-extra{color:var(--ink-soft);font-size:12px;font-style:italic;}
+  h4.cat-heading{font-size:13px;margin:22px 0 4px;color:var(--crust-dark);
+    text-transform:uppercase;letter-spacing:.03em;}
+  .cat-nav{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 0;}
+  .cat-nav a{font-size:11.5px;color:var(--ink-soft);border:1px solid var(--line);
+    padding:4px 9px;border-radius:12px;text-decoration:none;}
+  .cat-nav a:hover{border-color:var(--crust);color:var(--crust-dark);}
 
   .actions{margin-top:22px;display:flex;gap:10px;align-items:center;}
   .msg{font-size:13px;margin-top:14px;padding:10px 12px;border-radius:3px;display:none;}
@@ -214,8 +226,14 @@ async function renderLocal(){
       <input type="date" id="fechaCarga" value="${hoyISO()}">
     </div>
 
+    <p style="color:var(--ink-soft);font-size:12.5px;max-width:560px;">
+      Están listados todos los productos — completá cantidad y vencimiento solo en los que tengas hoy,
+      el resto se deja en blanco. Si un mismo producto tiene más de un lote con vencimientos distintos,
+      usá el botón <strong>+</strong> de esa fila para agregar otra línea.
+    </p>
+
+    <div id="catNav" class="cat-nav"></div>
     <div id="tablaLotesContainer"></div>
-    <button class="add-row" id="btnAgregar">+ Agregar lote</button>
 
     <div class="actions">
       <button class="btn" id="btnGuardar">Guardar stock cargado</button>
@@ -236,84 +254,85 @@ async function renderLocal(){
     return 'sabor';
   }
 
+  // una fila por producto, siempre visible (aunque quede vacía); el botón "+"
+  // agrega otra fila del MISMO producto para cargar un segundo vencimiento.
+  function filaProducto(nombre, esExtra){
+    const tr = document.createElement('tr');
+    tr.dataset.item = nombre;
+    tr.innerHTML = `
+      <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : nombre}</td>
+      <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0"></td>
+      <td><input type="date" class="inp-venc"></td>
+      <td class="col-add">${esExtra ? '' : '<button type="button" class="add-lote-btn" title="Agregar otro vencimiento para este producto">+</button>'}</td>
+      <td class="col-del">${esExtra ? '<button type="button" class="del-btn" title="Quitar">✕</button>' : ''}</td>
+    `;
+    if(esExtra){
+      tr.querySelector('.del-btn').onclick = () => tr.remove();
+    } else {
+      tr.querySelector('.add-lote-btn').onclick = () => {
+        tr.insertAdjacentElement('afterend', filaProducto(nombre, true));
+      };
+    }
+    return tr;
+  }
+
+  function tablaDe(labelCantidad, colHeader, items){
+    const table = document.createElement('table');
+    table.className = 'lotes';
+    table.innerHTML = `
+      <thead><tr>
+        <th>${colHeader}</th>
+        <th class="col-cant">${labelCantidad}</th>
+        <th class="col-venc">Vencimiento</th>
+        <th class="col-add"></th>
+        <th class="col-del"></th>
+      </tr></thead>
+      <tbody></tbody>`;
+    const tbody = table.querySelector('tbody');
+    items.forEach(nombre => tbody.appendChild(filaProducto(nombre, false)));
+    return table;
+  }
+
   function pintarTabla(){
     const modo = modoDeLocal(document.getElementById('selLocal').value);
     const labelCantidad = modo === 'relleno' ? 'Kilos' : modo === 'disco' ? 'Docenas' : 'Cantidad';
-    const colItem = modo === 'sabor'
-      ? `<th style="width:22%">Rubro</th><th style="width:28%">Sabor / ítem</th>`
-      : modo === 'relleno'
-        ? `<th style="width:50%">Relleno</th>`
-        : `<th style="width:50%">Tipo de disco</th>`;
-    document.getElementById('tablaLotesContainer').innerHTML = `
-      <table class="lotes" id="tablaLotes">
-        <thead>
-          <tr>
-            ${colItem}
-            <th class="col-cant">${labelCantidad}</th>
-            <th class="col-venc">Vencimiento</th>
-            <th class="col-del"></th>
-          </tr>
-        </thead>
-        <tbody id="filasLotes"></tbody>
-      </table>`;
-    agregarFila();
-  }
-
-  function agregarFila(){
-    const modo = modoDeLocal(document.getElementById('selLocal').value);
-    const filas = document.getElementById('filasLotes');
-    const tr = document.createElement('tr');
+    const cont = document.getElementById('tablaLotesContainer');
+    const nav = document.getElementById('catNav');
+    cont.innerHTML = '';
+    nav.innerHTML = '';
 
     if(modo === 'sabor'){
-      const primeraCategoria = nombresCategorias[0];
-      tr.innerHTML = `
-        <td>
-          <select class="sel-categoria">
-            ${nombresCategorias.map(c => `<option value="${c}">${c}</option>`).join('')}
-          </select>
-        </td>
-        <td>
-          <select class="sel-item">
-            ${categorias[primeraCategoria].map(s => `<option value="${s}">${s}</option>`).join('')}
-          </select>
-        </td>
-        <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0"></td>
-        <td><input type="date" class="inp-venc"></td>
-        <td class="col-del"><button class="del-btn" title="Quitar">✕</button></td>
-      `;
-      tr.querySelector('.sel-categoria').onchange = (ev) => {
-        const cat = ev.target.value;
-        const selItem = tr.querySelector('.sel-item');
-        selItem.innerHTML = categorias[cat].map(s => `<option value="${s}">${s}</option>`).join('');
-      };
+      nombresCategorias.forEach((cat, i) => {
+        const id = `cat-${i}`;
+        const h = document.createElement('h4');
+        h.className = 'cat-heading';
+        h.id = id;
+        h.textContent = cat;
+        cont.appendChild(h);
+        cont.appendChild(tablaDe(labelCantidad, 'Sabor / ítem', categorias[cat]));
+
+        const a = document.createElement('a');
+        a.href = `#${id}`;
+        a.textContent = cat;
+        nav.appendChild(a);
+      });
+    } else if(modo === 'relleno'){
+      cont.appendChild(tablaDe(labelCantidad, 'Relleno', rellenos));
     } else {
-      const opciones = modo === 'relleno' ? rellenos : TIPOS_DISCO;
-      tr.innerHTML = `
-        <td>
-          <select class="sel-item">
-            ${opciones.map(o => `<option value="${o}">${o}</option>`).join('')}
-          </select>
-        </td>
-        <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0"></td>
-        <td><input type="date" class="inp-venc"></td>
-        <td class="col-del"><button class="del-btn" title="Quitar">✕</button></td>
-      `;
+      cont.appendChild(tablaDe(labelCantidad, 'Tipo de disco', TIPOS_DISCO));
     }
-    tr.querySelector('.del-btn').onclick = () => tr.remove();
-    filas.appendChild(tr);
   }
 
   document.getElementById('selLocal').onchange = pintarTabla;
-  document.getElementById('btnAgregar').onclick = agregarFila;
-  pintarTabla(); // arranca con el modo del primer local y una fila lista
+  pintarTabla(); // arranca mostrando el listado completo del primer local
 
   document.getElementById('btnGuardar').onclick = async () => {
     const local = document.getElementById('selLocal').value;
     const responsable = document.getElementById('inpResponsable').value.trim();
     const fecha = document.getElementById('fechaCarga').value;
-    const filas = document.getElementById('filasLotes');
-    const items = [...filas.querySelectorAll('tr')].map(tr => ({
-      sabor: tr.querySelector('.sel-item').value,
+    const filas = [...document.querySelectorAll('#tablaLotesContainer tr[data-item]')];
+    const items = filas.map(tr => ({
+      sabor: tr.dataset.item,
       cantidad: tr.querySelector('.inp-cant').value,
       vencimiento: tr.querySelector('.inp-venc').value
     })).filter(it => it.cantidad && it.vencimiento);
