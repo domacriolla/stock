@@ -5,19 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Doma Criolla — Stock y Producción</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Poppins:wght@400;500;600;700&family=Sacramento&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
+  /* Paleta e identidad tomadas del Manual de Marca Doma Criolla:
+     Pullman Brown #65341A · Tiger's Eye #D88F31 · Zinnwaldite Brown #311B10.
+     Tipografía: Trajan Pro Bold (títulos) -> Cinzel, la alternativa libre más
+     cercana; Poppins para texto; script naranja como acento de marca. */
   :root{
-    --bg:#EAE5D8;
-    --panel:#F6F3EA;
-    --ink:#242017;
-    --ink-soft:#5B5648;
-    --line:#D8D1BE;
-    --crust:#8B5E34;
-    --crust-dark:#6E4A29;
-    --herb:#3F5B43;
-    --herb-bg:#DDE6DC;
+    --bg:#F7F1E4;
+    --panel:#FFFFFF;
+    --ink:#311B10;
+    --ink-soft:#7C6753;
+    --line:#E3D6C4;
+    --crust:#65341A;
+    --crust-dark:#46240F;
+    --accent:#D88F31;
+    --accent-bg:#FAEAD3;
+    --herb:#4B6B3F;
+    --herb-bg:#E3EAD9;
     --alert:#9A3B2E;
     --alert-bg:#F3DBD4;
   }
@@ -26,14 +32,14 @@
   body{
     background:var(--bg);
     color:var(--ink);
-    font-family:'Inter',system-ui,sans-serif;
+    font-family:'Poppins',system-ui,sans-serif;
     -webkit-font-smoothing:antialiased;
   }
-  h1,h2,h3{font-family:'Fraunces',serif;font-weight:600;margin:0;}
+  h1,h2,h3{font-family:'Cinzel',serif;font-weight:600;margin:0;letter-spacing:.01em;}
   .wrap{max-width:920px;margin:0 auto;padding:28px 20px 80px;}
   header.top{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:8px;}
-  header.top h1{font-size:26px;color:var(--crust-dark);}
-  header.top .sub{color:var(--ink-soft);font-size:14px;}
+  header.top h1{font-size:26px;color:var(--crust-dark);text-transform:uppercase;}
+  header.top .sub{font-family:'Sacramento',cursive;color:var(--accent);font-size:22px;}
 
   .home-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px;}
   @media (max-width:640px){.home-grid{grid-template-columns:1fr;}}
@@ -100,11 +106,11 @@
   table.prod tr:hover td{background:rgba(0,0,0,.02);}
   .num{text-align:right;font-variant-numeric:tabular-nums;}
   .badge{font-size:11px;padding:2px 7px;border-radius:10px;background:var(--herb-bg);color:var(--herb);}
-  .badge.reposo{background:#EADFC7;color:var(--crust-dark);}
+  .badge.reposo{background:var(--accent-bg);color:var(--crust-dark);}
 
   .tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin-bottom:16px;}
-  .tab-btn{background:none;border:none;padding:9px 16px;font-size:14px;color:var(--ink-soft);border-bottom:2px solid transparent;margin-bottom:-1px;}
-  .tab-btn.active{color:var(--crust-dark);border-bottom-color:var(--crust);font-weight:600;}
+  .tab-btn{background:none;border:none;padding:9px 16px;font-size:14px;color:var(--ink-soft);border-bottom:2px solid transparent;margin-bottom:-1px;font-family:'Poppins',sans-serif;}
+  .tab-btn.active{color:var(--crust-dark);border-bottom-color:var(--accent);font-weight:600;}
   .tab-btn:hover{color:var(--ink);}
 
   .alert-box{background:var(--alert-bg);border-radius:4px;padding:14px 16px;margin-bottom:18px;}
@@ -350,6 +356,9 @@ function bloqueAlertas(data){
     </div>`;
 }
 
+// redondeo a entero para mostrar en pantalla (el cálculo interno sigue con decimales)
+function ent(n){ return Math.round(Number(n) || 0).toLocaleString('es-AR'); }
+
 /* ---- Pestaña PRODUCCIÓN: qué armar hoy, por sabor (todos los rubros) ---- */
 function pintarProduccion(data){
   const cont = document.getElementById('contenidoFabrica');
@@ -375,7 +384,9 @@ function pintarProduccion(data){
           <tr>
             <th>Sabor / ítem</th>
             ${esEmpanada ? '<th>Relleno</th><th>Se cocinó</th>' : ''}
-            <th class="num">Objetivo</th><th class="num">Stock disponible</th>
+            <th class="num">Objetivo<br><span style="font-weight:400;">(días a cubrir)</span></th>
+            ${esEmpanada ? '<th class="num">Venta de hoy<br><span style="font-weight:400;">(solo con reposo)</span></th>' : ''}
+            <th class="num">Stock disponible</th>
             <th class="num">A ${esEmpanada ? 'armar' : 'reponer'} (u.)</th>
             ${esEmpanada ? '<th class="num">Docenas</th>' : ''}
           </tr>
@@ -385,10 +396,11 @@ function pintarProduccion(data){
             <tr>
               <td>${f.sabor}</td>
               ${esEmpanada ? `<td>${f.relleno}</td><td>${f.diaCocina}${f.diaCocina !== f.diaArmado ? ` <span class="badge reposo">reposo</span>` : ''}</td>` : ''}
-              <td class="num">${f.objetivoUnidades}</td>
-              <td class="num">${f.stockValidoUnidades}</td>
-              <td class="num"><strong>${f.aHacerUnidades}</strong></td>
-              ${esEmpanada ? `<td class="num">${f.aHacerDocenas}</td>` : ''}
+              <td class="num">${ent(f.objetivoUnidades)}</td>
+              ${esEmpanada ? `<td class="num">${f.reposo ? '+ ' + ent(f.ventaDiaCocinaUnidades) : '—'}</td>` : ''}
+              <td class="num">${ent(f.stockValidoUnidades)}</td>
+              <td class="num"><strong>${ent(f.aHacerUnidades)}</strong></td>
+              ${esEmpanada ? `<td class="num">${ent(f.aHacerDocenas)}</td>` : ''}
             </tr>`).join('')}
         </tbody>
       </table>`;
@@ -415,7 +427,7 @@ function pintarCocina(data){
 
   cont.className = '';
   cont.innerHTML = `
-    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${data.fecha} — ${totalKilos.toFixed(1)} kg de relleno en total</p>
+    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${data.fecha} — ${ent(totalKilos)} kg de relleno en total</p>
     <table class="prod">
       <thead><tr><th>Relleno</th><th>Sabores que arma</th><th class="num">Kg de relleno</th></tr></thead>
       <tbody>
@@ -423,7 +435,7 @@ function pintarCocina(data){
           <tr>
             <td><strong>${f.relleno}</strong></td>
             <td style="color:var(--ink-soft);font-size:12.5px;">${f.sabores.map(s => s.sabor).join(', ')}</td>
-            <td class="num"><strong>${f.kilosDeRelleno}</strong></td>
+            <td class="num"><strong>${ent(f.kilosDeRelleno)}</strong></td>
           </tr>`).join('')}
       </tbody>
     </table>
@@ -434,29 +446,24 @@ function pintarCocina(data){
 function pintarDiscos(data){
   const cont = document.getElementById('contenidoFabrica');
   const d = data.discos;
-  const fila = (nombre, obj) => {
-    const excede = obj.docenas > obj.capacidadDocenas;
-    return `
+  const fila = (nombre, obj) => `
       <tr>
         <td>${nombre}</td>
-        <td class="num">${obj.docenas}</td>
-        <td class="num">${obj.unidades}</td>
-        <td class="num">${obj.capacidadDocenas}</td>
-        <td>${excede ? '<span class="badge" style="background:var(--alert-bg);color:var(--alert);">excede</span>' : '<span class="badge">OK</span>'}</td>
+        <td class="num">${ent(obj.docenas)}</td>
+        <td class="num">${ent(obj.unidades)}</td>
       </tr>`;
-  };
   cont.className = '';
   cont.innerHTML = `
     <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${data.fecha} — discos necesarios según lo que producción arma hoy</p>
     <table class="prod">
-      <thead><tr><th>Tipo de disco</th><th class="num">Docenas</th><th class="num">Unidades</th><th class="num">Capacidad/día</th><th>Estado</th></tr></thead>
+      <thead><tr><th>Tipo de disco</th><th class="num">Docenas</th><th class="num">Unidades</th></tr></thead>
       <tbody>
         ${fila('Horno', d.horno)}
         ${fila('Horno con recorte', d.hornoConRecorte)}
         ${fila('Frito', d.frito)}
       </tbody>
     </table>
-    <p style="color:var(--ink-soft);font-size:12px;margin-top:10px;">Horno + Horno con recorte comparten la misma máquina/capacidad (${d.totalHornoDocenas} docenas combinadas). Frito tiene su propia capacidad aparte.</p>
+    <p style="color:var(--ink-soft);font-size:12px;margin-top:10px;">Horno + Horno con recorte comparten la misma máquina (${ent(d.totalHornoDocenas)} docenas combinadas). Frito es una máquina aparte.</p>
   `;
 }
 
