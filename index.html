@@ -488,12 +488,13 @@ function pintarCocina(data){
   cont.innerHTML = `
     <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${data.fecha} — ${ent(totalKilos)} kg de relleno en total</p>
     <table class="prod">
-      <thead><tr><th>Relleno</th><th>Sabores que arma</th><th class="num">Kg de relleno</th></tr></thead>
+      <thead><tr><th>Relleno</th><th>Sabores que arma</th><th>Días que cubre</th><th class="num">Kg de relleno</th></tr></thead>
       <tbody>
         ${filas.map(f => `
           <tr>
             <td><strong>${f.relleno}</strong></td>
             <td style="color:var(--ink-soft);font-size:12.5px;">${f.sabores.map(s => s.sabor).join(', ')}</td>
+            <td style="color:var(--ink-soft);font-size:12.5px;">${f.diasQueCubre}</td>
             <td class="num"><strong>${ent(f.kilosDeRelleno)}</strong></td>
           </tr>`).join('')}
       </tbody>
