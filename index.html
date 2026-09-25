@@ -5,13 +5,13 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Doma Criolla — Stock y Producción</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Poppins:wght@400;500;600;700&family=Sacramento&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* Paleta e identidad tomadas del Manual de Marca Doma Criolla:
      Pullman Brown #65341A · Tiger's Eye #D88F31 · Zinnwaldite Brown #311B10.
      Tipografía: Trajan Pro Bold (títulos) -> Cinzel, la alternativa libre más
-     cercana; Poppins para texto; script naranja como acento de marca. */
+     cercana; Poppins para texto y para el acento de marca. */
   :root{
     --bg:#F7F1E4;
     --panel:#FFFFFF;
@@ -39,7 +39,7 @@
   .wrap{max-width:920px;margin:0 auto;padding:28px 20px 80px;}
   header.top{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:8px;}
   header.top h1{font-size:26px;color:var(--crust-dark);text-transform:uppercase;}
-  header.top .sub{font-family:'Sacramento',cursive;color:var(--accent);font-size:22px;}
+  header.top .sub{font-family:'Poppins',sans-serif;color:var(--accent);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;}
 
   .home-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px;}
   @media (max-width:640px){.home-grid{grid-template-columns:1fr;}}
@@ -131,8 +131,10 @@
    ====================================================================== */
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx0MpQPLqVL_5QpuRAOmz_3uvA6Oz-72bzwABz3bN6ltR3kmH0-nnMwRnoDrfhanm0DWQ/exec';
 
-const LOCALES = ['Centro', 'Patagonia', 'Zelarrayan', 'Fábrica'];
+const LOCALES = ['Centro', 'Patagonia', 'Zelarrayan', 'Fábrica - Producción', 'Fábrica - Cocina', 'Fábrica - Discos'];
+const TIPOS_DISCO = ['Horno', 'Frito', 'Recorte'];
 let SABORES_CACHE = null;
+let RELLENOS_CACHE = null;
 
 const app = document.getElementById('app');
 
@@ -184,6 +186,14 @@ async function obtenerCategorias(){
   return SABORES_CACHE;
 }
 
+async function obtenerRellenos(){
+  if(RELLENOS_CACHE) return RELLENOS_CACHE;
+  const r = await fetch(`${APPS_SCRIPT_URL}?action=listarRellenos`);
+  const data = await r.json();
+  RELLENOS_CACHE = data.rellenos || [];
+  return RELLENOS_CACHE;
+}
+
 async function renderLocal(){
   app.innerHTML = `
     <button class="back" onclick="irA('home')">← Volver</button>
@@ -196,22 +206,15 @@ async function renderLocal(){
       </select>
     </div>
     <div class="field-row">
+      <label>¿Quién está cargando este stock?</label>
+      <input type="text" id="inpResponsable" placeholder="Nombre">
+    </div>
+    <div class="field-row">
       <label>Fecha (por si cargás con atraso)</label>
       <input type="date" id="fechaCarga" value="${hoyISO()}">
     </div>
 
-    <table class="lotes" id="tablaLotes">
-      <thead>
-        <tr>
-          <th style="width:22%">Rubro</th>
-          <th style="width:28%">Sabor / ítem</th>
-          <th class="col-cant">Cantidad</th>
-          <th class="col-venc">Vencimiento</th>
-          <th class="col-del"></th>
-        </tr>
-      </thead>
-      <tbody id="filasLotes"></tbody>
-    </table>
+    <div id="tablaLotesContainer"></div>
     <button class="add-row" id="btnAgregar">+ Agregar lote</button>
 
     <div class="actions">
@@ -221,48 +224,104 @@ async function renderLocal(){
   `;
 
   const categorias = await obtenerCategorias();
+  const rellenos = await obtenerRellenos();
   const nombresCategorias = Object.keys(categorias);
-  const filas = document.getElementById('filasLotes');
+
+  // según el sector elegido, se carga por Sabor (locales y Fábrica -
+  // Producción), por Relleno en kilos (Fábrica - Cocina), o por tipo de
+  // disco en docenas (Fábrica - Discos).
+  function modoDeLocal(local){
+    if(local === 'Fábrica - Cocina') return 'relleno';
+    if(local === 'Fábrica - Discos') return 'disco';
+    return 'sabor';
+  }
+
+  function pintarTabla(){
+    const modo = modoDeLocal(document.getElementById('selLocal').value);
+    const labelCantidad = modo === 'relleno' ? 'Kilos' : modo === 'disco' ? 'Docenas' : 'Cantidad';
+    const colItem = modo === 'sabor'
+      ? `<th style="width:22%">Rubro</th><th style="width:28%">Sabor / ítem</th>`
+      : modo === 'relleno'
+        ? `<th style="width:50%">Relleno</th>`
+        : `<th style="width:50%">Tipo de disco</th>`;
+    document.getElementById('tablaLotesContainer').innerHTML = `
+      <table class="lotes" id="tablaLotes">
+        <thead>
+          <tr>
+            ${colItem}
+            <th class="col-cant">${labelCantidad}</th>
+            <th class="col-venc">Vencimiento</th>
+            <th class="col-del"></th>
+          </tr>
+        </thead>
+        <tbody id="filasLotes"></tbody>
+      </table>`;
+    agregarFila();
+  }
 
   function agregarFila(){
+    const modo = modoDeLocal(document.getElementById('selLocal').value);
+    const filas = document.getElementById('filasLotes');
     const tr = document.createElement('tr');
-    const primeraCategoria = nombresCategorias[0];
-    tr.innerHTML = `
-      <td>
-        <select class="sel-categoria">
-          ${nombresCategorias.map(c => `<option value="${c}">${c}</option>`).join('')}
-        </select>
-      </td>
-      <td>
-        <select class="sel-sabor">
-          ${categorias[primeraCategoria].map(s => `<option value="${s}">${s}</option>`).join('')}
-        </select>
-      </td>
-      <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0"></td>
-      <td><input type="date" class="inp-venc"></td>
-      <td class="col-del"><button class="del-btn" title="Quitar">✕</button></td>
-    `;
-    tr.querySelector('.sel-categoria').onchange = (ev) => {
-      const cat = ev.target.value;
-      const selSabor = tr.querySelector('.sel-sabor');
-      selSabor.innerHTML = categorias[cat].map(s => `<option value="${s}">${s}</option>`).join('');
-    };
+
+    if(modo === 'sabor'){
+      const primeraCategoria = nombresCategorias[0];
+      tr.innerHTML = `
+        <td>
+          <select class="sel-categoria">
+            ${nombresCategorias.map(c => `<option value="${c}">${c}</option>`).join('')}
+          </select>
+        </td>
+        <td>
+          <select class="sel-item">
+            ${categorias[primeraCategoria].map(s => `<option value="${s}">${s}</option>`).join('')}
+          </select>
+        </td>
+        <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0"></td>
+        <td><input type="date" class="inp-venc"></td>
+        <td class="col-del"><button class="del-btn" title="Quitar">✕</button></td>
+      `;
+      tr.querySelector('.sel-categoria').onchange = (ev) => {
+        const cat = ev.target.value;
+        const selItem = tr.querySelector('.sel-item');
+        selItem.innerHTML = categorias[cat].map(s => `<option value="${s}">${s}</option>`).join('');
+      };
+    } else {
+      const opciones = modo === 'relleno' ? rellenos : TIPOS_DISCO;
+      tr.innerHTML = `
+        <td>
+          <select class="sel-item">
+            ${opciones.map(o => `<option value="${o}">${o}</option>`).join('')}
+          </select>
+        </td>
+        <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0"></td>
+        <td><input type="date" class="inp-venc"></td>
+        <td class="col-del"><button class="del-btn" title="Quitar">✕</button></td>
+      `;
+    }
     tr.querySelector('.del-btn').onclick = () => tr.remove();
     filas.appendChild(tr);
   }
+
+  document.getElementById('selLocal').onchange = pintarTabla;
   document.getElementById('btnAgregar').onclick = agregarFila;
-  agregarFila(); // arranca con una fila lista
+  pintarTabla(); // arranca con el modo del primer local y una fila lista
 
   document.getElementById('btnGuardar').onclick = async () => {
     const local = document.getElementById('selLocal').value;
+    const responsable = document.getElementById('inpResponsable').value.trim();
     const fecha = document.getElementById('fechaCarga').value;
+    const filas = document.getElementById('filasLotes');
     const items = [...filas.querySelectorAll('tr')].map(tr => ({
-      sabor: tr.querySelector('.sel-sabor').value,
+      sabor: tr.querySelector('.sel-item').value,
       cantidad: tr.querySelector('.inp-cant').value,
       vencimiento: tr.querySelector('.inp-venc').value
     })).filter(it => it.cantidad && it.vencimiento);
 
     const msg = document.getElementById('msg');
+    if(!responsable){
+      msg.className = 'msg err'; msg.textContent = 'Indicá quién está cargando este stock.'; return;
+    }
     if(items.length === 0){
       msg.className = 'msg err'; msg.textContent = 'Cargá al menos un lote con cantidad y vencimiento.'; return;
     }
@@ -271,13 +330,13 @@ async function renderLocal(){
     try{
       const r = await fetch(APPS_SCRIPT_URL, {
         method: 'POST',
-        body: JSON.stringify({ action: 'registrarStock', local, fecha, items })
+        body: JSON.stringify({ action: 'registrarStock', local, fecha, responsable, items })
       });
       const data = await r.json();
       if(data.error) throw new Error(data.error);
       msg.className = 'msg ok';
       msg.textContent = `Guardado: ${data.registros_guardados} lote(s) para ${local}.`;
-      filas.innerHTML = ''; agregarFila();
+      pintarTabla();
     }catch(err){
       msg.className = 'msg err'; msg.textContent = 'No se pudo guardar: ' + err.message;
     }finally{
@@ -384,10 +443,10 @@ function pintarProduccion(data){
           <tr>
             <th>Sabor / ítem</th>
             ${esEmpanada ? '<th>Relleno</th><th>Se cocinó</th>' : ''}
-            <th class="num">Objetivo<br><span style="font-weight:400;">(días a cubrir)</span></th>
-            ${esEmpanada ? '<th class="num">Venta de hoy<br><span style="font-weight:400;">(solo con reposo)</span></th>' : ''}
+            <th class="num">Objetivo</th>
+            ${esEmpanada ? '<th>Días que cubre</th>' : ''}
             <th class="num">Stock disponible</th>
-            <th class="num">A ${esEmpanada ? 'armar' : 'reponer'} (u.)</th>
+            <th class="num">${esEmpanada ? 'Stock necesario' : 'A reponer'} (u.)</th>
             ${esEmpanada ? '<th class="num">Docenas</th>' : ''}
           </tr>
         </thead>
@@ -397,7 +456,7 @@ function pintarProduccion(data){
               <td>${f.sabor}</td>
               ${esEmpanada ? `<td>${f.relleno}</td><td>${f.diaCocina}${f.diaCocina !== f.diaArmado ? ` <span class="badge reposo">reposo</span>` : ''}</td>` : ''}
               <td class="num">${ent(f.objetivoUnidades)}</td>
-              ${esEmpanada ? `<td class="num">${f.reposo ? '+ ' + ent(f.ventaDiaCocinaUnidades) : '—'}</td>` : ''}
+              ${esEmpanada ? `<td style="color:var(--ink-soft);font-size:12.5px;">${f.diasQueCubre}</td>` : ''}
               <td class="num">${ent(f.stockValidoUnidades)}</td>
               <td class="num"><strong>${ent(f.aHacerUnidades)}</strong></td>
               ${esEmpanada ? `<td class="num">${ent(f.aHacerDocenas)}</td>` : ''}
@@ -470,8 +529,6 @@ function pintarDiscos(data){
 /* ---------------------------------------------------------------------
    Pantalla PLANIFICACIÓN: editar venta proyectada por local
    --------------------------------------------------------------------- */
-const DIAS_SEMANA = ['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'];
-
 async function renderPlanificacion(){
   app.innerHTML = `
     <button class="back" onclick="irA('home')">← Volver</button>
@@ -481,22 +538,12 @@ async function renderPlanificacion(){
     </p>
 
     <div style="border:1px dashed var(--line);border-radius:4px;padding:14px 16px;margin:16px 0;">
-      <label style="margin-bottom:8px;">Importar desde Excel (reemplaza los 3 locales de una)</label>
+      <label style="margin-bottom:8px;">Importar desde Excel (reemplaza toda la planificación de los 3 locales)</label>
       <input type="file" id="inputExcelPlan" accept=".xlsx,.xls">
       <div id="msgImportPlan" class="msg" style="margin-top:10px;"></div>
     </div>
-
-    <div class="field-row">
-      <label>O editar un local a la vez</label>
-      <select id="selLocalPlan">
-        ${['Centro','Patagonia','Zelarrayan'].map(l => `<option value="${l}">${l}</option>`).join('')}
-      </select>
-    </div>
-    <div id="tablaPlanContainer" class="loading">Cargando…</div>
   `;
-  document.getElementById('selLocalPlan').onchange = cargarPlanificacion;
   document.getElementById('inputExcelPlan').onchange = importarExcelPlanificacion;
-  cargarPlanificacion();
 }
 
 // nombres de sabor en la planilla que no calzan tal cual con el sistema
@@ -575,8 +622,6 @@ async function importarExcelPlanificacion(ev){
     msg.className = unicosSinMatch.length ? 'msg err' : 'msg ok';
     msg.textContent = `Importado: ${totalActualizados} ítem(s) actualizados en los 3 locales.` +
       (unicosSinMatch.length ? ` Sin encontrar en el sistema (se ignoraron): ${unicosSinMatch.join(', ')}` : '');
-
-    cargarPlanificacion(); // refresca la tabla del local que esté seleccionado
   }catch(err){
     msg.className = 'msg err'; msg.textContent = 'No se pudo importar: ' + err.message;
   }
@@ -586,72 +631,6 @@ async function importarExcelPlanificacion(ev){
 async function obtenerSaboresPlanos(){
   const categorias = await obtenerCategorias();
   return Object.values(categorias).flat();
-}
-
-async function cargarPlanificacion(){
-  const local = document.getElementById('selLocalPlan').value;
-  const cont = document.getElementById('tablaPlanContainer');
-  cont.className = 'loading'; cont.textContent = 'Cargando…';
-  try{
-    const r = await fetch(`${APPS_SCRIPT_URL}?action=listarPlanificacion&local=${local}`);
-    const data = await r.json();
-    if(data.error) throw new Error(data.error);
-    pintarPlanificacion(data);
-  }catch(err){
-    cont.className = '';
-    cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar: ${err.message}</div>`;
-  }
-}
-
-function pintarPlanificacion(data){
-  const cont = document.getElementById('tablaPlanContainer');
-  cont.className = '';
-  cont.innerHTML = `
-    <div style="overflow-x:auto;">
-      <table class="prod" id="tablaPlan">
-        <thead>
-          <tr>
-            <th>Rubro</th><th style="width:22%">Sabor / ítem</th>
-            ${DIAS_SEMANA.map(d => `<th class="num">${d.slice(0,3)}</th>`).join('')}
-          </tr>
-        </thead>
-        <tbody>
-          ${data.filas.map((f, idx) => `
-            <tr data-sabor="${f.Sabor}">
-              <td style="color:var(--ink-soft);font-size:12px;">${f.Categoria}</td>
-              <td>${f.Sabor}</td>
-              ${DIAS_SEMANA.map(d => `<td><input type="number" min="0" step="0.5" class="inp-plan" data-dia="${d}" value="${f[d] || 0}" style="width:56px;"></td>`).join('')}
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>
-    <div class="actions"><button class="btn" id="btnGuardarPlan">Guardar planificación de ${data.local}</button></div>
-    <div class="msg" id="msgPlan"></div>
-  `;
-
-  document.getElementById('btnGuardarPlan').onclick = async () => {
-    const filas = [...document.querySelectorAll('#tablaPlan tbody tr')].map(tr => {
-      const fila = { sabor: tr.dataset.sabor };
-      tr.querySelectorAll('.inp-plan').forEach(inp => { fila[inp.dataset.dia] = inp.value; });
-      return fila;
-    });
-    const msg = document.getElementById('msgPlan');
-    const btn = document.getElementById('btnGuardarPlan');
-    btn.disabled = true; btn.textContent = 'Guardando...';
-    try{
-      const r = await fetch(APPS_SCRIPT_URL, {
-        method: 'POST',
-        body: JSON.stringify({ action: 'actualizarPlanificacion', local: data.local, filas })
-      });
-      const resp = await r.json();
-      if(resp.error) throw new Error(resp.error);
-      msg.className = 'msg ok'; msg.textContent = `Guardado: ${resp.filas_actualizadas} ítem(s) actualizados.`;
-    }catch(err){
-      msg.className = 'msg err'; msg.textContent = 'No se pudo guardar: ' + err.message;
-    }finally{
-      btn.disabled = false; btn.textContent = `Guardar planificación de ${data.local}`;
-    }
-  };
 }
 
 /* ---------------------------------------------------------------------
