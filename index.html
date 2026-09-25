@@ -580,6 +580,7 @@ async function importarExcelPlanificacion(ev){
 
     const sinMatch = [];
     let totalActualizados = 0;
+    let totalCreados = 0;
 
     for(const hoja of Object.keys(HOJA_A_LOCAL)){
       if(!wb.SheetNames.includes(hoja)){ continue; }
@@ -615,12 +616,14 @@ async function importarExcelPlanificacion(ev){
         const resp = await r.json();
         if(resp.error) throw new Error(`${local}: ${resp.error}`);
         totalActualizados += resp.filas_actualizadas;
+        totalCreados += resp.filas_creadas || 0;
       }
     }
 
     const unicosSinMatch = [...new Set(sinMatch)];
     msg.className = unicosSinMatch.length ? 'msg err' : 'msg ok';
     msg.textContent = `Importado: ${totalActualizados} ítem(s) actualizados en los 3 locales.` +
+      (totalCreados > 0 ? ` (${totalCreados} fila(s) nueva(s) creadas porque no existían todavía).` : '') +
       (unicosSinMatch.length ? ` Sin encontrar en el sistema (se ignoraron): ${unicosSinMatch.join(', ')}` : '');
   }catch(err){
     msg.className = 'msg err'; msg.textContent = 'No se pudo importar: ' + err.message;
