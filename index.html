@@ -180,11 +180,6 @@ function renderHome(){
         <h2>Ver qué producir hoy</h2>
         <p>Calculado a partir del stock cargado y la venta estimada de cada sabor.</p>
       </button>
-      <button class="home-card" onclick="irA('planificacion')">
-        <div class="tag">PLANIFICACIÓN</div>
-        <h2>Editar venta proyectada</h2>
-        <p>Actualizar, por local, cuánto se espera vender de cada sabor cada día de la semana.</p>
-      </button>
       <button class="home-card" onclick="irA('envios')">
         <div class="tag">FÁBRICA</div>
         <h2>Despachar envíos</h2>
@@ -194,6 +189,11 @@ function renderHome(){
         <div class="tag">LOCAL</div>
         <h2>Confirmar recepción</h2>
         <p>Registrar cuánto llegó realmente de lo que fábrica despachó hoy.</p>
+      </button>
+      <button class="home-card" onclick="irA('planificacion')">
+        <div class="tag">PLANIFICACIÓN</div>
+        <h2>Editar venta proyectada</h2>
+        <p>Actualizar, por local, cuánto se espera vender de cada sabor cada día de la semana.</p>
       </button>
       <button class="home-card" onclick="irA('historial')">
         <div class="tag">FÁBRICA / LOCAL</div>
@@ -441,13 +441,22 @@ function pintarTabActiva(){
   if(TAB_ACTIVA === 'discos') pintarDiscos(ULTIMO_CALCULO);
 }
 
+// convierte 'yyyy-MM-dd' (lo que devuelve el Apps Script) a 'dd-mm-aaaa' para
+// mostrar — la fecha se guarda y se calcula siempre en ISO, esto es solo visual.
+function fmtFecha(iso){
+  if(!iso) return '';
+  const m = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(!m) return iso;
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
 function bloqueAlertas(data){
   if(!data.alertasVencimiento || !data.alertasVencimiento.length) return '';
   return `
     <div class="alert-box">
       <h3>Vender ya — no llega vivo a la próxima reposición</h3>
       <ul>
-        ${data.alertasVencimiento.map(a => `<li>${a.sabor} — ${a.local}: ${a.cantidad} u. (vence ${a.vencimiento})</li>`).join('')}
+        ${data.alertasVencimiento.map(a => `<li>${a.sabor} — ${a.local}: ${a.cantidad} u. (vence ${fmtFecha(a.vencimiento)})</li>`).join('')}
       </ul>
     </div>`;
 }
@@ -504,7 +513,7 @@ function pintarProduccion(data){
 
   cont.className = '';
   cont.innerHTML = alertaHtml + `
-    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${data.fecha} — ${filas.length} ítem(s) con faltante</p>
+    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)} — ${filas.length} ítem(s) con faltante</p>
     ${bloques}
   `;
 }
@@ -523,7 +532,7 @@ function pintarCocina(data){
 
   cont.className = '';
   cont.innerHTML = `
-    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${data.fecha} — ${ent(totalKilos)} kg de relleno en total</p>
+    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)} — ${ent(totalKilos)} kg de relleno en total</p>
     <table class="prod">
       <thead><tr><th>Relleno</th><th>Sabores que arma</th><th>Días que cubre</th><th class="num">Kg de relleno</th></tr></thead>
       <tbody>
@@ -551,7 +560,7 @@ function pintarDiscos(data){
       </tr>`;
   cont.className = '';
   cont.innerHTML = `
-    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${data.fecha} — discos necesarios según lo que producción arma hoy</p>
+    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)} — discos necesarios según lo que producción arma hoy</p>
     <table class="prod">
       <thead><tr><th>Tipo de disco</th><th class="num">Docenas</th><th class="num">Unidades</th></tr></thead>
       <tbody>
@@ -701,7 +710,7 @@ function pintarEnvioLocal(local, itemsCalculados, data, categorias){
 
   const intro = document.createElement('p');
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
-  intro.textContent = `${data.dia}, ${data.fecha} — orden calculada para ${local}`;
+  intro.textContent = `${data.dia}, ${fmtFecha(data.fecha)} — orden calculada para ${local}`;
   div.appendChild(intro);
 
   const nav = document.createElement('div');
@@ -820,9 +829,9 @@ async function cargarPendientesRecepcion(){
           ${pendientes.map(p => `
             <tr data-id="${p.ID}">
               <td>${p.Sabor}</td>
-              <td style="color:var(--ink-soft);font-size:12.5px;">${p.Fecha_envio}</td>
+              <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Fecha_envio)}</td>
               <td class="num" style="color:var(--ink-soft);">${ent(p.Cantidad_Enviada)}</td>
-              <td style="color:var(--ink-soft);font-size:12.5px;">${p.Vencimiento}</td>
+              <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Vencimiento)}</td>
               <td><input type="number" min="0" step="1" class="inp-recibido" value="${p.Cantidad_Enviada}"></td>
             </tr>`).join('')}
         </tbody>
@@ -922,12 +931,12 @@ async function cargarHistorialEnvios(){
         <tbody>
           ${envios.map(f => `
             <tr>
-              <td>${f.Fecha_envio}</td>
+              <td>${fmtFecha(f.Fecha_envio)}</td>
               <td>${f.Local}</td>
               <td>${f.Sabor}</td>
               <td class="num">${ent(f.Cantidad_Enviada)}</td>
-              <td style="color:var(--ink-soft);font-size:12.5px;">${f.Vencimiento}</td>
-              <td style="color:var(--ink-soft);font-size:12.5px;">${f.Fecha_recepcion || '— sin confirmar —'}</td>
+              <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(f.Vencimiento)}</td>
+              <td style="color:var(--ink-soft);font-size:12.5px;">${f.Fecha_recepcion ? fmtFecha(f.Fecha_recepcion) : '— sin confirmar —'}</td>
               <td class="num">${f.Fecha_recepcion ? ent(f.Cantidad_Recibida) : '—'}</td>
               <td class="num" style="${f.Diferencia ? 'color:var(--alert);font-weight:600;' : ''}">${f.Diferencia === null ? '—' : (f.Diferencia > 0 ? '+' : '') + ent(f.Diferencia)}</td>
             </tr>`).join('')}
