@@ -177,6 +177,15 @@ const LOCALES = ['Centro', 'Patagonia', 'Zelarrayan', 'Fábrica - Producción', 
 const TIPOS_DISCO = ['Horno', 'Frito', 'Recorte'];
 let SABORES_CACHE = null;
 let RELLENOS_CACHE = null;
+let RECETAS_CACHE = null;
+
+async function obtenerRecetas(){
+  if(RECETAS_CACHE) return RECETAS_CACHE;
+  const r = await fetch(`${APPS_SCRIPT_URL}?action=listarRecetas`);
+  const data = await r.json();
+  RECETAS_CACHE = { cabecera: data.recetas || [], detalle: data.detalle || [] };
+  return RECETAS_CACHE;
+}
 
 const app = document.getElementById('app');
 
@@ -192,6 +201,7 @@ function irA(pantalla){
   if(pantalla === 'recepcion') renderRecepcion();
   if(pantalla === 'historial') renderHistorialEnvios();
   if(pantalla === 'registro') renderRegistroProduccion();
+  if(pantalla === 'fichas') renderFichasTecnicas();
 }
 
 function renderHome(){
@@ -235,6 +245,11 @@ function renderHome(){
         <div class="tag">FÁBRICA / LOCAL</div>
         <h2>Historial de envíos</h2>
         <p>Comparar lo enviado contra lo recibido, por local y sabor.</p>
+      </button>
+      <button class="home-card" onclick="irA('fichas')">
+        <div class="tag">FÁBRICA</div>
+        <h2>Fichas técnicas</h2>
+        <p>Importar y actualizar las recetas (Rellenos, Preparados, Postres, Dips, Edición Limitada).</p>
       </button>
     </div>
     <footer class="note">Doma Criolla — herramienta interna de planificación de producción.</footer>
@@ -622,10 +637,45 @@ function pintarCocina(data){
           </tr>`).join('')}
       </tbody>
     </table>
+    <div id="preparadosCocina" style="margin-top:22px;"></div>
   `;
 
   document.getElementById('inpPctRelleno').oninput = recalcularCocinaPct;
   recalcularCocinaPct();
+  cargarPreparadosCocina(data.fecha);
+}
+
+// "explota" las fichas técnicas contra lo que ya se calculó, para saber
+// cuántos kilos de cada Preparado (ej. Puré, Sofrito) hace falta cocinar hoy
+// — además de los rellenos de arriba. Ver los avisos de alcance en Code.gs >
+// calcularDemandaPreparados (por ahora no incluye Dips ni Discos/Canastas).
+async function cargarPreparadosCocina(fecha){
+  const cont = document.getElementById('preparadosCocina');
+  if(!cont) return;
+  cont.innerHTML = `<p class="loading">Buscando preparados…</p>`;
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=calcularDemandaPreparados&fecha=${encodeURIComponent(fecha)}`);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    const demanda = data.demandaPreparados || [];
+    if(demanda.length === 0){
+      cont.innerHTML = '';
+      return;
+    }
+    cont.innerHTML = `
+      <h4 class="cat-heading">Preparados a cocinar hoy</h4>
+      <p style="color:var(--ink-soft);font-size:12px;">Calculado a partir de las fichas técnicas cargadas (Rellenos y Postres) — Dips y Discos/Canastas todavía no entran acá.</p>
+      <table class="prod">
+        <thead><tr><th>Preparado</th><th class="num">Cantidad</th></tr></thead>
+        <tbody>
+          ${demanda.map(d => `<tr><td><strong>${d.preparado}</strong></td><td class="num">${ent(d.cantidad)} ${d.unidad}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      ${(data.avisos || []).length ? `<p style="color:var(--alert);font-size:12px;margin-top:8px;">${data.avisos.join(' ')}</p>` : ''}
+    `;
+  }catch(err){
+    cont.innerHTML = `<p style="color:var(--ink-soft);font-size:12px;">No se pudieron calcular los preparados: ${err.message}</p>`;
+  }
 }
 
 // el % de venta a cubrir es un ajuste manual de Cocina sobre lo mostrado acá
@@ -735,11 +785,127 @@ function pintarSectorRegistro(sector){
   SECTOR_REGISTRO_ACTIVO = sector;
   const cont = document.getElementById('contenidoRegistro');
   cont.className = '';
-  if(sector !== 'produccion'){
-    cont.innerHTML = `<div class="empty">Todavía no tengo la planilla de este sector — pasámela y lo armamos.</div>`;
+  if(sector === 'produccion'){
+    pintarRegistroProduccionSector();
     return;
   }
-  pintarRegistroProduccionSector();
+  if(sector === 'cocina'){
+    pintarRegistroCocinaSector();
+    return;
+  }
+  cont.innerHTML = `<div class="empty">Todavía no tengo la planilla de este sector — pasámela y lo armamos.</div>`;
+}
+
+// Registrar producción — sector COCINA: por cada relleno que se cocina hoy,
+// el bruto y el rinde REAL de los insumos que tienen un rinde de referencia
+// en la ficha técnica (los demás insumos no llevan control de rendimiento).
+// Si no se guarda nada para un ingrediente, se entiende que se usó el valor
+// de la ficha (Cantidad/Rinde de Ref_RecetaDetalle).
+async function pintarRegistroCocinaSector(){
+  const cont = document.getElementById('contenidoRegistro');
+  cont.innerHTML = `<p class="loading">Buscando fichas técnicas…</p>`;
+
+  const fecha = document.getElementById('fechaRegistro').value;
+  const cocina = (CALCULO_REGISTRO.cocina || []).filter(f => f.kilosDeRelleno > 0);
+  if(cocina.length === 0){
+    cont.innerHTML = `<div class="empty">Cocina no elabora ningún relleno el ${CALCULO_REGISTRO.dia.toLowerCase()}.</div>`;
+    return;
+  }
+
+  const recetas = await obtenerRecetas();
+  if(recetas.detalle.length === 0){
+    cont.innerHTML = `
+      <div class="empty">Todavía no importaste ninguna ficha técnica de Rellenos — sin eso no sé qué insumos controlar acá.</div>
+      <div class="actions"><button class="btn secondary" onclick="irA('fichas')">Ir a Fichas técnicas</button></div>
+    `;
+    return;
+  }
+
+  cont.innerHTML = '';
+  const intro = document.createElement('p');
+  intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
+  intro.textContent = `${CALCULO_REGISTRO.dia}, ${fmtFecha(fecha)} — cargá el bruto y el rinde real solo de lo que difirió de la ficha; si no cargás nada para un insumo, se toma el valor de referencia.`;
+  cont.appendChild(intro);
+
+  let algunBloque = false;
+  cocina.forEach(f => {
+    const ingredientesReceta = recetas.detalle.filter(d =>
+      normalizarFicha(d.Receta) === normalizarFicha(f.relleno) && d.Rinde !== '' && d.Rinde != null
+    );
+    if(ingredientesReceta.length === 0) return;
+    algunBloque = true;
+
+    const h = document.createElement('h4');
+    h.className = 'cat-heading';
+    h.textContent = `${f.relleno} — ${ent(f.kilosDeRelleno)} kg calculados hoy`;
+    cont.appendChild(h);
+
+    const wrap = document.createElement('div');
+    wrap.style.overflowX = 'auto';
+    const table = document.createElement('table');
+    table.className = 'lotes traza';
+    table.innerHTML = `
+      <thead><tr>
+        <th>Insumo</th>
+        <th class="num">Bruto ficha</th>
+        <th class="num">Bruto real</th>
+        <th class="num">Rinde ficha</th>
+        <th class="num">Rinde real</th>
+        <th></th>
+      </tr></thead>
+      <tbody></tbody>`;
+    const tbody = table.querySelector('tbody');
+    ingredientesReceta.forEach(ing => {
+      const tr = document.createElement('tr');
+      tr.dataset.relleno = f.relleno;
+      tr.dataset.ingrediente = ing.Ingrediente;
+      tr.innerHTML = `
+        <td>${ing.Ingrediente}</td>
+        <td class="num" style="color:var(--ink-soft);">${ent(ing.Cantidad)} ${ing.Medida || ''}</td>
+        <td><input type="number" min="0" step="0.01" class="inp-bruto-real" style="width:90px;" placeholder="${ent(ing.Cantidad)}"></td>
+        <td class="num" style="color:var(--ink-soft);">${ent(ing.Rinde)} ${ing.Medida || ''}</td>
+        <td><input type="number" min="0" step="0.01" class="inp-rinde-real" style="width:90px;" placeholder="${ent(ing.Rinde)}"></td>
+        <td><button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;">Guardar</button></td>
+      `;
+      tr.querySelector('.btn-guardar-item').onclick = () => guardarItemCocina(tr, fecha);
+      tbody.appendChild(tr);
+    });
+    wrap.appendChild(table);
+    cont.appendChild(wrap);
+  });
+
+  if(!algunBloque){
+    cont.innerHTML += `<div class="empty" style="margin-top:14px;">Los rellenos de hoy no tienen ningún insumo con rinde de referencia cargado en su ficha.</div>`;
+  }
+}
+
+async function guardarItemCocina(tr, fecha){
+  const btn = tr.querySelector('.btn-guardar-item');
+  const cantidadBrutoReal = tr.querySelector('.inp-bruto-real').value;
+  const rindeReal = tr.querySelector('.inp-rinde-real').value;
+  if(!cantidadBrutoReal && !rindeReal){
+    alert('Cargá al menos el bruto real o el rinde real antes de guardar.');
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try{
+    const r = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'registrarTrazabilidadCocinaItem',
+        fecha, relleno: tr.dataset.relleno, ingrediente: tr.dataset.ingrediente,
+        cantidadBrutoReal, rindeReal
+      })
+    });
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    tr.classList.add('fila-guardada');
+    [...tr.querySelectorAll('input')].forEach(el => el.disabled = true);
+    btn.textContent = '✓ Guardado';
+  }catch(err){
+    btn.disabled = false; btn.textContent = 'Guardar';
+    alert('No se pudo guardar: ' + err.message);
+  }
 }
 
 // arma el bloque "puestos" de una máquina: 5 desplegables (empleado en cada
@@ -1526,6 +1692,178 @@ async function importarExcelPlanificacion(ev){
 async function obtenerSaboresPlanos(){
   const categorias = await obtenerCategorias();
   return Object.values(categorias).flat();
+}
+
+/* ---------------------------------------------------------------------
+   Pantalla FICHAS TÉCNICAS: importar/actualizar recetas (Rellenos,
+   Preparados, Postres, Dips, Edición Limitada) desde el .xlsx de cada una.
+   Se parsea directo acá en el navegador (con la misma librería XLSX que ya
+   usa la importación de Planificación) — el backend solo guarda lo ya
+   armado en Ref_Recetas / Ref_RecetaDetalle.
+   --------------------------------------------------------------------- */
+const TIPOS_FICHA = [
+  { value: 'Relleno', label: 'Relleno' },
+  { value: 'Preparado', label: 'Preparado' },
+  { value: 'Postre', label: 'Postre' },
+  { value: 'Dip', label: 'Dip' },
+  { value: 'EdicionLimitada', label: 'Edición Limitada' }
+];
+const SECCIONES_FIN_FICHA = ['PROCEDIMIENTO', 'DATOS TECNIC', 'PUNTOS DE CONTROL'];
+
+function normalizarFicha(s){
+  return String(s == null ? '' : s).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+}
+
+// misma lógica que Code.gs > parseFichaTecnica — si se cambia acá, cambiar
+// también allá (o viceversa). Recibe una hoja ya convertida a array de
+// arrays (XLSX.utils.sheet_to_json con header:1).
+function parseFichaTecnica(filas){
+  let filaHeader = -1;
+  let colClasif = -1, colIngred = -1, colCant = -1, colMedida = -1, colRinde = -1;
+  for(let r = 0; r < Math.min(filas.length, 10); r++){
+    const fila = filas[r];
+    let cIdxClasif = -1, cIdxIngred = -1;
+    for(let c = 0; c < fila.length; c++){
+      const v = normalizarFicha(fila[c]);
+      if(v === 'CLASIFICACION') cIdxClasif = c;
+      if(v === 'INGREDIENTE') cIdxIngred = c;
+    }
+    if(cIdxClasif !== -1 && cIdxIngred !== -1){
+      filaHeader = r; colClasif = cIdxClasif; colIngred = cIdxIngred;
+      for(let c = 0; c < fila.length; c++){
+        const v = normalizarFicha(fila[c]);
+        if(v === 'CANTIDAD') colCant = c;
+        if(v === 'MEDIDA') colMedida = c;
+        if(v === 'RINDE') colRinde = c;
+      }
+      break;
+    }
+  }
+  if(filaHeader === -1) return null;
+
+  let rindeCantidad = '', rindeUnidad = '';
+  for(let r = 0; r < filaHeader; r++){
+    const fila = filas[r];
+    for(let c = 0; c < fila.length; c++){
+      if(normalizarFicha(fila[c]).indexOf('RINDE') === 0){
+        const resto = fila.slice(c + 1).filter(x => x !== '' && x != null);
+        if(resto.length >= 1) rindeCantidad = resto[0];
+        if(resto.length >= 2) rindeUnidad = resto[1];
+      }
+    }
+  }
+
+  const ingredientes = [];
+  for(let r = filaHeader + 1; r < filas.length; r++){
+    const fila = filas[r];
+    const clasif = fila[colClasif];
+    const ingred = fila[colIngred];
+    const clasifNorm = normalizarFicha(clasif);
+    if(SECCIONES_FIN_FICHA.some(k => clasifNorm.indexOf(k) === 0)) break;
+    if((clasif === '' || clasif == null) && (ingred === '' || ingred == null)) break;
+    if(ingred === '' || ingred == null) continue;
+    ingredientes.push({
+      clasificacion: clasif || '',
+      ingrediente: String(ingred).trim(),
+      cantidad: colCant !== -1 && fila[colCant] !== '' && fila[colCant] != null ? Number(fila[colCant]) : '',
+      medida: colMedida !== -1 ? (fila[colMedida] || '') : '',
+      rinde: colRinde !== -1 && fila[colRinde] !== '' && fila[colRinde] != null ? Number(fila[colRinde]) : ''
+    });
+  }
+  return { rindeCantidad, rindeUnidad, ingredientes };
+}
+
+async function renderFichasTecnicas(){
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <header class="top"><h1>Fichas técnicas</h1></header>
+    <p style="color:var(--ink-soft);font-size:13px;">
+      Importá acá el .xlsx de cada ficha (Rellenos, Preparados, Postres, Dips, Edición Limitada) — cada solapa del
+      Excel es una receta. Volver a importar una ficha reemplaza sus recetas por la versión nueva. El nombre de
+      cada solapa tiene que ser igual al Relleno/Sabor que ya usás en el resto del sistema, para que puedan cruzarse.
+    </p>
+
+    <div style="border:1px dashed var(--line);border-radius:4px;padding:14px 16px;margin:16px 0;max-width:480px;">
+      <div class="field-row" style="margin-bottom:12px;">
+        <label>Tipo de ficha</label>
+        <select id="selTipoFicha">
+          ${TIPOS_FICHA.map(t => `<option value="${t.value}">${t.label}</option>`).join('')}
+        </select>
+      </div>
+      <label style="margin-bottom:8px;">Archivo (.xlsx)</label>
+      <input type="file" id="inputFichaTecnica" accept=".xlsx,.xls">
+      <div id="msgImportFicha" class="msg" style="margin-top:10px;"></div>
+    </div>
+
+    <div id="contenidoRecetasCargadas" class="loading">Buscando recetas cargadas…</div>
+  `;
+  document.getElementById('inputFichaTecnica').onchange = importarFichaTecnica;
+  cargarRecetasCargadas();
+}
+
+async function importarFichaTecnica(ev){
+  const file = ev.target.files[0];
+  if(!file) return;
+  const tipoFicha = document.getElementById('selTipoFicha').value;
+  const msg = document.getElementById('msgImportFicha');
+  msg.className = 'msg'; msg.style.display = 'block'; msg.textContent = 'Leyendo archivo…';
+
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+
+    const recetas = [];
+    const salteadas = [];
+    wb.SheetNames.forEach(nombreHoja => {
+      const filas = XLSX.utils.sheet_to_json(wb.Sheets[nombreHoja], { header: 1, raw: true, defval: '' });
+      const parsed = parseFichaTecnica(filas);
+      if(!parsed){ salteadas.push(nombreHoja); return; }
+      recetas.push({ nombreReceta: nombreHoja.trim(), rindeCantidad: parsed.rindeCantidad, rindeUnidad: parsed.rindeUnidad, ingredientes: parsed.ingredientes });
+    });
+
+    if(recetas.length === 0){
+      msg.className = 'msg err'; msg.textContent = 'No encontré ninguna receta en ese archivo.'; return;
+    }
+
+    msg.textContent = 'Guardando ' + recetas.length + ' receta(s)…';
+    const r = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'importarFichaTecnica', tipoFicha, recetas })
+    });
+    const resp = await r.json();
+    if(resp.error) throw new Error(resp.error);
+
+    msg.className = 'msg ok';
+    msg.textContent = `Importadas ${resp.recetasImportadas.length} receta(s): ${resp.recetasImportadas.join(', ')}.` +
+      (salteadas.length ? ` Se salteó (no parece receta): ${salteadas.join(', ')}.` : '');
+    cargarRecetasCargadas();
+  }catch(err){
+    msg.className = 'msg err'; msg.textContent = 'No se pudo importar: ' + err.message;
+  }
+  ev.target.value = '';
+}
+
+async function cargarRecetasCargadas(){
+  const cont = document.getElementById('contenidoRecetasCargadas');
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=listarRecetas`);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    const recetas = data.recetas || [];
+    cont.className = '';
+    if(recetas.length === 0){
+      cont.innerHTML = `<div class="empty">Todavía no importaste ninguna ficha.</div>`;
+      return;
+    }
+    const porTipo = {};
+    recetas.forEach(r => { (porTipo[r.TipoFicha] = porTipo[r.TipoFicha] || []).push(r); });
+    cont.innerHTML = TIPOS_FICHA.filter(t => porTipo[t.value]).map(t => `
+      <h4 class="cat-heading">${t.label} (${porTipo[t.value].length})</h4>
+      <p style="color:var(--ink-soft);font-size:12.5px;">${porTipo[t.value].map(r => `${r.Receta} (${r.RindeCantidad} ${r.RindeUnidad})`).join(' · ')}</p>
+    `).join('');
+  }catch(err){
+    cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo buscar: ${err.message}</div>`;
+  }
 }
 
 /* ---------------------------------------------------------------------
