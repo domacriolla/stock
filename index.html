@@ -160,6 +160,7 @@ function irA(pantalla){
   if(pantalla === 'planificacion') renderPlanificacion();
   if(pantalla === 'envios') renderEnvios();
   if(pantalla === 'recepcion') renderRecepcion();
+  if(pantalla === 'historial') renderHistorialEnvios();
 }
 
 function renderHome(){
@@ -193,6 +194,11 @@ function renderHome(){
         <div class="tag">LOCAL</div>
         <h2>Confirmar recepción</h2>
         <p>Registrar cuánto llegó realmente de lo que fábrica despachó hoy.</p>
+      </button>
+      <button class="home-card" onclick="irA('historial')">
+        <div class="tag">FÁBRICA / LOCAL</div>
+        <h2>Historial de envíos</h2>
+        <p>Comparar lo enviado contra lo recibido, por local y sabor.</p>
       </button>
     </div>
     <footer class="note">Doma Criolla — herramienta interna de planificación de producción.</footer>
@@ -863,6 +869,73 @@ async function guardarRecepcion(){
     msg.className = 'msg err'; msg.textContent = 'No se pudo guardar: ' + err.message;
   }finally{
     btn.disabled = false; btn.textContent = 'Confirmar recepción';
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Pantalla HISTORIAL: enviado vs. recibido, por local — solo lectura
+   --------------------------------------------------------------------- */
+async function renderHistorialEnvios(){
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <header class="top"><h1>Historial de envíos</h1></header>
+    <div class="field-row">
+      <label>Local</label>
+      <select id="selLocalHistorial">
+        <option value="">Todos</option>
+        ${LOCALES_VENTA.map(l => `<option value="${l}">${l}</option>`).join('')}
+      </select>
+    </div>
+    <div id="contenidoHistorial" class="loading">Buscando envíos…</div>
+  `;
+  document.getElementById('selLocalHistorial').onchange = cargarHistorialEnvios;
+  cargarHistorialEnvios();
+}
+
+async function cargarHistorialEnvios(){
+  const local = document.getElementById('selLocalHistorial').value;
+  const cont = document.getElementById('contenidoHistorial');
+  cont.className = 'loading'; cont.textContent = 'Buscando envíos…';
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=listarHistorialEnvios${local ? '&local=' + encodeURIComponent(local) : ''}`);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    const envios = data.envios || [];
+    cont.className = '';
+    if(envios.length === 0){
+      cont.innerHTML = `<div class="empty">Todavía no hay envíos registrados${local ? ' para ' + local : ''}.</div>`;
+      return;
+    }
+    cont.innerHTML = `
+      <p style="color:var(--ink-soft);font-size:13px;">${envios.length} envío(s) registrado(s)${local ? ' — ' + local : ''}</p>
+      <table class="prod">
+        <thead><tr>
+          <th>Fecha envío</th>
+          <th>Local</th>
+          <th>Sabor</th>
+          <th class="num">Enviado</th>
+          <th>Vencimiento</th>
+          <th>Recibido el</th>
+          <th class="num">Recibido</th>
+          <th class="num">Diferencia</th>
+        </tr></thead>
+        <tbody>
+          ${envios.map(f => `
+            <tr>
+              <td>${f.Fecha_envio}</td>
+              <td>${f.Local}</td>
+              <td>${f.Sabor}</td>
+              <td class="num">${ent(f.Cantidad_Enviada)}</td>
+              <td style="color:var(--ink-soft);font-size:12.5px;">${f.Vencimiento}</td>
+              <td style="color:var(--ink-soft);font-size:12.5px;">${f.Fecha_recepcion || '— sin confirmar —'}</td>
+              <td class="num">${f.Fecha_recepcion ? ent(f.Cantidad_Recibida) : '—'}</td>
+              <td class="num" style="${f.Diferencia ? 'color:var(--alert);font-weight:600;' : ''}">${f.Diferencia === null ? '—' : (f.Diferencia > 0 ? '+' : '') + ent(f.Diferencia)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    `;
+  }catch(err){
+    cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo buscar: ${err.message}</div>`;
   }
 }
 
