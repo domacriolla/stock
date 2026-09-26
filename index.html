@@ -145,6 +145,7 @@
     table.prod{font-size:12px;}
     table.prod tr{break-inside:avoid;}
     .alert-box{break-inside:avoid;}
+    .no-print{display:none !important;}
   }
 
   /* Orden de envío imprimible — arma una hoja aparte con solo lo cargado en
@@ -601,24 +602,45 @@ function pintarCocina(data){
     cont.innerHTML = tituloSector + `<div class="empty">Cocina no elabora ningún relleno el ${data.dia.toLowerCase()}.</div>`;
     return;
   }
-  const totalKilos = filas.reduce((a,f) => a + f.kilosDeRelleno, 0);
 
   cont.className = '';
   cont.innerHTML = tituloSector + `
-    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)} — ${ent(totalKilos)} kg de relleno en total</p>
+    <div class="field-row no-print" style="max-width:320px;">
+      <label>% de venta a cubrir <span style="color:var(--ink-soft);font-weight:400;">(los locales siempre tienen algo de stock — bajalo si no hace falta cubrir el 100%)</span></label>
+      <input type="number" id="inpPctRelleno" min="0" max="200" step="5" value="100" style="width:90px;">
+    </div>
+    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)} — <span id="totalKilosCocina"></span> kg de relleno en total</p>
     <table class="prod">
       <thead><tr><th>Relleno</th><th>Sabores que arma</th><th>Días que cubre</th><th class="num">Kg de relleno</th></tr></thead>
       <tbody>
         ${filas.map(f => `
-          <tr>
+          <tr data-kilos-base="${f.kilosDeRelleno}">
             <td><strong>${f.relleno}</strong></td>
             <td style="color:var(--ink-soft);font-size:12.5px;">${f.sabores.map(s => s.sabor).join(', ')}</td>
             <td style="color:var(--ink-soft);font-size:12.5px;">${f.diasQueCubre}</td>
-            <td class="num"><strong>${ent(f.kilosDeRelleno)}</strong></td>
+            <td class="num kg-relleno"><strong></strong></td>
           </tr>`).join('')}
       </tbody>
     </table>
   `;
+
+  document.getElementById('inpPctRelleno').oninput = recalcularCocinaPct;
+  recalcularCocinaPct();
+}
+
+// el % de venta a cubrir es un ajuste manual de Cocina sobre lo mostrado acá
+// (no toca la fórmula de Producción/Envíos, que sigue siendo venta − stock).
+function recalcularCocinaPct(){
+  const pct = Number(document.getElementById('inpPctRelleno').value);
+  const pctValido = isNaN(pct) ? 100 : pct;
+  let total = 0;
+  document.querySelectorAll('#contenidoFabrica table.prod tbody tr[data-kilos-base]').forEach(tr => {
+    const base = Number(tr.dataset.kilosBase) || 0;
+    const ajustado = base * pctValido / 100;
+    total += ajustado;
+    tr.querySelector('.kg-relleno strong').textContent = ent(ajustado);
+  });
+  document.getElementById('totalKilosCocina').textContent = ent(total);
 }
 
 /* ---- Pestaña DISCOS: discos que necesita la tanda de producción de hoy ---- */
