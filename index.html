@@ -979,9 +979,14 @@ async function obtenerSaboresPlanos(){
 /* ---------------------------------------------------------------------
    utilidades
    --------------------------------------------------------------------- */
+// OJO: NO usar toISOString() acá — siempre da la fecha en UTC, así que entre
+// las 21:00 y las 23:59 (hora Argentina) ya devuelve el día SIGUIENTE. Se
+// calcula la fecha de hoy explícitamente en el huso horario de Argentina.
 function hoyISO(){
-  const d = new Date();
-  return d.toISOString().slice(0,10);
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit'
+  });
+  return fmt.format(new Date()); // en-CA da directamente formato yyyy-MM-dd
 }
 
 irA('home');
