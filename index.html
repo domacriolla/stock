@@ -581,8 +581,10 @@ async function renderEnvios(){
       <input type="text" id="inpResponsableEnvio" placeholder="Nombre">
     </div>
     <p style="color:var(--ink-soft);font-size:12.5px;max-width:560px;">
-      La "orden calculada" sale de la venta proyectada de ese local menos lo que ya tiene cargado.
-      Ajustá "Enviado (real)" si mandás otra cantidad, y cargá el vencimiento del lote que sale hoy.
+      Están listados todos los productos, igual que en "Cargar stock" — completá "Enviado (real)" y
+      vencimiento solo en lo que mandás hoy. La columna "Orden calculada" es de referencia (venta
+      proyectada de ese local menos lo que ya tiene cargado). Si un mismo producto sale con más de un
+      vencimiento, usá el botón <strong>+</strong> de esa fila para agregar otra línea.
     </p>
     <div class="tabs" id="tabsEnvios" style="display:none;"></div>
     <div id="contenidoEnvios" class="loading">Calculando…</div>
@@ -601,7 +603,10 @@ async function cargarEnvios(){
   msg.className = 'msg'; msg.textContent = '';
 
   try{
-    const r = await fetch(`${APPS_SCRIPT_URL}?action=calcularEnvios&fecha=${fecha}`);
+    const [r, categorias] = await Promise.all([
+      fetch(`${APPS_SCRIPT_URL}?action=calcularEnvios&fecha=${fecha}`),
+      obtenerCategorias()
+    ]);
     const data = await r.json();
     if(data.error) throw new Error(data.error);
 
@@ -617,7 +622,10 @@ async function cargarEnvios(){
     });
 
     cont.className = '';
-    cont.innerHTML = LOCALES_VENTA.map(local => pintarEnvioLocal(local, data.envios[local] || [], data)).join('');
+    cont.innerHTML = '';
+    LOCALES_VENTA.forEach(local => {
+      cont.appendChild(pintarEnvioLocal(local, data.envios[local] || [], data, categorias));
+    });
     [...document.querySelectorAll('.panel-envio-local')].forEach(p => p.style.display = (p.dataset.local === TAB_ENVIO_ACTIVO ? '' : 'none'));
 
     LOCALES_VENTA.forEach(local => {
@@ -629,46 +637,92 @@ async function cargarEnvios(){
   }
 }
 
-function pintarEnvioLocal(local, items, data){
-  if(items.length === 0){
-    return `<div class="panel-envio-local" data-local="${local}" style="display:none;">
-      <div class="empty">Nada para enviar a ${local} el ${String(data.dia).toLowerCase()} — el stock que ya tiene cargado alcanza.</div>
-    </div>`;
+// una fila por producto (todos, siempre visibles); el botón "+" agrega otra
+// fila del MISMO producto para cargar un segundo lote con otro vencimiento —
+// mismo patrón que "Cargar stock".
+function filaEnvio(nombre, ordenCalculada, esExtra){
+  const tr = document.createElement('tr');
+  tr.dataset.item = nombre;
+  tr.innerHTML = `
+    <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : nombre}</td>
+    <td class="num" style="color:var(--ink-soft);">${esExtra ? '' : ent(ordenCalculada)}</td>
+    <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0"></td>
+    <td><input type="date" class="inp-venc"></td>
+    <td class="col-add">${esExtra ? '' : '<button type="button" class="add-lote-btn" title="Agregar otro vencimiento para este producto">+</button>'}</td>
+    <td class="col-del">${esExtra ? '<button type="button" class="del-btn" title="Quitar">✕</button>' : ''}</td>
+  `;
+  if(esExtra){
+    tr.querySelector('.del-btn').onclick = () => tr.remove();
+  } else {
+    tr.querySelector('.add-lote-btn').onclick = () => {
+      tr.insertAdjacentElement('afterend', filaEnvio(nombre, ordenCalculada, true));
+    };
   }
-  const rubros = [...new Set(items.map(f => f.rubro))];
-  rubros.sort((a,b) => (a.startsWith('Empanadas') ? -1 : b.startsWith('Empanadas') ? 1 : a.localeCompare(b)));
+  return tr;
+}
 
-  const bloques = rubros.map(rubro => {
-    const filas = items.filter(f => f.rubro === rubro);
-    return `
-      <h3 style="font-size:15px;margin:20px 0 8px;">${rubro}</h3>
-      <table class="lotes">
-        <thead><tr>
-          <th>Sabor / ítem</th>
-          <th class="col-cant">Orden calculada</th>
-          <th class="col-cant">Enviado (real)</th>
-          <th class="col-venc">Vencimiento</th>
-        </tr></thead>
-        <tbody>
-          ${filas.map(f => `
-            <tr data-sabor="${f.sabor}">
-              <td>${f.sabor}</td>
-              <td class="num" style="color:var(--ink-soft);">${ent(f.aHacerUnidades)}</td>
-              <td><input type="number" min="0" step="1" class="inp-enviado" value="${f.aHacerUnidades}"></td>
-              <td><input type="date" class="inp-venc-envio"></td>
-            </tr>`).join('')}
-        </tbody>
-      </table>`;
-  }).join('');
+function tablaEnvioDe(items, porSabor){
+  const table = document.createElement('table');
+  table.className = 'lotes';
+  table.innerHTML = `
+    <thead><tr>
+      <th>Sabor / ítem</th>
+      <th class="col-cant">Orden calculada</th>
+      <th class="col-cant">Enviado (real)</th>
+      <th class="col-venc">Vencimiento</th>
+      <th class="col-add"></th>
+      <th class="col-del"></th>
+    </tr></thead>
+    <tbody></tbody>`;
+  const tbody = table.querySelector('tbody');
+  items.forEach(nombre => {
+    const orden = (porSabor[nombre] && porSabor[nombre].aHacerUnidades) || 0;
+    tbody.appendChild(filaEnvio(nombre, orden, false));
+  });
+  return table;
+}
 
-  return `
-    <div class="panel-envio-local" data-local="${local}" style="display:none;">
-      <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${data.fecha} — orden calculada para ${local}</p>
-      ${bloques}
-      <div class="actions">
-        <button class="btn" id="btnGuardarEnvio-${cssId(local)}">Guardar despacho a ${local}</button>
-      </div>
-    </div>`;
+function pintarEnvioLocal(local, itemsCalculados, data, categorias){
+  const id = cssId(local);
+  const porSabor = {};
+  itemsCalculados.forEach(it => { porSabor[it.sabor] = it; });
+  const nombresCategorias = Object.keys(categorias);
+
+  const div = document.createElement('div');
+  div.className = 'panel-envio-local';
+  div.dataset.local = local;
+  div.style.display = 'none';
+
+  const intro = document.createElement('p');
+  intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
+  intro.textContent = `${data.dia}, ${data.fecha} — orden calculada para ${local}`;
+  div.appendChild(intro);
+
+  const nav = document.createElement('div');
+  nav.className = 'cat-nav';
+  div.appendChild(nav);
+
+  nombresCategorias.forEach((cat, i) => {
+    const catId = `cat-envio-${id}-${i}`;
+    const h = document.createElement('h4');
+    h.className = 'cat-heading';
+    h.id = catId;
+    h.textContent = cat;
+    div.appendChild(h);
+    div.appendChild(tablaEnvioDe(categorias[cat], porSabor));
+
+    const a = document.createElement('a');
+    a.href = `#${catId}`;
+    a.textContent = cat;
+    nav.appendChild(a);
+  });
+
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  actions.innerHTML = `<button class="btn" id="btnGuardarEnvio-${id}">Guardar despacho a ${local}</button>`;
+  div.appendChild(actions);
+
+  return div;
 }
 
 async function guardarEnvio(local, fecha){
@@ -678,11 +732,11 @@ async function guardarEnvio(local, fecha){
     msg.className = 'msg err'; msg.textContent = 'Indicá quién está despachando este envío.'; return;
   }
   const panel = document.querySelector(`.panel-envio-local[data-local="${local}"]`);
-  const filas = [...panel.querySelectorAll('tr[data-sabor]')];
+  const filas = [...panel.querySelectorAll('tr[data-item]')];
   const items = filas.map(tr => ({
-    sabor: tr.dataset.sabor,
-    cantidad: tr.querySelector('.inp-enviado').value,
-    vencimiento: tr.querySelector('.inp-venc-envio').value
+    sabor: tr.dataset.item,
+    cantidad: tr.querySelector('.inp-cant').value,
+    vencimiento: tr.querySelector('.inp-venc').value
   })).filter(it => it.cantidad && Number(it.cantidad) > 0 && it.vencimiento);
 
   if(items.length === 0){
