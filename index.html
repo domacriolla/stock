@@ -143,6 +143,21 @@
     table.prod tr{break-inside:avoid;}
     .alert-box{break-inside:avoid;}
   }
+
+  /* Orden de envío imprimible — arma una hoja aparte con solo lo cargado en
+     pantalla para ese local, y se muestra únicamente al imprimir. */
+  #printAreaEnvio{display:none;}
+  #printAreaEnvio h1{font-size:20px;margin-bottom:2px;}
+  #printAreaEnvio .print-sub{color:var(--ink-soft);font-size:14px;margin:0 0 16px;}
+  #printAreaEnvio h3{font-size:14px;margin:18px 0 6px;}
+  table.print-tabla{width:100%;border-collapse:collapse;margin-bottom:6px;}
+  table.print-tabla th{text-align:left;font-size:11px;color:var(--ink-soft);border-bottom:1px solid var(--ink-soft);padding:6px 8px;}
+  table.print-tabla td{padding:6px 8px;border-bottom:1px solid var(--line);}
+  table.print-tabla .num{text-align:right;}
+  @media print{
+    body.print-envio .wrap{display:none !important;}
+    body.print-envio #printAreaEnvio{display:block;}
+  }
 </style>
 </head>
 <body>
@@ -482,9 +497,11 @@ function pintarProduccion(data){
   const filas = data.produccion.filter(f => f.aHacerUnidades > 0);
   const alertaHtml = bloqueAlertas(data);
 
+  const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Producción</h2>`;
+
   if(filas.length === 0){
     cont.className = '';
-    cont.innerHTML = alertaHtml + `<div class="empty">Nada para armar/reponer el ${data.dia.toLowerCase()} — el stock cargado alcanza.</div>`;
+    cont.innerHTML = tituloSector + alertaHtml + `<div class="empty">Nada para armar/reponer el ${data.dia.toLowerCase()} — el stock cargado alcanza.</div>`;
     return;
   }
 
@@ -524,7 +541,7 @@ function pintarProduccion(data){
   }).join('');
 
   cont.className = '';
-  cont.innerHTML = alertaHtml + `
+  cont.innerHTML = tituloSector + alertaHtml + `
     <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)} — ${filas.length} ítem(s) con faltante</p>
     ${bloques}
   `;
@@ -534,16 +551,17 @@ function pintarProduccion(data){
 function pintarCocina(data){
   const cont = document.getElementById('contenidoFabrica');
   const filas = data.cocina.filter(f => f.kilosDeRelleno > 0);
+  const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Cocina</h2>`;
 
   if(filas.length === 0){
     cont.className = '';
-    cont.innerHTML = `<div class="empty">Cocina no elabora ningún relleno el ${data.dia.toLowerCase()}.</div>`;
+    cont.innerHTML = tituloSector + `<div class="empty">Cocina no elabora ningún relleno el ${data.dia.toLowerCase()}.</div>`;
     return;
   }
   const totalKilos = filas.reduce((a,f) => a + f.kilosDeRelleno, 0);
 
   cont.className = '';
-  cont.innerHTML = `
+  cont.innerHTML = tituloSector + `
     <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)} — ${ent(totalKilos)} kg de relleno en total</p>
     <table class="prod">
       <thead><tr><th>Relleno</th><th>Sabores que arma</th><th>Días que cubre</th><th class="num">Kg de relleno</th></tr></thead>
@@ -572,6 +590,7 @@ function pintarDiscos(data){
       </tr>`;
   cont.className = '';
   cont.innerHTML = `
+    <h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Discos</h2>
     <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)} — discos necesarios según lo que producción arma hoy</p>
     <table class="prod">
       <thead><tr><th>Tipo de disco</th><th class="num">Docenas</th><th class="num">Unidades</th></tr></thead>
@@ -658,6 +677,8 @@ async function cargarEnvios(){
     LOCALES_VENTA.forEach(local => {
       const btn = document.getElementById(`btnGuardarEnvio-${cssId(local)}`);
       if(btn) btn.onclick = () => guardarEnvio(local, fecha);
+      const btnImprimir = document.getElementById(`btnImprimirEnvio-${cssId(local)}`);
+      if(btnImprimir) btnImprimir.onclick = () => imprimirOrdenEnvio(local, fecha);
     });
   }catch(err){
     cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo calcular: ${err.message}</div>`;
@@ -746,7 +767,10 @@ function pintarEnvioLocal(local, itemsCalculados, data, categorias){
 
   const actions = document.createElement('div');
   actions.className = 'actions';
-  actions.innerHTML = `<button class="btn" id="btnGuardarEnvio-${id}">Guardar despacho a ${local}</button>`;
+  actions.innerHTML = `
+    <button class="btn" id="btnGuardarEnvio-${id}">Guardar despacho a ${local}</button>
+    <button class="btn secondary" id="btnImprimirEnvio-${id}">🖶 Imprimir orden de envío</button>
+  `;
   div.appendChild(actions);
 
   return div;
@@ -785,6 +809,70 @@ async function guardarEnvio(local, fecha){
   }finally{
     btn.disabled = false; btn.textContent = `Guardar despacho a ${local}`;
   }
+}
+
+// Arma una hoja de "Orden de envío" imprimible para UN local, con lo que
+// realmente se cargó en pantalla (no el listado completo) — se salta
+// cualquier producto en cero, y salta la categoría entera si ninguno de
+// sus productos tiene cantidad cargada.
+function imprimirOrdenEnvio(local, fecha){
+  const panel = document.querySelector(`.panel-envio-local[data-local="${local}"]`);
+  const filas = [...panel.querySelectorAll('tr[data-item]')];
+  const porSabor = {};
+  filas.forEach(tr => {
+    const cantidad = Number(tr.querySelector('.inp-cant').value) || 0;
+    if(cantidad <= 0) return;
+    const nombre = tr.dataset.item;
+    const venc = tr.querySelector('.inp-venc').value;
+    // si hay más de un lote del mismo producto (botón "+"), se suman para el impreso
+    if(porSabor[nombre]){
+      porSabor[nombre].cantidad += cantidad;
+      if(!porSabor[nombre].vencimiento) porSabor[nombre].vencimiento = venc;
+    } else {
+      porSabor[nombre] = { cantidad, vencimiento: venc };
+    }
+  });
+
+  if(Object.keys(porSabor).length === 0){
+    alert(`Todavía no cargaste ninguna cantidad para ${local} — no hay nada para imprimir.`);
+    return;
+  }
+
+  const categorias = SABORES_CACHE || {};
+  let filasHtml = '';
+  Object.keys(categorias).forEach(cat => {
+    const nombres = categorias[cat].filter(n => porSabor[n]);
+    if(nombres.length === 0) return; // sin nada que enviar en esta categoría: no se imprime
+    filasHtml += `
+      <h3>${cat}</h3>
+      <table class="print-tabla">
+        <thead><tr><th>Sabor / ítem</th><th class="num">Cantidad</th><th>Vencimiento</th></tr></thead>
+        <tbody>
+          ${nombres.map(n => `
+            <tr>
+              <td>${n}</td>
+              <td class="num">${ent(porSabor[n].cantidad)}</td>
+              <td>${porSabor[n].vencimiento ? fmtFecha(porSabor[n].vencimiento) : ''}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  });
+
+  let area = document.getElementById('printAreaEnvio');
+  if(!area){
+    area = document.createElement('div');
+    area.id = 'printAreaEnvio';
+    document.body.appendChild(area);
+  }
+  area.innerHTML = `
+    <h1>Orden de envío</h1>
+    <p class="print-sub">${local} — ${fmtFecha(fecha)}</p>
+    ${filasHtml}
+  `;
+
+  document.body.classList.add('print-envio');
+  window.print();
+  document.body.classList.remove('print-envio');
 }
 
 /* ---------------------------------------------------------------------
