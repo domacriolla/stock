@@ -259,12 +259,21 @@ function renderHome(){
 /* ---------------------------------------------------------------------
    Pantalla LOCAL: cargar lotes de stock
    --------------------------------------------------------------------- */
+let CATEGORIA_POR_SABOR_CACHE = null;
 async function obtenerCategorias(){
   if(SABORES_CACHE) return SABORES_CACHE;
   const r = await fetch(`${APPS_SCRIPT_URL}?action=listarSabores`);
   const data = await r.json();
   SABORES_CACHE = data.categorias || {};
+  CATEGORIA_POR_SABOR_CACHE = data.categoriaPorSabor || {};
   return SABORES_CACHE;
+}
+// Categoria (Canasta, Frito, Horno, etc.) de cada sabor — para saber, por
+// ejemplo, cuáles son Canasta (armado manual del molde) sin adivinarlo por
+// el nombre.
+async function obtenerCategoriaPorSabor(){
+  if(!CATEGORIA_POR_SABOR_CACHE) await obtenerCategorias();
+  return CATEGORIA_POR_SABOR_CACHE || {};
 }
 
 async function obtenerRellenos(){
@@ -493,6 +502,7 @@ async function renderFabrica(){
 }
 
 let ULTIMO_CALCULO = null;
+let PREP_ACTUAL = null;
 let TAB_ACTIVA = 'produccion';
 
 async function cargarCalculo(){
@@ -501,10 +511,15 @@ async function cargarCalculo(){
   cont.className = 'loading'; cont.textContent = 'Calculando…';
   document.getElementById('tabsFabrica').style.display = 'none';
   try{
-    const r = await fetch(`${APPS_SCRIPT_URL}?action=calcularTodo&fecha=${fecha}`);
+    const [r, rPrep] = await Promise.all([
+      fetch(`${APPS_SCRIPT_URL}?action=calcularTodo&fecha=${fecha}`),
+      fetch(`${APPS_SCRIPT_URL}?action=calcularPrepDiaAnterior&fecha=${fecha}`)
+    ]);
     const data = await r.json();
     if(data.error) throw new Error(data.error);
+    const prep = await rPrep.json();
     ULTIMO_CALCULO = data;
+    PREP_ACTUAL = prep.error ? null : prep;
     document.getElementById('tabsFabrica').style.display = 'flex';
     [...document.querySelectorAll('.tab-btn')].forEach(b => {
       b.onclick = () => { TAB_ACTIVA = b.dataset.tab; marcarTabActiva(); pintarTabActiva(); };
@@ -550,17 +565,36 @@ function bloqueAlertas(data){
 // redondeo a entero para mostrar en pantalla (el cálculo interno sigue con decimales)
 function ent(n){ return Math.round(Number(n) || 0).toLocaleString('es-AR'); }
 
+// bloque "para mañana": Rollos de Jamón y Queso + Canastas que hay que
+// dejar armados HOY (se ve en la pestaña Producción, arriba de lo del día).
+function bloquePrepDiaAnterior(){
+  const prep = PREP_ACTUAL;
+  if(!prep) return '';
+  const rollos = Number(prep.rollosJyQ) || 0;
+  const canastas = (prep.canastas || []).filter(c => c.aHacerUnidades > 0);
+  if(rollos <= 0 && canastas.length === 0) return '';
+  const filaRollos = rollos > 0 ? `<tr><td>Rollos de Jamón y Queso</td><td class="num"><strong>${ent(rollos)}</strong></td></tr>` : '';
+  const filasCanastas = canastas.map(c => `<tr><td>Canasta — ${c.sabor}</td><td class="num"><strong>${ent(c.aHacerUnidades)}</strong></td></tr>`).join('');
+  return `
+    <h3 style="font-size:15px;margin:20px 0 8px;">Para mañana (${prep.diaManana}, ${fmtFecha(prep.fechaManana)}) — armar/moldear HOY</h3>
+    <table class="prod">
+      <thead><tr><th>Ítem</th><th class="num">Cantidad</th></tr></thead>
+      <tbody>${filaRollos}${filasCanastas}</tbody>
+    </table>`;
+}
+
 /* ---- Pestaña PRODUCCIÓN: qué armar hoy, por sabor (todos los rubros) ---- */
 function pintarProduccion(data){
   const cont = document.getElementById('contenidoFabrica');
   const filas = data.produccion.filter(f => f.aHacerUnidades > 0);
   const alertaHtml = bloqueAlertas(data);
+  const prepHtml = bloquePrepDiaAnterior();
 
   const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Producción</h2>`;
 
   if(filas.length === 0){
     cont.className = '';
-    cont.innerHTML = tituloSector + alertaHtml + `<div class="empty">Nada para armar/reponer el ${data.dia.toLowerCase()} — el stock cargado alcanza.</div>`;
+    cont.innerHTML = tituloSector + alertaHtml + prepHtml + `<div class="empty">Nada para armar/reponer el ${data.dia.toLowerCase()} — el stock cargado alcanza.</div>`;
     return;
   }
 
@@ -600,7 +634,7 @@ function pintarProduccion(data){
   }).join('');
 
   cont.className = '';
-  cont.innerHTML = tituloSector + alertaHtml + `
+  cont.innerHTML = tituloSector + alertaHtml + prepHtml + `
     <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)} — ${filas.length} ítem(s) con faltante</p>
     ${bloques}
   `;
@@ -727,8 +761,11 @@ function pintarDiscos(data){
    --------------------------------------------------------------------- */
 let CALCULO_REGISTRO = null;
 let CATEGORIAS_REGISTRO = null;
+let CATEGORIA_POR_SABOR_REGISTRO = null;
 let EMPLEADOS_REGISTRO = null;
+let PREP_REGISTRO = null;
 let SECTOR_REGISTRO_ACTIVO = 'produccion';
+const NOMBRE_ROLLOS_JYQ = 'Rollos de Jamón y Queso';
 
 async function renderRegistroProduccion(){
   app.innerHTML = `
@@ -765,15 +802,20 @@ async function cargarRegistroProduccion(){
   const msg = document.getElementById('msgRegistro');
   msg.className = 'msg'; msg.textContent = '';
   try{
-    const [r, categorias, empleados] = await Promise.all([
+    const [r, rPrep, categorias, categoriaPorSabor, empleados] = await Promise.all([
       fetch(`${APPS_SCRIPT_URL}?action=calcularTodo&fecha=${fecha}`),
+      fetch(`${APPS_SCRIPT_URL}?action=calcularPrepDiaAnterior&fecha=${fecha}`),
       obtenerCategorias(),
+      obtenerCategoriaPorSabor(),
       obtenerEmpleados()
     ]);
     const data = await r.json();
     if(data.error) throw new Error(data.error);
+    const prep = await rPrep.json();
     CALCULO_REGISTRO = data;
+    PREP_REGISTRO = prep.error ? { rollosJyQ: 0, canastas: [] } : prep;
     CATEGORIAS_REGISTRO = categorias;
+    CATEGORIA_POR_SABOR_REGISTRO = categoriaPorSabor;
     EMPLEADOS_REGISTRO = empleados;
     pintarSectorRegistro(SECTOR_REGISTRO_ACTIVO);
   }catch(err){
@@ -865,9 +907,13 @@ async function pintarRegistroCocinaSector(){
         <td><input type="number" min="0" step="0.01" class="inp-bruto-real" style="width:90px;" placeholder="${ent(ing.Cantidad)}"></td>
         <td class="num" style="color:var(--ink-soft);">${ent(ing.Rinde)} ${ing.Medida || ''}</td>
         <td><input type="number" min="0" step="0.01" class="inp-rinde-real" style="width:90px;" placeholder="${ent(ing.Rinde)}"></td>
-        <td><button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;">Guardar</button></td>
+        <td style="white-space:nowrap;">
+          <button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;">Guardar</button>
+          <button type="button" class="btn secondary btn-editar-item" style="font-size:12px;padding:5px 9px;display:none;">Editar</button>
+        </td>
       `;
       tr.querySelector('.btn-guardar-item').onclick = () => guardarItemCocina(tr, fecha);
+      tr.querySelector('.btn-editar-item').onclick = () => habilitarEdicionFila(tr);
       tbody.appendChild(tr);
     });
     wrap.appendChild(table);
@@ -901,7 +947,9 @@ async function guardarItemCocina(tr, fecha){
     if(data.error) throw new Error(data.error);
     tr.classList.add('fila-guardada');
     [...tr.querySelectorAll('input')].forEach(el => el.disabled = true);
-    btn.textContent = '✓ Guardado';
+    btn.textContent = '✓ Guardado'; btn.style.display = 'none';
+    const btnEditar = tr.querySelector('.btn-editar-item');
+    if(btnEditar) btnEditar.style.display = '';
   }catch(err){
     btn.disabled = false; btn.textContent = 'Guardar';
     alert('No se pudo guardar: ' + err.message);
@@ -935,19 +983,25 @@ function bloquePuestosMaquina(titulo, idBase, empleados){
 function pintarRegistroProduccionSector(){
   const cont = document.getElementById('contenidoRegistro');
   const data = CALCULO_REGISTRO;
+  const prep = PREP_REGISTRO || {};
   const categorias = CATEGORIAS_REGISTRO || {};
+  const categoriaPorSabor = CATEGORIA_POR_SABOR_REGISTRO || {};
   // mismo listado de sabores que "Ver qué producir hoy" (Empanadas Horno + Frito),
   // TODOS, no solo los que calcularon faltante — así no se pierde ningún sabor
-  // que se haya armado igual ese turno.
-  const sabores = [...(categorias['Empanadas Horno'] || []), ...(categorias['Empanadas Frito'] || [])];
+  // que se haya armado igual ese turno. "Rollos de Jamón y Queso" se agrega
+  // aparte: no es un sabor de Ref_Sabores, es la tanda que arma Producción un
+  // día antes de hornear/freír esas empanadas.
+  const sabores = [NOMBRE_ROLLOS_JYQ, ...(categorias['Empanadas Horno'] || []), ...(categorias['Empanadas Frito'] || [])];
   const porSabor = {};
   (data.produccion || []).forEach(f => { if(f.tipoCalculo === 'Calendario') porSabor[f.sabor] = f; });
+  const canastaPorSabor = {};
+  (prep.canastas || []).forEach(c => { canastaPorSabor[c.sabor] = c; });
 
   cont.innerHTML = '';
 
   const intro = document.createElement('p');
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
-  intro.textContent = `${data.dia}, ${fmtFecha(data.fecha)} — completá solo los sabores que se armaron este turno. "A producir (calc.)" es de referencia. Guardá cada sabor con su botón apenas lo termines (no hace falta esperar al final del turno); los puestos y las observaciones se guardan al cerrar el turno, con el botón de abajo.`;
+  intro.textContent = `${data.dia}, ${fmtFecha(data.fecha)} — completá solo los sabores que se armaron este turno. "A producir (calc.)" es de referencia (para Canastas y Rollos de Jamón y Queso, es lo que hace falta dejar armado HOY para mañana). Guardá cada sabor con su botón apenas lo termines (no hace falta esperar al final del turno); tocá "Editar" si necesitás corregir algo ya guardado. Los puestos y las observaciones se guardan al cerrar el turno, con el botón de abajo.`;
   cont.appendChild(intro);
 
   cont.appendChild(bloquePuestosMaquina('Máquina 1', 'm1', EMPLEADOS_REGISTRO));
@@ -966,7 +1020,7 @@ function pintarRegistroProduccionSector(){
     <thead><tr>
       <th>Sabor</th>
       <th class="num">A producir (calc.)</th>
-      <th>Máquina Nº</th>
+      <th>Máquina Nº /<br>Responsable</th>
       <th>Velocidad</th>
       <th>Disco lote</th>
       <th>Peso prom.<br>tanda discos</th>
@@ -982,17 +1036,37 @@ function pintarRegistroProduccionSector(){
     <tbody></tbody>`;
   const tbody = table.querySelector('tbody');
   sabores.forEach(nombre => {
-    const ref = porSabor[nombre];
+    const esRollos = nombre === NOMBRE_ROLLOS_JYQ;
+    const esCanasta = categoriaPorSabor[nombre] === 'Canasta';
+
+    let aHacerMostrar = null;
+    let etiquetaExtra = '';
+    if(esRollos){
+      aHacerMostrar = prep.rollosJyQ;
+      etiquetaExtra = ' <span style="color:var(--ink-soft);font-size:11px;">(armar hoy para mañana)</span>';
+    } else if(esCanasta){
+      const c = canastaPorSabor[nombre];
+      aHacerMostrar = c ? c.aHacerUnidades : 0;
+      etiquetaExtra = ' <span style="color:var(--ink-soft);font-size:11px;">(canasta — moldear hoy para mañana)</span>';
+    } else {
+      const ref = porSabor[nombre];
+      aHacerMostrar = ref ? ref.aHacerUnidades : null;
+    }
+
+    const celdaMaquina = esCanasta
+      ? `<select class="inp-responsable-canasta" style="min-width:130px;">${opcionesEmpleados(EMPLEADOS_REGISTRO)}</select>`
+      : `<select class="inp-maq-num" style="width:56px;">
+          <option value=""></option>
+          <option value="1">1</option>
+          <option value="2">2</option>
+        </select>`;
+
     const tr = document.createElement('tr');
     tr.dataset.sabor = nombre;
     tr.innerHTML = `
-      <td>${nombre}</td>
-      <td class="num" style="color:var(--ink-soft);">${ref ? ent(ref.aHacerUnidades) : '—'}</td>
-      <td><select class="inp-maq-num" style="width:56px;">
-        <option value=""></option>
-        <option value="1">1</option>
-        <option value="2">2</option>
-      </select></td>
+      <td>${nombre}${etiquetaExtra}</td>
+      <td class="num" style="color:var(--ink-soft);">${aHacerMostrar != null ? ent(aHacerMostrar) : '—'}</td>
+      <td>${celdaMaquina}</td>
       <td><input type="text" class="inp-maq-vel" style="width:64px;"></td>
       <td><input type="text" class="inp-disco-lote" style="width:90px;"></td>
       <td><input type="number" min="0" step="0.01" class="inp-peso-prom" style="width:80px;"></td>
@@ -1003,9 +1077,13 @@ function pintarRegistroProduccionSector(){
       <td><input type="time" class="inp-hora-fin"></td>
       <td><input type="number" min="0" step="1" class="inp-total-prod" style="width:80px;"></td>
       <td><input type="number" min="0" step="1" class="inp-discos-danados" style="width:64px;"></td>
-      <td><button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;white-space:nowrap;">Guardar</button></td>
+      <td style="white-space:nowrap;">
+        <button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;">Guardar</button>
+        <button type="button" class="btn secondary btn-editar-item" style="font-size:12px;padding:5px 9px;display:none;">Editar</button>
+      </td>
     `;
     tr.querySelector('.btn-guardar-item').onclick = () => guardarItemTrazabilidad(tr);
+    tr.querySelector('.btn-editar-item').onclick = () => habilitarEdicionFila(tr);
     tbody.appendChild(tr);
   });
   wrap.appendChild(table);
@@ -1027,11 +1105,16 @@ function pintarRegistroProduccionSector(){
   document.getElementById('btnGuardarRegistro').onclick = guardarRegistroProduccion;
 }
 
-// arma el objeto "item" de un sabor a partir de su fila en la tabla
+// arma el objeto "item" de un sabor a partir de su fila en la tabla. La
+// celda de "máquina" puede ser el desplegable de Máquina Nº (sabores
+// normales) o el de Responsable (Canastas) — nunca los dos a la vez.
 function leerFilaSabor(tr){
+  const maq = tr.querySelector('.inp-maq-num');
+  const resp = tr.querySelector('.inp-responsable-canasta');
   return {
     sabor: tr.dataset.sabor,
-    maquinaNumero: tr.querySelector('.inp-maq-num').value,
+    maquinaNumero: maq ? maq.value : '',
+    responsable: resp ? resp.value : '',
     maquinaVelocidad: tr.querySelector('.inp-maq-vel').value,
     discosLote: tr.querySelector('.inp-disco-lote').value,
     pesoPromTandaDiscos: tr.querySelector('.inp-peso-prom').value,
@@ -1043,6 +1126,18 @@ function leerFilaSabor(tr){
     totalProduccion: tr.querySelector('.inp-total-prod').value,
     discosDanados: tr.querySelector('.inp-discos-danados').value
   };
+}
+
+// re-habilita una fila ya guardada (Producción o Cocina) para corregirla —
+// al volver a tocar "Guardar" se pisa la misma fila en la planilla, no se
+// duplica (ver upsertFila en Code.gs).
+function habilitarEdicionFila(tr){
+  tr.classList.remove('fila-guardada');
+  [...tr.querySelectorAll('input,select')].forEach(el => el.disabled = false);
+  const btnGuardar = tr.querySelector('.btn-guardar-item');
+  if(btnGuardar){ btnGuardar.disabled = false; btnGuardar.textContent = 'Guardar'; btnGuardar.style.display = ''; }
+  const btnEditar = tr.querySelector('.btn-editar-item');
+  if(btnEditar) btnEditar.style.display = 'none';
 }
 
 // "preguardar" un sabor apenas se termina, sin esperar al cierre del turno.
@@ -1064,7 +1159,9 @@ async function guardarItemTrazabilidad(tr){
     if(data.error) throw new Error(data.error);
     tr.classList.add('fila-guardada');
     [...tr.querySelectorAll('input,select')].forEach(el => el.disabled = true);
-    btn.textContent = '✓ Guardado';
+    btn.textContent = '✓ Guardado'; btn.style.display = 'none';
+    const btnEditar = tr.querySelector('.btn-editar-item');
+    if(btnEditar) btnEditar.style.display = '';
   }catch(err){
     btn.disabled = false; btn.textContent = 'Guardar';
     alert('No se pudo guardar este sabor: ' + err.message);
@@ -1104,7 +1201,10 @@ async function guardarRegistroProduccion(){
       if(Number(tr.querySelector('.inp-total-prod').value) > 0){
         tr.classList.add('fila-guardada');
         [...tr.querySelectorAll('input,select')].forEach(el => el.disabled = true);
-        tr.querySelector('.btn-guardar-item').textContent = '✓ Guardado';
+        const btnG = tr.querySelector('.btn-guardar-item');
+        btnG.textContent = '✓ Guardado'; btnG.style.display = 'none';
+        const btnE = tr.querySelector('.btn-editar-item');
+        if(btnE) btnE.style.display = '';
       }
     });
     msg.className = 'msg ok';
@@ -1214,8 +1314,9 @@ async function cargarEnvios(){
 
 // una fila por producto (todos, siempre visibles); el botón "+" agrega otra
 // fila del MISMO producto para cargar un segundo lote con otro vencimiento —
-// mismo patrón que "Cargar stock".
-function filaEnvio(nombre, ordenCalculada, esExtra){
+// mismo patrón que "Cargar stock". Cada fila tiene su propio Guardar/Editar,
+// igual que en Registrar producción.
+function filaEnvio(nombre, ordenCalculada, esExtra, local, fecha){
   const tr = document.createElement('tr');
   tr.dataset.item = nombre;
   // la orden calculada se guarda en la fila base (no en los "otro lote") para
@@ -1228,18 +1329,24 @@ function filaEnvio(nombre, ordenCalculada, esExtra){
     <td><input type="date" class="inp-venc"></td>
     <td class="col-add">${esExtra ? '' : '<button type="button" class="add-lote-btn" title="Agregar otro vencimiento para este producto">+</button>'}</td>
     <td class="col-del">${esExtra ? '<button type="button" class="del-btn" title="Quitar">✕</button>' : ''}</td>
+    <td style="white-space:nowrap;">
+      <button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;">Guardar</button>
+      <button type="button" class="btn secondary btn-editar-item" style="font-size:12px;padding:5px 9px;display:none;">Editar</button>
+    </td>
   `;
   if(esExtra){
     tr.querySelector('.del-btn').onclick = () => tr.remove();
   } else {
     tr.querySelector('.add-lote-btn').onclick = () => {
-      tr.insertAdjacentElement('afterend', filaEnvio(nombre, ordenCalculada, true));
+      tr.insertAdjacentElement('afterend', filaEnvio(nombre, ordenCalculada, true, local, fecha));
     };
   }
+  tr.querySelector('.btn-guardar-item').onclick = () => guardarItemEnvio(tr, local, fecha);
+  tr.querySelector('.btn-editar-item').onclick = () => habilitarEdicionFila(tr);
   return tr;
 }
 
-function tablaEnvioDe(items, porSabor){
+function tablaEnvioDe(items, porSabor, local, fecha){
   const table = document.createElement('table');
   table.className = 'lotes';
   table.innerHTML = `
@@ -1250,12 +1357,13 @@ function tablaEnvioDe(items, porSabor){
       <th class="col-venc">Vencimiento</th>
       <th class="col-add"></th>
       <th class="col-del"></th>
+      <th></th>
     </tr></thead>
     <tbody></tbody>`;
   const tbody = table.querySelector('tbody');
   items.forEach(nombre => {
     const orden = (porSabor[nombre] && porSabor[nombre].aHacerUnidades) || 0;
-    tbody.appendChild(filaEnvio(nombre, orden, false));
+    tbody.appendChild(filaEnvio(nombre, orden, false, local, fecha));
   });
   return table;
 }
@@ -1287,7 +1395,7 @@ function pintarEnvioLocal(local, itemsCalculados, data, categorias){
     h.id = catId;
     h.textContent = cat;
     div.appendChild(h);
-    div.appendChild(tablaEnvioDe(categorias[cat], porSabor));
+    div.appendChild(tablaEnvioDe(categorias[cat], porSabor, local, data.fecha));
 
     const a = document.createElement('a');
     a.href = `#${catId}`;
@@ -1306,16 +1414,61 @@ function pintarEnvioLocal(local, itemsCalculados, data, categorias){
   return div;
 }
 
+// lee los 3 campos compartidos del despacho (responsable, repartidor,
+// acompañante) — los pide tanto el guardado por fila como el final.
+function datosComunesEnvio(){
+  return {
+    responsable: document.getElementById('inpResponsableEnvio').value.trim(),
+    repartidor: document.getElementById('inpRepartidorEnvio').value.trim(),
+    acompanante: document.getElementById('inpAcompananteEnvio').value.trim()
+  };
+}
+
+// "preguardar" un producto/lote apenas se carga, sin esperar a terminar
+// todo el despacho de ese local.
+async function guardarItemEnvio(tr, local, fecha){
+  const { responsable, repartidor, acompanante } = datosComunesEnvio();
+  if(!responsable){
+    alert('Indicá quién está despachando este envío antes de guardar (arriba de la lista de productos).');
+    return;
+  }
+  const cantidad = tr.querySelector('.inp-cant').value;
+  const vencimiento = tr.querySelector('.inp-venc').value;
+  if(!cantidad || Number(cantidad) <= 0 || !vencimiento){
+    alert('Cargá cantidad y vencimiento de este producto antes de guardarlo.');
+    return;
+  }
+  const item = { sabor: tr.dataset.item, cantidad, vencimiento };
+  const btn = tr.querySelector('.btn-guardar-item');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try{
+    const r = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'registrarEnvio', local, fecha, responsable, repartidor, acompanante, items: [item] })
+    });
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    tr.classList.add('fila-guardada');
+    [...tr.querySelectorAll('input')].forEach(el => el.disabled = true);
+    btn.textContent = '✓ Guardado'; btn.style.display = 'none';
+    const btnEditar = tr.querySelector('.btn-editar-item');
+    if(btnEditar) btnEditar.style.display = '';
+  }catch(err){
+    btn.disabled = false; btn.textContent = 'Guardar';
+    alert('No se pudo guardar este producto: ' + err.message);
+  }
+}
+
+// "Guardar despacho a [local]": guarda de una sola vez todo lo que haya
+// quedado sin guardar individualmente con su propio botón.
 async function guardarEnvio(local, fecha){
-  const responsable = document.getElementById('inpResponsableEnvio').value.trim();
-  const repartidor = document.getElementById('inpRepartidorEnvio').value.trim();
-  const acompanante = document.getElementById('inpAcompananteEnvio').value.trim();
+  const { responsable, repartidor, acompanante } = datosComunesEnvio();
   const msg = document.getElementById('msgEnvios');
   if(!responsable){
     msg.className = 'msg err'; msg.textContent = 'Indicá quién está despachando este envío.'; return;
   }
   const panel = document.querySelector(`.panel-envio-local[data-local="${local}"]`);
-  const filas = [...panel.querySelectorAll('tr[data-item]')];
+  const filas = [...panel.querySelectorAll('tr[data-item]:not(.fila-guardada)')];
   const items = filas.map(tr => ({
     sabor: tr.dataset.item,
     cantidad: tr.querySelector('.inp-cant').value,
@@ -1323,7 +1476,7 @@ async function guardarEnvio(local, fecha){
   })).filter(it => it.cantidad && Number(it.cantidad) > 0 && it.vencimiento);
 
   if(items.length === 0){
-    msg.className = 'msg err'; msg.textContent = 'Cargá cantidad y vencimiento de al menos un producto.'; return;
+    msg.className = 'msg err'; msg.textContent = 'Cargá cantidad y vencimiento de al menos un producto (los que ya guardaste con su propio botón no hace falta repetirlos).'; return;
   }
   const btn = document.getElementById(`btnGuardarEnvio-${cssId(local)}`);
   btn.disabled = true; btn.textContent = 'Guardando...';
@@ -1334,8 +1487,18 @@ async function guardarEnvio(local, fecha){
     });
     const data = await r.json();
     if(data.error) throw new Error(data.error);
+    filas.forEach(tr => {
+      if(Number(tr.querySelector('.inp-cant').value) > 0 && tr.querySelector('.inp-venc').value){
+        tr.classList.add('fila-guardada');
+        [...tr.querySelectorAll('input')].forEach(el => el.disabled = true);
+        const btnG = tr.querySelector('.btn-guardar-item');
+        btnG.textContent = '✓ Guardado'; btnG.style.display = 'none';
+        const btnE = tr.querySelector('.btn-editar-item');
+        if(btnE) btnE.style.display = '';
+      }
+    });
     msg.className = 'msg ok';
-    msg.textContent = `Despacho guardado: ${data.envios_guardados} producto(s) enviados a ${local}.`;
+    msg.textContent = `Despacho guardado: ${data.envios_guardados} producto(s) más enviados a ${local}.`;
   }catch(err){
     msg.className = 'msg err'; msg.textContent = 'No se pudo guardar: ' + err.message;
   }finally{
@@ -1714,9 +1877,8 @@ function normalizarFicha(s){
   return String(s == null ? '' : s).toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
 }
 
-// misma lógica que Code.gs > parseFichaTecnica — si se cambia acá, cambiar
-// también allá (o viceversa). Recibe una hoja ya convertida a array de
-// arrays (XLSX.utils.sheet_to_json con header:1).
+// única lógica de parseo — corre acá en el navegador (Code.gs solo recibe
+// el JSON ya armado, ver importarFichaTecnica en Code.gs).
 function parseFichaTecnica(filas){
   let filaHeader = -1;
   let colClasif = -1, colIngred = -1, colCant = -1, colMedida = -1, colRinde = -1;
@@ -1741,7 +1903,11 @@ function parseFichaTecnica(filas){
   }
   if(filaHeader === -1) return null;
 
-  let rindeCantidad = '', rindeUnidad = '';
+  // el "Rinde:" puede traer DOS pares cantidad+unidad, uno debajo del otro
+  // (ej. Dips: "3 KG" y, en la fila de abajo, "75 UN") — se guardan los dos
+  // para poder convertir entre kilos y unidades más adelante.
+  let rindeCantidad = '', rindeUnidad = '', rindeCantidad2 = '', rindeUnidad2 = '';
+  let filaRindeEncontrada = -1, colRindeLabel = -1;
   for(let r = 0; r < filaHeader; r++){
     const fila = filas[r];
     for(let c = 0; c < fila.length; c++){
@@ -1749,7 +1915,17 @@ function parseFichaTecnica(filas){
         const resto = fila.slice(c + 1).filter(x => x !== '' && x != null);
         if(resto.length >= 1) rindeCantidad = resto[0];
         if(resto.length >= 2) rindeUnidad = resto[1];
+        filaRindeEncontrada = r;
+        colRindeLabel = c;
       }
+    }
+  }
+  if(filaRindeEncontrada !== -1 && filaRindeEncontrada + 1 < filaHeader){
+    const filaSig = filas[filaRindeEncontrada + 1];
+    const restoSig = filaSig.slice(colRindeLabel + 1).filter(x => x !== '' && x != null);
+    if(restoSig.length >= 2 && !isNaN(Number(restoSig[0]))){
+      rindeCantidad2 = restoSig[0];
+      rindeUnidad2 = restoSig[1];
     }
   }
 
@@ -1770,7 +1946,7 @@ function parseFichaTecnica(filas){
       rinde: colRinde !== -1 && fila[colRinde] !== '' && fila[colRinde] != null ? Number(fila[colRinde]) : ''
     });
   }
-  return { rindeCantidad, rindeUnidad, ingredientes };
+  return { rindeCantidad, rindeUnidad, rindeCantidad2, rindeUnidad2, ingredientes };
 }
 
 async function renderFichasTecnicas(){
@@ -1795,17 +1971,31 @@ async function renderFichasTecnicas(){
       <div id="msgImportFicha" class="msg" style="margin-top:10px;"></div>
     </div>
 
+    <div id="revisionFichaContainer"></div>
+
     <div id="contenidoRecetasCargadas" class="loading">Buscando recetas cargadas…</div>
   `;
-  document.getElementById('inputFichaTecnica').onchange = importarFichaTecnica;
+  document.getElementById('inputFichaTecnica').onchange = manejarArchivoFicha;
   cargarRecetasCargadas();
 }
 
-async function importarFichaTecnica(ev){
+// tipo de ficha -> a qué lista de nombres ya existentes se compara cada
+// solapa, para poder avisar ANTES de guardar si el nombre no coincide con
+// nada (Relleno/Sabor con typo, o directamente inventado). Los Preparados
+// no se validan porque no aparecen sueltos en ningún lado — solo se usan
+// como ingrediente adentro de otras fichas.
+async function referenciaParaTipo(tipoFicha){
+  if(tipoFicha === 'Relleno' || tipoFicha === 'EdicionLimitada') return await obtenerRellenos();
+  if(tipoFicha === 'Postre' || tipoFicha === 'Dip') return Object.values(await obtenerCategorias()).flat();
+  return null;
+}
+
+async function manejarArchivoFicha(ev){
   const file = ev.target.files[0];
   if(!file) return;
   const tipoFicha = document.getElementById('selTipoFicha').value;
   const msg = document.getElementById('msgImportFicha');
+  document.getElementById('revisionFichaContainer').innerHTML = '';
   msg.className = 'msg'; msg.style.display = 'block'; msg.textContent = 'Leyendo archivo…';
 
   try{
@@ -1818,29 +2008,99 @@ async function importarFichaTecnica(ev){
       const filas = XLSX.utils.sheet_to_json(wb.Sheets[nombreHoja], { header: 1, raw: true, defval: '' });
       const parsed = parseFichaTecnica(filas);
       if(!parsed){ salteadas.push(nombreHoja); return; }
-      recetas.push({ nombreReceta: nombreHoja.trim(), rindeCantidad: parsed.rindeCantidad, rindeUnidad: parsed.rindeUnidad, ingredientes: parsed.ingredientes });
+      recetas.push({
+        nombreReceta: nombreHoja.trim(),
+        rindeCantidad: parsed.rindeCantidad, rindeUnidad: parsed.rindeUnidad,
+        rindeCantidad2: parsed.rindeCantidad2, rindeUnidad2: parsed.rindeUnidad2,
+        ingredientes: parsed.ingredientes
+      });
     });
 
     if(recetas.length === 0){
-      msg.className = 'msg err'; msg.textContent = 'No encontré ninguna receta en ese archivo.'; return;
+      msg.className = 'msg err'; msg.textContent = 'No encontré ninguna receta en ese archivo.';
+      ev.target.value = ''; return;
     }
 
-    msg.textContent = 'Guardando ' + recetas.length + ' receta(s)…';
-    const r = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'importarFichaTecnica', tipoFicha, recetas })
-    });
-    const resp = await r.json();
-    if(resp.error) throw new Error(resp.error);
-
-    msg.className = 'msg ok';
-    msg.textContent = `Importadas ${resp.recetasImportadas.length} receta(s): ${resp.recetasImportadas.join(', ')}.` +
-      (salteadas.length ? ` Se salteó (no parece receta): ${salteadas.join(', ')}.` : '');
-    cargarRecetasCargadas();
+    msg.style.display = 'none';
+    const referencia = await referenciaParaTipo(tipoFicha);
+    mostrarRevisionFicha(tipoFicha, recetas, salteadas, referencia);
   }catch(err){
-    msg.className = 'msg err'; msg.textContent = 'No se pudo importar: ' + err.message;
+    msg.className = 'msg err'; msg.textContent = 'No se pudo leer el archivo: ' + err.message;
   }
   ev.target.value = '';
+}
+
+// pantalla de revisión ANTES de guardar: por cada solapa, dice si el nombre
+// coincide con un Relleno/Sabor que ya existe en el sistema; si no coincide
+// deja un campo para escribir a mano a qué corresponde en vez de cancelar
+// todo e ir a corregir el Excel.
+function mostrarRevisionFicha(tipoFicha, recetas, salteadas, referencia){
+  const rev = document.getElementById('revisionFichaContainer');
+  const referenciaNorm = referencia ? referencia.map(n => normalizarFicha(n)) : null;
+  const etiquetaReferencia = (tipoFicha === 'Postre' || tipoFicha === 'Dip') ? 'Sabores' : 'Rellenos';
+
+  const filasHtml = recetas.map((r, i) => {
+    const coincide = referenciaNorm === null ? null : referenciaNorm.indexOf(normalizarFicha(r.nombreReceta)) !== -1;
+    const estado = coincide === null
+      ? `<span style="color:var(--ink-soft);">— no se valida (Preparado)</span>`
+      : coincide
+        ? `<span style="color:#3f7a4a;">✓ coincide</span>`
+        : `<span style="color:#b23b2e;">⚠ no encontré ese nombre entre los ${etiquetaReferencia}</span>`;
+    const rinde2 = r.rindeCantidad2 !== '' ? ` / ${r.rindeCantidad2} ${r.rindeUnidad2}` : '';
+    return `
+      <tr>
+        <td>${r.nombreReceta}<br>${estado}</td>
+        <td>${r.rindeCantidad} ${r.rindeUnidad}${rinde2}</td>
+        <td>${r.ingredientes.length}</td>
+        <td><input type="text" class="inp-nombre-correcto" data-idx="${i}" placeholder="dejar igual"></td>
+      </tr>`;
+  }).join('');
+
+  const salteadasHtml = salteadas.length
+    ? `<p style="color:var(--ink-soft);font-size:12.5px;margin-top:10px;">Se salteó (no parece una hoja de receta): ${salteadas.join(', ')}.</p>`
+    : '';
+
+  rev.innerHTML = `
+    <div style="border:1px solid var(--line);border-radius:4px;padding:14px 16px;margin:16px 0;">
+      <p style="font-size:13px;margin-bottom:10px;">
+        Revisá antes de guardar. Si alguna receta dice "⚠ no encontré ese nombre", escribí en la última columna
+        a qué ${etiquetaReferencia.slice(0, -1)} corresponde tal cual está en el sistema (o cancelá y corregí el
+        nombre de la solapa en el Excel).
+      </p>
+      <table class="lotes" style="width:100%;">
+        <thead><tr><th>Receta (solapa del Excel)</th><th>Rinde</th><th>Ingredientes</th><th>Corregir nombre a…</th></tr></thead>
+        <tbody>${filasHtml}</tbody>
+      </table>
+      ${salteadasHtml}
+      <div class="actions" style="margin-top:12px;">
+        <button class="btn" id="btnConfirmarFicha">Confirmar y guardar</button>
+        <button class="btn secondary" id="btnCancelarFicha">Cancelar</button>
+      </div>
+      <div class="msg" id="msgConfirmarFicha"></div>
+    </div>`;
+
+  document.getElementById('btnCancelarFicha').onclick = () => { rev.innerHTML = ''; };
+  document.getElementById('btnConfirmarFicha').onclick = async () => {
+    rev.querySelectorAll('.inp-nombre-correcto').forEach(inp => {
+      const val = inp.value.trim();
+      if(val) recetas[Number(inp.dataset.idx)].nombreReceta = val;
+    });
+    const msgC = document.getElementById('msgConfirmarFicha');
+    msgC.className = 'msg'; msgC.style.display = 'block'; msgC.textContent = 'Guardando ' + recetas.length + ' receta(s)…';
+    try{
+      const r = await fetch(APPS_SCRIPT_URL, {
+        method: 'POST',
+        body: JSON.stringify({ action: 'importarFichaTecnica', tipoFicha, recetas })
+      });
+      const resp = await r.json();
+      if(resp.error) throw new Error(resp.error);
+      msgC.className = 'msg ok';
+      msgC.textContent = `Importadas ${resp.recetasImportadas.length} receta(s): ${resp.recetasImportadas.join(', ')}.`;
+      cargarRecetasCargadas();
+    }catch(err){
+      msgC.className = 'msg err'; msgC.textContent = 'No se pudo importar: ' + err.message;
+    }
+  };
 }
 
 async function cargarRecetasCargadas(){
