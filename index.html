@@ -187,6 +187,7 @@ function irA(pantalla){
   if(pantalla === 'envios') renderEnvios();
   if(pantalla === 'recepcion') renderRecepcion();
   if(pantalla === 'historial') renderHistorialEnvios();
+  if(pantalla === 'registro') renderRegistroProduccion();
 }
 
 function renderHome(){
@@ -205,6 +206,11 @@ function renderHome(){
         <div class="tag">FÁBRICA</div>
         <h2>Ver qué producir hoy</h2>
         <p>Calculado a partir del stock cargado y la venta estimada de cada sabor.</p>
+      </button>
+      <button class="home-card" onclick="irA('registro')">
+        <div class="tag">FÁBRICA</div>
+        <h2>Registrar producción</h2>
+        <p>Trazabilidad del turno: máquina, disco, relleno, horas y total producido por sabor.</p>
       </button>
       <button class="home-card" onclick="irA('envios')">
         <div class="tag">FÁBRICA</div>
@@ -250,6 +256,23 @@ async function obtenerRellenos(){
   return RELLENOS_CACHE;
 }
 
+// Lista de empleados (hoja "Empleados" del Sheet) para los desplegables de
+// "quién hizo esto" — Responsable, Repartidor, Acompañante, puestos de máquina.
+let EMPLEADOS_CACHE = null;
+async function obtenerEmpleados(){
+  if(EMPLEADOS_CACHE) return EMPLEADOS_CACHE;
+  const r = await fetch(`${APPS_SCRIPT_URL}?action=listarEmpleados`);
+  const data = await r.json();
+  EMPLEADOS_CACHE = data.empleados || [];
+  return EMPLEADOS_CACHE;
+}
+function opcionesEmpleados(empleados){
+  if(!empleados || empleados.length === 0){
+    return '<option value="">(cargá empleados en la hoja "Empleados")</option>';
+  }
+  return '<option value="">— Seleccionar —</option>' + empleados.map(n => `<option value="${n}">${n}</option>`).join('');
+}
+
 async function renderLocal(){
   app.innerHTML = `
     <button class="back" onclick="irA('home')">← Volver</button>
@@ -263,7 +286,7 @@ async function renderLocal(){
     </div>
     <div class="field-row">
       <label>¿Quién está cargando este stock?</label>
-      <input type="text" id="inpResponsable" placeholder="Nombre">
+      <select id="inpResponsable"><option value="">Cargando…</option></select>
     </div>
     <div class="field-row">
       <label>Fecha (por si cargás con atraso)</label>
@@ -287,6 +310,8 @@ async function renderLocal(){
 
   const categorias = await obtenerCategorias();
   const rellenos = await obtenerRellenos();
+  const empleados = await obtenerEmpleados();
+  document.getElementById('inpResponsable').innerHTML = opcionesEmpleados(empleados);
   const nombresCategorias = Object.keys(categorias);
 
   // según el sector elegido, se carga por Sabor (locales y Fábrica -
@@ -605,6 +630,242 @@ function pintarDiscos(data){
 }
 
 /* ---------------------------------------------------------------------
+   Pantalla REGISTRAR PRODUCCIÓN (trazabilidad de turno) — por sector.
+   Por ahora solo está armado el sector Producción (con la planilla en
+   papel "Registro de Producción y Trazabilidad"); Cocina y Discos quedan
+   con un aviso hasta tener esas planillas.
+   --------------------------------------------------------------------- */
+let CALCULO_REGISTRO = null;
+let CATEGORIAS_REGISTRO = null;
+let EMPLEADOS_REGISTRO = null;
+let SECTOR_REGISTRO_ACTIVO = 'produccion';
+
+async function renderRegistroProduccion(){
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <div class="fab-toolbar">
+      <header class="top" style="margin:0;"><h1>Registrar producción</h1></header>
+      <div class="field-row">
+        <label>Fecha del turno</label>
+        <input type="date" id="fechaRegistro" value="${hoyISO()}">
+      </div>
+    </div>
+    <div class="tabs" id="tabsRegistro">
+      <button class="tab-btn active" data-sector="produccion">Producción</button>
+      <button class="tab-btn" data-sector="cocina">Cocina</button>
+      <button class="tab-btn" data-sector="discos">Discos</button>
+    </div>
+    <div id="contenidoRegistro" class="loading">Cargando…</div>
+    <div class="msg" id="msgRegistro"></div>
+  `;
+  [...document.querySelectorAll('#tabsRegistro .tab-btn')].forEach(b => {
+    b.onclick = () => {
+      [...document.querySelectorAll('#tabsRegistro .tab-btn')].forEach(x => x.classList.toggle('active', x === b));
+      pintarSectorRegistro(b.dataset.sector);
+    };
+  });
+  document.getElementById('fechaRegistro').onchange = cargarRegistroProduccion;
+  cargarRegistroProduccion();
+}
+
+async function cargarRegistroProduccion(){
+  const fecha = document.getElementById('fechaRegistro').value;
+  const cont = document.getElementById('contenidoRegistro');
+  cont.className = 'loading'; cont.textContent = 'Cargando…';
+  const msg = document.getElementById('msgRegistro');
+  msg.className = 'msg'; msg.textContent = '';
+  try{
+    const [r, categorias, empleados] = await Promise.all([
+      fetch(`${APPS_SCRIPT_URL}?action=calcularTodo&fecha=${fecha}`),
+      obtenerCategorias(),
+      obtenerEmpleados()
+    ]);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    CALCULO_REGISTRO = data;
+    CATEGORIAS_REGISTRO = categorias;
+    EMPLEADOS_REGISTRO = empleados;
+    pintarSectorRegistro(SECTOR_REGISTRO_ACTIVO);
+  }catch(err){
+    cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar: ${err.message}</div>`;
+  }
+}
+
+function pintarSectorRegistro(sector){
+  SECTOR_REGISTRO_ACTIVO = sector;
+  const cont = document.getElementById('contenidoRegistro');
+  cont.className = '';
+  if(sector !== 'produccion'){
+    cont.innerHTML = `<div class="empty">Todavía no tengo la planilla de este sector — pasámela y lo armamos.</div>`;
+    return;
+  }
+  pintarRegistroProduccionSector();
+}
+
+// arma el bloque "puestos" de una máquina: 5 desplegables (empleado en cada
+// posición, de la hoja "Empleados"), igual a la planilla en papel.
+function bloquePuestosMaquina(titulo, idBase, empleados){
+  const opciones = opcionesEmpleados(empleados);
+  const div = document.createElement('div');
+  div.style.marginBottom = '16px';
+  const h = document.createElement('h4');
+  h.className = 'cat-heading';
+  h.textContent = titulo + ' — puestos';
+  div.appendChild(h);
+  const table = document.createElement('table');
+  table.className = 'lotes';
+  table.dataset.maquina = idBase;
+  table.innerHTML = `
+    <thead><tr><th>Entrada</th><th>Relleno</th><th>Salida</th></tr></thead>
+    <tbody><tr>
+      <td><select class="inp-puesto" data-puesto="entrada">${opciones}</select></td>
+      <td><select class="inp-puesto" data-puesto="relleno">${opciones}</select></td>
+      <td><select class="inp-puesto" data-puesto="salida">${opciones}</select></td>
+    </tr></tbody>`;
+  div.appendChild(table);
+  return div;
+}
+
+function pintarRegistroProduccionSector(){
+  const cont = document.getElementById('contenidoRegistro');
+  const data = CALCULO_REGISTRO;
+  const categorias = CATEGORIAS_REGISTRO || {};
+  // mismo listado de sabores que "Ver qué producir hoy" (Empanadas Horno + Frito),
+  // TODOS, no solo los que calcularon faltante — así no se pierde ningún sabor
+  // que se haya armado igual ese turno.
+  const sabores = [...(categorias['Empanadas Horno'] || []), ...(categorias['Empanadas Frito'] || [])];
+  const porSabor = {};
+  (data.produccion || []).forEach(f => { if(f.tipoCalculo === 'Calendario') porSabor[f.sabor] = f; });
+
+  cont.innerHTML = '';
+
+  const intro = document.createElement('p');
+  intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
+  intro.textContent = `${data.dia}, ${fmtFecha(data.fecha)} — completá solo los sabores que se armaron este turno. "A producir (calc.)" es de referencia.`;
+  cont.appendChild(intro);
+
+  cont.appendChild(bloquePuestosMaquina('Máquina 1', 'm1', EMPLEADOS_REGISTRO));
+  cont.appendChild(bloquePuestosMaquina('Máquina 2', 'm2', EMPLEADOS_REGISTRO));
+
+  const h = document.createElement('h4');
+  h.className = 'cat-heading';
+  h.textContent = 'Producción por sabor';
+  cont.appendChild(h);
+
+  const wrap = document.createElement('div');
+  wrap.style.overflowX = 'auto';
+  const table = document.createElement('table');
+  table.className = 'lotes traza';
+  table.innerHTML = `
+    <thead><tr>
+      <th>Sabor</th>
+      <th class="num">A producir (calc.)</th>
+      <th>Máquina Nº</th>
+      <th>Velocidad</th>
+      <th>Disco lote</th>
+      <th>Peso prom.<br>tanda discos</th>
+      <th>Relleno fecha</th>
+      <th>Peso inicial<br>relleno (kg)</th>
+      <th>Peso final<br>relleno (kg)</th>
+      <th>Hora inicio</th>
+      <th>Hora fin</th>
+      <th>Total<br>producción</th>
+      <th>Discos<br>dañados</th>
+    </tr></thead>
+    <tbody></tbody>`;
+  const tbody = table.querySelector('tbody');
+  sabores.forEach(nombre => {
+    const ref = porSabor[nombre];
+    const tr = document.createElement('tr');
+    tr.dataset.sabor = nombre;
+    tr.innerHTML = `
+      <td>${nombre}</td>
+      <td class="num" style="color:var(--ink-soft);">${ref ? ent(ref.aHacerUnidades) : '—'}</td>
+      <td><input type="number" min="0" step="1" class="inp-maq-num" style="width:56px;"></td>
+      <td><input type="text" class="inp-maq-vel" style="width:64px;"></td>
+      <td><input type="text" class="inp-disco-lote" style="width:90px;"></td>
+      <td><input type="number" min="0" step="0.01" class="inp-peso-prom" style="width:80px;"></td>
+      <td><input type="date" class="inp-relleno-fecha"></td>
+      <td><input type="number" min="0" step="0.01" class="inp-peso-inicial" style="width:80px;"></td>
+      <td><input type="number" min="0" step="0.01" class="inp-peso-final" style="width:80px;"></td>
+      <td><input type="time" class="inp-hora-inicio"></td>
+      <td><input type="time" class="inp-hora-fin"></td>
+      <td><input type="number" min="0" step="1" class="inp-total-prod" style="width:80px;"></td>
+      <td><input type="number" min="0" step="1" class="inp-discos-danados" style="width:64px;"></td>
+    `;
+    tbody.appendChild(tr);
+  });
+  wrap.appendChild(table);
+  cont.appendChild(wrap);
+
+  const obsWrap = document.createElement('div');
+  obsWrap.className = 'field-row';
+  obsWrap.style.cssText = 'max-width:640px;margin-top:18px;';
+  obsWrap.innerHTML = `
+    <label>Observaciones generales del turno</label>
+    <textarea id="inpObservacionesRegistro" rows="3" style="width:100%;font-family:inherit;font-size:14px;padding:9px 10px;border:1px solid var(--line);border-radius:3px;"></textarea>
+  `;
+  cont.appendChild(obsWrap);
+
+  const actions = document.createElement('div');
+  actions.className = 'actions';
+  actions.innerHTML = `<button class="btn" id="btnGuardarRegistro">Guardar registro del turno</button>`;
+  cont.appendChild(actions);
+  document.getElementById('btnGuardarRegistro').onclick = guardarRegistroProduccion;
+}
+
+async function guardarRegistroProduccion(){
+  const fecha = document.getElementById('fechaRegistro').value;
+  const msg = document.getElementById('msgRegistro');
+
+  const leerMaquina = (idBase) => {
+    const table = document.querySelector(`table.lotes[data-maquina="${idBase}"]`);
+    const get = (p) => table.querySelector(`.inp-puesto[data-puesto="${p}"]`).value.trim();
+    return { entrada: get('entrada'), relleno: get('relleno'), salida: get('salida') };
+  };
+  const maquina1 = leerMaquina('m1');
+  const maquina2 = leerMaquina('m2');
+  const observaciones = document.getElementById('inpObservacionesRegistro').value.trim();
+
+  const filas = [...document.querySelectorAll('table.traza tbody tr[data-sabor]')];
+  const items = filas.map(tr => ({
+    sabor: tr.dataset.sabor,
+    maquinaNumero: tr.querySelector('.inp-maq-num').value,
+    maquinaVelocidad: tr.querySelector('.inp-maq-vel').value,
+    discosLote: tr.querySelector('.inp-disco-lote').value,
+    pesoPromTandaDiscos: tr.querySelector('.inp-peso-prom').value,
+    rellenoFecha: tr.querySelector('.inp-relleno-fecha').value,
+    pesoInicialRelleno: tr.querySelector('.inp-peso-inicial').value,
+    pesoFinalRelleno: tr.querySelector('.inp-peso-final').value,
+    horaInicio: tr.querySelector('.inp-hora-inicio').value,
+    horaFin: tr.querySelector('.inp-hora-fin').value,
+    totalProduccion: tr.querySelector('.inp-total-prod').value,
+    discosDanados: tr.querySelector('.inp-discos-danados').value
+  })).filter(it => it.totalProduccion && Number(it.totalProduccion) > 0);
+
+  if(items.length === 0){
+    msg.className = 'msg err'; msg.textContent = 'Cargá el total producido de al menos un sabor.'; return;
+  }
+
+  const btn = document.getElementById('btnGuardarRegistro');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try{
+    const r = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'registrarTrazabilidadProduccion', fecha, maquina1, maquina2, observaciones, items })
+    });
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    msg.className = 'msg ok';
+    msg.textContent = `Registro guardado: ${data.filas_detalle} sabor(es) con producción.`;
+  }catch(err){
+    msg.className = 'msg err'; msg.textContent = 'No se pudo guardar: ' + err.message;
+  }finally{
+    btn.disabled = false; btn.textContent = 'Guardar registro del turno';
+  }
+}
+
+/* ---------------------------------------------------------------------
    Pantalla ENVÍOS (Fábrica): cuánto mandarle hoy a cada local
    --------------------------------------------------------------------- */
 const LOCALES_VENTA = LOCALES.slice(0, 3); // Centro, Patagonia, Zelarrayan — sin sectores de Fábrica
@@ -622,9 +883,19 @@ async function renderEnvios(){
         <input type="date" id="fechaEnvios" value="${hoyISO()}">
       </div>
     </div>
-    <div class="field-row">
-      <label>¿Quién despacha?</label>
-      <input type="text" id="inpResponsableEnvio" placeholder="Nombre">
+    <div class="fab-toolbar">
+      <div class="field-row">
+        <label>¿Quién despacha?</label>
+        <select id="inpResponsableEnvio"><option value="">Cargando…</option></select>
+      </div>
+      <div class="field-row">
+        <label>Repartidor</label>
+        <select id="inpRepartidorEnvio"><option value="">Cargando…</option></select>
+      </div>
+      <div class="field-row">
+        <label>Acompañante</label>
+        <select id="inpAcompananteEnvio"><option value="">Cargando…</option></select>
+      </div>
     </div>
     <p style="color:var(--ink-soft);font-size:12.5px;max-width:560px;">
       Están listados todos los productos, igual que en "Cargar stock" — completá "Enviado (real)" y
@@ -649,12 +920,17 @@ async function cargarEnvios(){
   msg.className = 'msg'; msg.textContent = '';
 
   try{
-    const [r, categorias] = await Promise.all([
+    const [r, categorias, empleados] = await Promise.all([
       fetch(`${APPS_SCRIPT_URL}?action=calcularEnvios&fecha=${fecha}`),
-      obtenerCategorias()
+      obtenerCategorias(),
+      obtenerEmpleados()
     ]);
     const data = await r.json();
     if(data.error) throw new Error(data.error);
+
+    document.getElementById('inpResponsableEnvio').innerHTML = opcionesEmpleados(empleados);
+    document.getElementById('inpRepartidorEnvio').innerHTML = opcionesEmpleados(empleados);
+    document.getElementById('inpAcompananteEnvio').innerHTML = opcionesEmpleados(empleados);
 
     const tabs = document.getElementById('tabsEnvios');
     tabs.style.display = 'flex';
@@ -781,6 +1057,8 @@ function pintarEnvioLocal(local, itemsCalculados, data, categorias){
 
 async function guardarEnvio(local, fecha){
   const responsable = document.getElementById('inpResponsableEnvio').value.trim();
+  const repartidor = document.getElementById('inpRepartidorEnvio').value.trim();
+  const acompanante = document.getElementById('inpAcompananteEnvio').value.trim();
   const msg = document.getElementById('msgEnvios');
   if(!responsable){
     msg.className = 'msg err'; msg.textContent = 'Indicá quién está despachando este envío.'; return;
@@ -801,7 +1079,7 @@ async function guardarEnvio(local, fecha){
   try{
     const r = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'registrarEnvio', local, fecha, responsable, items })
+      body: JSON.stringify({ action: 'registrarEnvio', local, fecha, responsable, repartidor, acompanante, items })
     });
     const data = await r.json();
     if(data.error) throw new Error(data.error);
@@ -897,11 +1175,14 @@ async function renderRecepcion(){
     </div>
     <div class="field-row">
       <label>¿Quién confirma?</label>
-      <input type="text" id="inpResponsableRecepcion" placeholder="Nombre">
+      <select id="inpResponsableRecepcion"><option value="">Cargando…</option></select>
     </div>
     <div id="contenidoRecepcion" class="loading">Buscando envíos pendientes…</div>
     <div class="msg" id="msgRecepcion"></div>
   `;
+  obtenerEmpleados().then(empleados => {
+    document.getElementById('inpResponsableRecepcion').innerHTML = opcionesEmpleados(empleados);
+  });
   document.getElementById('selLocalRecepcion').onchange = cargarPendientesRecepcion;
   cargarPendientesRecepcion();
 }
