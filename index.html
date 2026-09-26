@@ -691,6 +691,9 @@ async function cargarEnvios(){
 function filaEnvio(nombre, ordenCalculada, esExtra){
   const tr = document.createElement('tr');
   tr.dataset.item = nombre;
+  // la orden calculada se guarda en la fila base (no en los "otro lote") para
+  // poder imprimir con este valor cuando todavía no se cargó nada a mano.
+  tr.dataset.orden = esExtra ? 0 : (ordenCalculada || 0);
   tr.innerHTML = `
     <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : nombre}</td>
     <td class="num" style="color:var(--ink-soft);">${esExtra ? '' : ent(ordenCalculada)}</td>
@@ -811,37 +814,41 @@ async function guardarEnvio(local, fecha){
   }
 }
 
-// Arma una hoja de "Orden de envío" imprimible para UN local, con lo que
-// realmente se cargó en pantalla (no el listado completo) — se salta
-// cualquier producto en cero, y salta la categoría entera si ninguno de
-// sus productos tiene cantidad cargada.
+// Arma una hoja de "Orden de envío" imprimible para UN local. Si ya cargaron
+// cantidad a mano, imprime eso; si no (todavía no tiene tablet a mano quien
+// prepara el pedido), imprime la orden CALCULADA, así sirve de planilla en
+// papel para armar el envío y cargarlo después. Se salta cualquier producto
+// sin nada (ni cargado ni calculado) y la categoría entera si ninguno de sus
+// productos tiene algo para enviar.
 function imprimirOrdenEnvio(local, fecha){
   const panel = document.querySelector(`.panel-envio-local[data-local="${local}"]`);
   const filas = [...panel.querySelectorAll('tr[data-item]')];
   const porSabor = {};
   filas.forEach(tr => {
-    const cantidad = Number(tr.querySelector('.inp-cant').value) || 0;
-    if(cantidad <= 0) return;
     const nombre = tr.dataset.item;
+    const cantidadReal = Number(tr.querySelector('.inp-cant').value) || 0;
     const venc = tr.querySelector('.inp-venc').value;
-    // si hay más de un lote del mismo producto (botón "+"), se suman para el impreso
-    if(porSabor[nombre]){
-      porSabor[nombre].cantidad += cantidad;
-      if(!porSabor[nombre].vencimiento) porSabor[nombre].vencimiento = venc;
-    } else {
-      porSabor[nombre] = { cantidad, vencimiento: venc };
+    if(!porSabor[nombre]){
+      porSabor[nombre] = { ordenCalculada: Number(tr.dataset.orden) || 0, cantidadReal: 0, vencimiento: '' };
     }
+    porSabor[nombre].cantidadReal += cantidadReal;
+    if(!porSabor[nombre].vencimiento && venc) porSabor[nombre].vencimiento = venc;
+  });
+  Object.keys(porSabor).forEach(n => {
+    const it = porSabor[n];
+    it.cantidadImprimir = it.cantidadReal > 0 ? it.cantidadReal : it.ordenCalculada;
   });
 
-  if(Object.keys(porSabor).length === 0){
-    alert(`Todavía no cargaste ninguna cantidad para ${local} — no hay nada para imprimir.`);
+  const hayAlgo = Object.keys(porSabor).some(n => porSabor[n].cantidadImprimir > 0);
+  if(!hayAlgo){
+    alert(`No hay nada para enviar a ${local} hoy (ni cargado ni calculado).`);
     return;
   }
 
   const categorias = SABORES_CACHE || {};
   let filasHtml = '';
   Object.keys(categorias).forEach(cat => {
-    const nombres = categorias[cat].filter(n => porSabor[n]);
+    const nombres = categorias[cat].filter(n => porSabor[n] && porSabor[n].cantidadImprimir > 0);
     if(nombres.length === 0) return; // sin nada que enviar en esta categoría: no se imprime
     filasHtml += `
       <h3>${cat}</h3>
@@ -851,7 +858,7 @@ function imprimirOrdenEnvio(local, fecha){
           ${nombres.map(n => `
             <tr>
               <td>${n}</td>
-              <td class="num">${ent(porSabor[n].cantidad)}</td>
+              <td class="num">${ent(porSabor[n].cantidadImprimir)}</td>
               <td>${porSabor[n].vencimiento ? fmtFecha(porSabor[n].vencimiento) : ''}</td>
             </tr>`).join('')}
         </tbody>
