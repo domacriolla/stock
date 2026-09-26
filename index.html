@@ -473,7 +473,7 @@ function pintarProduccion(data){
         <thead>
           <tr>
             <th>Sabor / ítem</th>
-            ${esEmpanada ? '<th>Relleno</th><th>Se cocinó</th>' : ''}
+            ${esEmpanada ? '<th>Se cocinó</th>' : ''}
             <th class="num">Objetivo</th>
             ${esEmpanada ? '<th>Días que cubre</th>' : ''}
             <th class="num">Stock disponible</th>
@@ -485,7 +485,7 @@ function pintarProduccion(data){
           ${items.map(f => `
             <tr>
               <td>${f.sabor}</td>
-              ${esEmpanada ? `<td>${f.relleno}</td><td>${f.diaCocina}${f.diaCocina !== f.diaArmado ? ` <span class="badge reposo">reposo</span>` : ''}</td>` : ''}
+              ${esEmpanada ? `<td>${f.diaCocina}${f.diaCocina !== f.diaArmado ? ` <span class="badge reposo">reposo</span>` : ''}</td>` : ''}
               <td class="num">${ent(f.objetivoUnidades)}</td>
               ${esEmpanada ? `<td style="color:var(--ink-soft);font-size:12.5px;">${f.diasQueCubre}</td>` : ''}
               <td class="num">${ent(f.stockValidoUnidades)}</td>
