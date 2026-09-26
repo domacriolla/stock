@@ -586,7 +586,9 @@ function bloquePrepDiaAnterior(){
 /* ---- Pestaña PRODUCCIÓN: qué armar hoy, por sabor (todos los rubros) ---- */
 function pintarProduccion(data){
   const cont = document.getElementById('contenidoFabrica');
-  const filas = data.produccion.filter(f => f.aHacerUnidades > 0);
+  // Dips y Postres los elabora Cocina (no Producción) — se muestran en la
+  // pestaña Cocina, junto con Preparados y Rellenos.
+  const filas = data.produccion.filter(f => f.aHacerUnidades > 0 && f.rubro !== 'Dips' && f.rubro !== 'Postres');
   const alertaHtml = bloqueAlertas(data);
   const prepHtml = bloquePrepDiaAnterior();
 
@@ -640,71 +642,142 @@ function pintarProduccion(data){
   `;
 }
 
-/* ---- Pestaña COCINA: cuánto relleno cocinar hoy, por relleno ---- */
+/* ---- Pestaña COCINA: todo lo que elabora Cocina hoy — Preparados, Rellenos,
+   Dips y Postres (Dips/Postres los arma Cocina, no Producción) ---- */
 function pintarCocina(data){
   const cont = document.getElementById('contenidoFabrica');
-  const filas = data.cocina.filter(f => f.kilosDeRelleno > 0);
+  const filasRelleno = data.cocina.filter(f => f.kilosDeRelleno > 0);
   const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Cocina</h2>`;
 
-  if(filas.length === 0){
+  const tablaSimple = (rubro, titulo) => {
+    const items = (data.produccion || []).filter(f => f.rubro === rubro && f.aHacerUnidades > 0);
+    if(items.length === 0) return '';
+    return `
+      <h3 style="font-size:15px;margin:20px 0 8px;">${titulo}</h3>
+      <table class="prod">
+        <thead><tr><th>Sabor / ítem</th><th class="num">Objetivo</th><th class="num">Stock disponible</th><th class="num">A reponer (u.)</th></tr></thead>
+        <tbody>
+          ${items.map(f => `
+            <tr>
+              <td>${f.sabor}</td>
+              <td class="num">${ent(f.objetivoUnidades)}</td>
+              <td class="num">${ent(f.stockValidoUnidades)}</td>
+              <td class="num"><strong>${ent(f.aHacerUnidades)}</strong></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  };
+  const bloqueDips = tablaSimple('Dips', 'Dips');
+  const bloquePostres = tablaSimple('Postres', 'Postres');
+
+  if(filasRelleno.length === 0 && !bloqueDips && !bloquePostres){
     cont.className = '';
-    cont.innerHTML = tituloSector + `<div class="empty">Cocina no elabora ningún relleno el ${data.dia.toLowerCase()}.</div>`;
+    cont.innerHTML = tituloSector + `<div class="empty">Cocina no elabora nada el ${data.dia.toLowerCase()}.</div>`;
     return;
   }
 
-  cont.className = '';
-  cont.innerHTML = tituloSector + `
+  const tablaRellenos = filasRelleno.length === 0 ? '' : `
+    <h3 style="font-size:15px;margin:20px 0 8px;">Rellenos</h3>
     <div class="field-row no-print" style="max-width:320px;">
       <label>% de venta a cubrir <span style="color:var(--ink-soft);font-weight:400;">(los locales siempre tienen algo de stock — bajalo si no hace falta cubrir el 100%)</span></label>
       <input type="number" id="inpPctRelleno" min="0" max="200" step="5" value="100" style="width:90px;">
     </div>
-    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)} — <span id="totalKilosCocina"></span> kg de relleno en total</p>
+    <p style="color:var(--ink-soft);font-size:13px;"><span id="totalKilosCocina"></span> kg de relleno en total</p>
     <table class="prod">
-      <thead><tr><th>Relleno</th><th>Sabores que arma</th><th>Días que cubre</th><th class="num">Kg de relleno</th></tr></thead>
+      <thead><tr><th>Relleno</th><th>Sabores que arma</th><th>Días que cubre</th><th class="num">Kg de relleno</th><th class="num">Ollas</th></tr></thead>
       <tbody>
-        ${filas.map(f => `
-          <tr data-kilos-base="${f.kilosDeRelleno}">
+        ${filasRelleno.map(f => `
+          <tr data-kilos-base="${f.kilosDeRelleno}" data-relleno="${f.relleno}">
             <td><strong>${f.relleno}</strong></td>
             <td style="color:var(--ink-soft);font-size:12.5px;">${f.sabores.map(s => s.sabor).join(', ')}</td>
             <td style="color:var(--ink-soft);font-size:12.5px;">${f.diasQueCubre}</td>
             <td class="num kg-relleno"><strong></strong></td>
+            <td class="num ollas-relleno">—</td>
           </tr>`).join('')}
       </tbody>
     </table>
-    <div id="preparadosCocina" style="margin-top:22px;"></div>
+    <div id="gramajeOllasRellenos"></div>`;
+
+  cont.className = '';
+  cont.innerHTML = tituloSector + `
+    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)}</p>
+    <div id="preparadosCocina"></div>
+    ${tablaRellenos}
+    ${bloqueDips}
+    ${bloquePostres}
   `;
 
-  document.getElementById('inpPctRelleno').oninput = recalcularCocinaPct;
-  recalcularCocinaPct();
+  if(filasRelleno.length > 0){
+    document.getElementById('inpPctRelleno').oninput = recalcularCocinaPct;
+    recalcularCocinaPct();
+  }
   cargarPreparadosCocina(data.fecha);
 }
 
+// pequeño detalle plegable con el gramaje de ingredientes escalado a una
+// olla (8 kg) — se usa tanto para Preparados como para Rellenos directos.
+function bloqueGramajeOllas(items){
+  if(!items || items.length === 0) return '';
+  return items.map(o => `
+    <details style="margin-top:8px;font-size:12.5px;">
+      <summary style="cursor:pointer;color:var(--ink-soft);">Gramaje por olla (8 kg) — ${o.nombre}</summary>
+      <ul style="margin:8px 0 0 18px;">
+        ${(o.gramajePorOlla || []).map(g => `<li>${g.ingrediente}: ${ent(g.cantidad)} ${g.medida || ''}</li>`).join('')}
+      </ul>
+    </details>`).join('');
+}
+
 // "explota" las fichas técnicas contra lo que ya se calculó, para saber
-// cuántos kilos de cada Preparado (ej. Puré, Sofrito) hace falta cocinar hoy
-// — además de los rellenos de arriba. Ver los avisos de alcance en Code.gs >
-// calcularDemandaPreparados (por ahora no incluye Dips ni Discos/Canastas).
+// cuántos kilos de cada Preparado (ej. Puré, Sofrito, Relleno Carne, Pollo
+// Grille) hace falta cocinar hoy, y de paso trae las Ollas (calcularOllas):
+// cuántos lotes de 8 kg de carne cruda arma Cocina, tanto de los Preparados
+// que se comparten entre varios rellenos como de los rellenos que usan un
+// ingrediente crudo directo (ver el comentario de calcularOllas en Code.gs).
 async function cargarPreparadosCocina(fecha){
   const cont = document.getElementById('preparadosCocina');
   if(!cont) return;
-  cont.innerHTML = `<p class="loading">Buscando preparados…</p>`;
+  cont.innerHTML = `<h3 style="font-size:15px;margin:0 0 8px;">Preparados</h3><p class="loading">Buscando preparados…</p>`;
   try{
-    const r = await fetch(`${APPS_SCRIPT_URL}?action=calcularDemandaPreparados&fecha=${encodeURIComponent(fecha)}`);
-    const data = await r.json();
+    const [rDem, rOllas] = await Promise.all([
+      fetch(`${APPS_SCRIPT_URL}?action=calcularDemandaPreparados&fecha=${encodeURIComponent(fecha)}`),
+      fetch(`${APPS_SCRIPT_URL}?action=calcularOllas&fecha=${encodeURIComponent(fecha)}`)
+    ]);
+    const data = await rDem.json();
     if(data.error) throw new Error(data.error);
+    const ollasData = await rOllas.json();
+    const ollasPrep = ollasData.error ? [] : (ollasData.preparados || []);
+    const ollasRelleno = ollasData.error ? [] : (ollasData.rellenos || []);
+
+    // completa la columna "Ollas" de la tabla de Rellenos, ya renderizada
+    const gramajeRellenosCont = document.getElementById('gramajeOllasRellenos');
+    ollasRelleno.forEach(o => {
+      const fila = [...document.querySelectorAll('tr[data-relleno]')].find(tr => tr.dataset.relleno === o.nombre);
+      const celda = fila ? fila.querySelector('.ollas-relleno') : null;
+      if(celda) celda.innerHTML = `<strong>${o.ollas}</strong> <span style="color:var(--ink-soft);font-size:11px;">(${ent(o.kilosNecesarios)} kg de ${o.ingredienteClave})</span>`;
+    });
+    if(gramajeRellenosCont) gramajeRellenosCont.innerHTML = bloqueGramajeOllas(ollasRelleno);
+
     const demanda = data.demandaPreparados || [];
     if(demanda.length === 0){
-      cont.innerHTML = '';
+      cont.innerHTML = `<h3 style="font-size:15px;margin:0 0 8px;">Preparados</h3><div class="empty">Nada para preparar hoy.</div>`;
       return;
     }
+    const ollasPorNombre = {};
+    ollasPrep.forEach(o => { ollasPorNombre[normalizarFicha(o.nombre)] = o; });
+
     cont.innerHTML = `
-      <h4 class="cat-heading">Preparados a cocinar hoy</h4>
-      <p style="color:var(--ink-soft);font-size:12px;">Calculado a partir de las fichas técnicas cargadas (Rellenos y Postres) — Dips y Discos/Canastas todavía no entran acá.</p>
+      <h3 style="font-size:15px;margin:0 0 8px;">Preparados</h3>
+      <p style="color:var(--ink-soft);font-size:12px;">Calculado a partir de las fichas técnicas cargadas (Rellenos, Postres y Dips) — Discos/Canastas todavía no entra acá.</p>
       <table class="prod">
-        <thead><tr><th>Preparado</th><th class="num">Cantidad</th></tr></thead>
+        <thead><tr><th>Preparado</th><th class="num">Cantidad</th><th class="num">Ollas</th></tr></thead>
         <tbody>
-          ${demanda.map(d => `<tr><td><strong>${d.preparado}</strong></td><td class="num">${ent(d.cantidad)} ${d.unidad}</td></tr>`).join('')}
+          ${demanda.map(d => {
+            const o = ollasPorNombre[normalizarFicha(d.preparado)];
+            return `<tr><td><strong>${d.preparado}</strong></td><td class="num">${ent(d.cantidad)} ${d.unidad}</td><td class="num">${o ? `<strong>${o.ollas}</strong>` : '—'}</td></tr>`;
+          }).join('')}
         </tbody>
       </table>
+      ${bloqueGramajeOllas(ollasPrep)}
       ${(data.avisos || []).length ? `<p style="color:var(--alert);font-size:12px;margin-top:8px;">${data.avisos.join(' ')}</p>` : ''}
     `;
   }catch(err){
@@ -839,10 +912,13 @@ function pintarSectorRegistro(sector){
 }
 
 // Registrar producción — sector COCINA: por cada relleno que se cocina hoy,
-// el bruto y el rinde REAL de los insumos que tienen un rinde de referencia
-// en la ficha técnica (los demás insumos no llevan control de rendimiento).
-// Si no se guarda nada para un ingrediente, se entiende que se usó el valor
-// de la ficha (Cantidad/Rinde de Ref_RecetaDetalle).
+// se muestran TODOS los ingredientes de su ficha técnica. A los que tienen
+// un rinde de referencia cargado se les puede cargar el bruto y el rinde
+// REAL para comparar contra la ficha; los demás (sin rinde de referencia,
+// ej. condimentos) se muestran solo a modo de consulta, sin esos campos —
+// no hay contra qué compararlos. Si no se guarda nada para un ingrediente
+// con rinde, se entiende que se usó el valor de la ficha (Cantidad/Rinde de
+// Ref_RecetaDetalle).
 async function pintarRegistroCocinaSector(){
   const cont = document.getElementById('contenidoRegistro');
   cont.innerHTML = `<p class="loading">Buscando fichas técnicas…</p>`;
@@ -871,9 +947,7 @@ async function pintarRegistroCocinaSector(){
 
   let algunBloque = false;
   cocina.forEach(f => {
-    const ingredientesReceta = recetas.detalle.filter(d =>
-      normalizarFicha(d.Receta) === normalizarFicha(f.relleno) && d.Rinde !== '' && d.Rinde != null
-    );
+    const ingredientesReceta = recetas.detalle.filter(d => normalizarFicha(d.Receta) === normalizarFicha(f.relleno));
     if(ingredientesReceta.length === 0) return;
     algunBloque = true;
 
@@ -898,9 +972,19 @@ async function pintarRegistroCocinaSector(){
       <tbody></tbody>`;
     const tbody = table.querySelector('tbody');
     ingredientesReceta.forEach(ing => {
+      const tieneRinde = ing.Rinde !== '' && ing.Rinde != null;
       const tr = document.createElement('tr');
       tr.dataset.relleno = f.relleno;
       tr.dataset.ingrediente = ing.Ingrediente;
+      if(!tieneRinde){
+        tr.innerHTML = `
+          <td>${ing.Ingrediente}</td>
+          <td class="num" colspan="4" style="color:var(--ink-soft);">${ent(ing.Cantidad)} ${ing.Medida || ''} <span style="font-size:11px;">(sin control de rinde)</span></td>
+          <td></td>
+        `;
+        tbody.appendChild(tr);
+        return;
+      }
       tr.innerHTML = `
         <td>${ing.Ingrediente}</td>
         <td class="num" style="color:var(--ink-soft);">${ent(ing.Cantidad)} ${ing.Medida || ''}</td>
@@ -921,7 +1005,7 @@ async function pintarRegistroCocinaSector(){
   });
 
   if(!algunBloque){
-    cont.innerHTML += `<div class="empty" style="margin-top:14px;">Los rellenos de hoy no tienen ningún insumo con rinde de referencia cargado en su ficha.</div>`;
+    cont.innerHTML += `<div class="empty" style="margin-top:14px;">No encontré la ficha técnica de ninguno de los rellenos de hoy.</div>`;
   }
 }
 
