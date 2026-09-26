@@ -644,6 +644,7 @@ function pintarProduccion(data){
 
 /* ---- Pestaña COCINA: todo lo que elabora Cocina hoy — Preparados, Rellenos,
    Dips y Postres (Dips/Postres los arma Cocina, no Producción) ---- */
+let cocinaPctDebounce = null;
 function pintarCocina(data){
   const cont = document.getElementById('contenidoFabrica');
   const filasRelleno = data.cocina.filter(f => f.kilosDeRelleno > 0);
@@ -708,10 +709,18 @@ function pintarCocina(data){
   `;
 
   if(filasRelleno.length > 0){
-    document.getElementById('inpPctRelleno').oninput = recalcularCocinaPct;
+    const inpPct = document.getElementById('inpPctRelleno');
+    inpPct.oninput = () => {
+      recalcularCocinaPct();
+      // Preparados y Ollas se recalculan en el servidor con el mismo %
+      // (Dips y Postres no se tocan, siempre van al 100%) — con un pequeño
+      // debounce para no disparar un pedido por cada tecla.
+      clearTimeout(cocinaPctDebounce);
+      cocinaPctDebounce = setTimeout(() => cargarPreparadosCocina(data.fecha, inpPct.value), 400);
+    };
     recalcularCocinaPct();
   }
-  cargarPreparadosCocina(data.fecha);
+  cargarPreparadosCocina(data.fecha, 100);
 }
 
 // pequeño detalle plegable con el gramaje de ingredientes escalado a una
@@ -733,14 +742,15 @@ function bloqueGramajeOllas(items){
 // cuántos lotes de 8 kg de carne cruda arma Cocina, tanto de los Preparados
 // que se comparten entre varios rellenos como de los rellenos que usan un
 // ingrediente crudo directo (ver el comentario de calcularOllas en Code.gs).
-async function cargarPreparadosCocina(fecha){
+async function cargarPreparadosCocina(fecha, pct){
   const cont = document.getElementById('preparadosCocina');
   if(!cont) return;
+  const pctValido = Number(pct) || 100;
   cont.innerHTML = `<h3 style="font-size:15px;margin:0 0 8px;">Preparados</h3><p class="loading">Buscando preparados…</p>`;
   try{
     const [rDem, rOllas] = await Promise.all([
-      fetch(`${APPS_SCRIPT_URL}?action=calcularDemandaPreparados&fecha=${encodeURIComponent(fecha)}`),
-      fetch(`${APPS_SCRIPT_URL}?action=calcularOllas&fecha=${encodeURIComponent(fecha)}`)
+      fetch(`${APPS_SCRIPT_URL}?action=calcularDemandaPreparados&fecha=${encodeURIComponent(fecha)}&pct=${pctValido}`),
+      fetch(`${APPS_SCRIPT_URL}?action=calcularOllas&fecha=${encodeURIComponent(fecha)}&pct=${pctValido}`)
     ]);
     const data = await rDem.json();
     if(data.error) throw new Error(data.error);
@@ -767,7 +777,6 @@ async function cargarPreparadosCocina(fecha){
 
     cont.innerHTML = `
       <h3 style="font-size:15px;margin:0 0 8px;">Preparados</h3>
-      <p style="color:var(--ink-soft);font-size:12px;">Calculado a partir de las fichas técnicas cargadas (Rellenos, Postres y Dips) — Discos/Canastas todavía no entra acá.</p>
       <table class="prod">
         <thead><tr><th>Preparado</th><th class="num">Cantidad</th><th class="num">Ollas</th></tr></thead>
         <tbody>
@@ -912,13 +921,17 @@ function pintarSectorRegistro(sector){
 }
 
 // Registrar producción — sector COCINA: por cada relleno que se cocina hoy,
-// se muestran TODOS los ingredientes de su ficha técnica. A los que tienen
-// un rinde de referencia cargado se les puede cargar el bruto y el rinde
-// REAL para comparar contra la ficha; los demás (sin rinde de referencia,
-// ej. condimentos) se muestran solo a modo de consulta, sin esos campos —
-// no hay contra qué compararlos. Si no se guarda nada para un ingrediente
-// con rinde, se entiende que se usó el valor de la ficha (Cantidad/Rinde de
-// Ref_RecetaDetalle).
+// se muestran TODOS los ingredientes de su ficha técnica, y de TODOS se
+// registra el bruto real usado (con su propio botón Guardar/Editar). A los
+// que además tienen un rinde de referencia cargado se les puede cargar
+// también el rinde REAL para comparar contra la ficha; los demás (sin rinde
+// de referencia, ej. condimentos) solo llevan el bruto real, sin esa
+// comparación — no hay contra qué compararlos. Si no se guarda nada para un
+// ingrediente, se entiende que se usó el valor de la ficha (Cantidad/Rinde
+// de Ref_RecetaDetalle). Arriba de todo se muestran las Ollas (lotes de 8 kg
+// de carne cruda): los Preparados compartidos (Relleno Carne, Pollo Grille)
+// en un bloque propio, y para cada relleno que arma sus ollas directo (sin
+// pasar por un Preparado) el detalle aparece encima de su tabla de insumos.
 async function pintarRegistroCocinaSector(){
   const cont = document.getElementById('contenidoRegistro');
   cont.innerHTML = `<p class="loading">Buscando fichas técnicas…</p>`;
@@ -930,7 +943,11 @@ async function pintarRegistroCocinaSector(){
     return;
   }
 
-  const recetas = await obtenerRecetas();
+  const [recetas, ollasResp] = await Promise.all([
+    obtenerRecetas(),
+    fetch(`${APPS_SCRIPT_URL}?action=calcularOllas&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({}))
+  ]);
+  const ollasData = (ollasResp && !ollasResp.error) ? ollasResp : { preparados: [], rellenos: [] };
   if(recetas.detalle.length === 0){
     cont.innerHTML = `
       <div class="empty">Todavía no importaste ninguna ficha técnica de Rellenos — sin eso no sé qué insumos controlar acá.</div>
@@ -942,8 +959,24 @@ async function pintarRegistroCocinaSector(){
   cont.innerHTML = '';
   const intro = document.createElement('p');
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
-  intro.textContent = `${CALCULO_REGISTRO.dia}, ${fmtFecha(fecha)} — cargá el bruto y el rinde real solo de lo que difirió de la ficha; si no cargás nada para un insumo, se toma el valor de referencia.`;
+  intro.textContent = `${CALCULO_REGISTRO.dia}, ${fmtFecha(fecha)} — cargá el bruto real de cada insumo (y el rinde real cuando aplique); si no cargás nada, se toma el valor de la ficha.`;
   cont.appendChild(intro);
+
+  if((ollasData.preparados || []).length){
+    const hPrep = document.createElement('h4');
+    hPrep.className = 'cat-heading';
+    hPrep.textContent = 'Preparados en olla (8 kg)';
+    cont.appendChild(hPrep);
+    const tablaPrep = document.createElement('table');
+    tablaPrep.className = 'prod';
+    tablaPrep.innerHTML = `
+      <thead><tr><th>Preparado</th><th class="num">Total</th><th class="num">Ollas</th></tr></thead>
+      <tbody>${ollasData.preparados.map(o => `<tr><td><strong>${o.nombre}</strong></td><td class="num">${ent(o.kilos)} KG</td><td class="num"><strong>${o.ollas}</strong></td></tr>`).join('')}</tbody>`;
+    cont.appendChild(tablaPrep);
+    const divGramajePrep = document.createElement('div');
+    divGramajePrep.innerHTML = bloqueGramajeOllas(ollasData.preparados);
+    cont.appendChild(divGramajePrep);
+  }
 
   let algunBloque = false;
   cocina.forEach(f => {
@@ -955,6 +988,14 @@ async function pintarRegistroCocinaSector(){
     h.className = 'cat-heading';
     h.textContent = `${f.relleno} — ${ent(f.kilosDeRelleno)} kg calculados hoy`;
     cont.appendChild(h);
+
+    const infoOllas = (ollasData.rellenos || []).find(o => o.nombre === f.relleno);
+    if(infoOllas){
+      const divOllas = document.createElement('div');
+      divOllas.style.cssText = 'font-size:12.5px;color:var(--ink-soft);margin:2px 0 10px;';
+      divOllas.innerHTML = `<strong>${infoOllas.ollas} olla(s)</strong> de 8 kg (${ent(infoOllas.kilosNecesarios)} kg de ${infoOllas.ingredienteClave} en total)` + bloqueGramajeOllas([infoOllas]);
+      cont.appendChild(divOllas);
+    }
 
     const wrap = document.createElement('div');
     wrap.style.overflowX = 'auto';
@@ -976,21 +1017,12 @@ async function pintarRegistroCocinaSector(){
       const tr = document.createElement('tr');
       tr.dataset.relleno = f.relleno;
       tr.dataset.ingrediente = ing.Ingrediente;
-      if(!tieneRinde){
-        tr.innerHTML = `
-          <td>${ing.Ingrediente}</td>
-          <td class="num" colspan="4" style="color:var(--ink-soft);">${ent(ing.Cantidad)} ${ing.Medida || ''} <span style="font-size:11px;">(sin control de rinde)</span></td>
-          <td></td>
-        `;
-        tbody.appendChild(tr);
-        return;
-      }
       tr.innerHTML = `
         <td>${ing.Ingrediente}</td>
         <td class="num" style="color:var(--ink-soft);">${ent(ing.Cantidad)} ${ing.Medida || ''}</td>
         <td><input type="number" min="0" step="0.01" class="inp-bruto-real" style="width:90px;" placeholder="${ent(ing.Cantidad)}"></td>
-        <td class="num" style="color:var(--ink-soft);">${ent(ing.Rinde)} ${ing.Medida || ''}</td>
-        <td><input type="number" min="0" step="0.01" class="inp-rinde-real" style="width:90px;" placeholder="${ent(ing.Rinde)}"></td>
+        <td class="num" style="color:var(--ink-soft);">${tieneRinde ? `${ent(ing.Rinde)} ${ing.Medida || ''}` : `<span style="font-size:11px;">sin control de rinde</span>`}</td>
+        <td>${tieneRinde ? `<input type="number" min="0" step="0.01" class="inp-rinde-real" style="width:90px;" placeholder="${ent(ing.Rinde)}">` : ''}</td>
         <td style="white-space:nowrap;">
           <button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;">Guardar</button>
           <button type="button" class="btn secondary btn-editar-item" style="font-size:12px;padding:5px 9px;display:none;">Editar</button>
@@ -1011,10 +1043,12 @@ async function pintarRegistroCocinaSector(){
 
 async function guardarItemCocina(tr, fecha){
   const btn = tr.querySelector('.btn-guardar-item');
-  const cantidadBrutoReal = tr.querySelector('.inp-bruto-real').value;
-  const rindeReal = tr.querySelector('.inp-rinde-real').value;
+  const inputBruto = tr.querySelector('.inp-bruto-real');
+  const inputRinde = tr.querySelector('.inp-rinde-real');
+  const cantidadBrutoReal = inputBruto ? inputBruto.value : '';
+  const rindeReal = inputRinde ? inputRinde.value : '';
   if(!cantidadBrutoReal && !rindeReal){
-    alert('Cargá al menos el bruto real o el rinde real antes de guardar.');
+    alert('Cargá el bruto real antes de guardar.');
     return;
   }
   btn.disabled = true; btn.textContent = 'Guardando...';
