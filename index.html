@@ -158,6 +158,8 @@ function irA(pantalla){
   if(pantalla === 'local') renderLocal();
   if(pantalla === 'fabrica') renderFabrica();
   if(pantalla === 'planificacion') renderPlanificacion();
+  if(pantalla === 'envios') renderEnvios();
+  if(pantalla === 'recepcion') renderRecepcion();
 }
 
 function renderHome(){
@@ -181,6 +183,16 @@ function renderHome(){
         <div class="tag">PLANIFICACIÓN</div>
         <h2>Editar venta proyectada</h2>
         <p>Actualizar, por local, cuánto se espera vender de cada sabor cada día de la semana.</p>
+      </button>
+      <button class="home-card" onclick="irA('envios')">
+        <div class="tag">FÁBRICA</div>
+        <h2>Despachar envíos</h2>
+        <p>Cuánto hay que mandarle hoy a cada local, calculado con lo que vende y lo que ya tiene cargado.</p>
+      </button>
+      <button class="home-card" onclick="irA('recepcion')">
+        <div class="tag">LOCAL</div>
+        <h2>Confirmar recepción</h2>
+        <p>Registrar cuánto llegó realmente de lo que fábrica despachó hoy.</p>
       </button>
     </div>
     <footer class="note">Doma Criolla — herramienta interna de planificación de producción.</footer>
@@ -544,6 +556,260 @@ function pintarDiscos(data){
     </table>
     <p style="color:var(--ink-soft);font-size:12px;margin-top:10px;">Horno + Horno con recorte comparten la misma máquina (${ent(d.totalHornoDocenas)} docenas combinadas). Frito es una máquina aparte.</p>
   `;
+}
+
+/* ---------------------------------------------------------------------
+   Pantalla ENVÍOS (Fábrica): cuánto mandarle hoy a cada local
+   --------------------------------------------------------------------- */
+const LOCALES_VENTA = LOCALES.slice(0, 3); // Centro, Patagonia, Zelarrayan — sin sectores de Fábrica
+let TAB_ENVIO_ACTIVO = LOCALES_VENTA[0];
+
+function cssId(local){ return local.replace(/[^a-zA-Z0-9]/g, ''); }
+
+async function renderEnvios(){
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <div class="fab-toolbar">
+      <header class="top" style="margin:0;"><h1>Despachar envíos</h1></header>
+      <div class="field-row">
+        <label>Fecha</label>
+        <input type="date" id="fechaEnvios" value="${hoyISO()}">
+      </div>
+    </div>
+    <div class="field-row">
+      <label>¿Quién despacha?</label>
+      <input type="text" id="inpResponsableEnvio" placeholder="Nombre">
+    </div>
+    <p style="color:var(--ink-soft);font-size:12.5px;max-width:560px;">
+      La "orden calculada" sale de la venta proyectada de ese local menos lo que ya tiene cargado.
+      Ajustá "Enviado (real)" si mandás otra cantidad, y cargá el vencimiento del lote que sale hoy.
+    </p>
+    <div class="tabs" id="tabsEnvios" style="display:none;"></div>
+    <div id="contenidoEnvios" class="loading">Calculando…</div>
+    <div class="msg" id="msgEnvios"></div>
+  `;
+  document.getElementById('fechaEnvios').onchange = cargarEnvios;
+  cargarEnvios();
+}
+
+async function cargarEnvios(){
+  const fecha = document.getElementById('fechaEnvios').value;
+  const cont = document.getElementById('contenidoEnvios');
+  cont.className = 'loading'; cont.textContent = 'Calculando…';
+  document.getElementById('tabsEnvios').style.display = 'none';
+  const msg = document.getElementById('msgEnvios');
+  msg.className = 'msg'; msg.textContent = '';
+
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=calcularEnvios&fecha=${fecha}`);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+
+    const tabs = document.getElementById('tabsEnvios');
+    tabs.style.display = 'flex';
+    tabs.innerHTML = LOCALES_VENTA.map(l => `<button class="tab-btn ${l===TAB_ENVIO_ACTIVO?'active':''}" data-local="${l}">${l}</button>`).join('');
+    [...tabs.querySelectorAll('.tab-btn')].forEach(b => {
+      b.onclick = () => {
+        TAB_ENVIO_ACTIVO = b.dataset.local;
+        [...tabs.querySelectorAll('.tab-btn')].forEach(x => x.classList.toggle('active', x.dataset.local === TAB_ENVIO_ACTIVO));
+        [...document.querySelectorAll('.panel-envio-local')].forEach(p => p.style.display = (p.dataset.local === TAB_ENVIO_ACTIVO ? '' : 'none'));
+      };
+    });
+
+    cont.className = '';
+    cont.innerHTML = LOCALES_VENTA.map(local => pintarEnvioLocal(local, data.envios[local] || [], data)).join('');
+    [...document.querySelectorAll('.panel-envio-local')].forEach(p => p.style.display = (p.dataset.local === TAB_ENVIO_ACTIVO ? '' : 'none'));
+
+    LOCALES_VENTA.forEach(local => {
+      const btn = document.getElementById(`btnGuardarEnvio-${cssId(local)}`);
+      if(btn) btn.onclick = () => guardarEnvio(local, fecha);
+    });
+  }catch(err){
+    cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo calcular: ${err.message}</div>`;
+  }
+}
+
+function pintarEnvioLocal(local, items, data){
+  if(items.length === 0){
+    return `<div class="panel-envio-local" data-local="${local}" style="display:none;">
+      <div class="empty">Nada para enviar a ${local} el ${String(data.dia).toLowerCase()} — el stock que ya tiene cargado alcanza.</div>
+    </div>`;
+  }
+  const rubros = [...new Set(items.map(f => f.rubro))];
+  rubros.sort((a,b) => (a.startsWith('Empanadas') ? -1 : b.startsWith('Empanadas') ? 1 : a.localeCompare(b)));
+
+  const bloques = rubros.map(rubro => {
+    const filas = items.filter(f => f.rubro === rubro);
+    return `
+      <h3 style="font-size:15px;margin:20px 0 8px;">${rubro}</h3>
+      <table class="lotes">
+        <thead><tr>
+          <th>Sabor / ítem</th>
+          <th class="col-cant">Orden calculada</th>
+          <th class="col-cant">Enviado (real)</th>
+          <th class="col-venc">Vencimiento</th>
+        </tr></thead>
+        <tbody>
+          ${filas.map(f => `
+            <tr data-sabor="${f.sabor}">
+              <td>${f.sabor}</td>
+              <td class="num" style="color:var(--ink-soft);">${ent(f.aHacerUnidades)}</td>
+              <td><input type="number" min="0" step="1" class="inp-enviado" value="${f.aHacerUnidades}"></td>
+              <td><input type="date" class="inp-venc-envio"></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+  }).join('');
+
+  return `
+    <div class="panel-envio-local" data-local="${local}" style="display:none;">
+      <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${data.fecha} — orden calculada para ${local}</p>
+      ${bloques}
+      <div class="actions">
+        <button class="btn" id="btnGuardarEnvio-${cssId(local)}">Guardar despacho a ${local}</button>
+      </div>
+    </div>`;
+}
+
+async function guardarEnvio(local, fecha){
+  const responsable = document.getElementById('inpResponsableEnvio').value.trim();
+  const msg = document.getElementById('msgEnvios');
+  if(!responsable){
+    msg.className = 'msg err'; msg.textContent = 'Indicá quién está despachando este envío.'; return;
+  }
+  const panel = document.querySelector(`.panel-envio-local[data-local="${local}"]`);
+  const filas = [...panel.querySelectorAll('tr[data-sabor]')];
+  const items = filas.map(tr => ({
+    sabor: tr.dataset.sabor,
+    cantidad: tr.querySelector('.inp-enviado').value,
+    vencimiento: tr.querySelector('.inp-venc-envio').value
+  })).filter(it => it.cantidad && Number(it.cantidad) > 0 && it.vencimiento);
+
+  if(items.length === 0){
+    msg.className = 'msg err'; msg.textContent = 'Cargá cantidad y vencimiento de al menos un producto.'; return;
+  }
+  const btn = document.getElementById(`btnGuardarEnvio-${cssId(local)}`);
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try{
+    const r = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'registrarEnvio', local, fecha, responsable, items })
+    });
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    msg.className = 'msg ok';
+    msg.textContent = `Despacho guardado: ${data.envios_guardados} producto(s) enviados a ${local}.`;
+  }catch(err){
+    msg.className = 'msg err'; msg.textContent = 'No se pudo guardar: ' + err.message;
+  }finally{
+    btn.disabled = false; btn.textContent = `Guardar despacho a ${local}`;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Pantalla RECEPCIÓN (Local): confirmar cuánto llegó realmente
+   --------------------------------------------------------------------- */
+async function renderRecepcion(){
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <header class="top"><h1>Confirmar recepción</h1></header>
+    <div class="field-row">
+      <label>¿Qué local sos?</label>
+      <select id="selLocalRecepcion">
+        ${LOCALES_VENTA.map(l => `<option value="${l}">${l}</option>`).join('')}
+      </select>
+    </div>
+    <div class="field-row">
+      <label>¿Quién confirma?</label>
+      <input type="text" id="inpResponsableRecepcion" placeholder="Nombre">
+    </div>
+    <div id="contenidoRecepcion" class="loading">Buscando envíos pendientes…</div>
+    <div class="msg" id="msgRecepcion"></div>
+  `;
+  document.getElementById('selLocalRecepcion').onchange = cargarPendientesRecepcion;
+  cargarPendientesRecepcion();
+}
+
+async function cargarPendientesRecepcion(){
+  const local = document.getElementById('selLocalRecepcion').value;
+  const cont = document.getElementById('contenidoRecepcion');
+  cont.className = 'loading'; cont.textContent = 'Buscando envíos pendientes…';
+  const msg = document.getElementById('msgRecepcion');
+  msg.className = 'msg'; msg.textContent = '';
+
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=listarEnviosPendientes&local=${encodeURIComponent(local)}`);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    const pendientes = data.pendientes || [];
+    cont.className = '';
+    if(pendientes.length === 0){
+      cont.innerHTML = `<div class="empty">No hay envíos pendientes de confirmar para ${local}.</div>`;
+      return;
+    }
+    cont.innerHTML = `
+      <table class="lotes">
+        <thead><tr>
+          <th>Sabor / ítem</th>
+          <th>Enviado el</th>
+          <th class="col-cant">Cant. enviada</th>
+          <th>Vencimiento</th>
+          <th class="col-cant">Cant. recibida</th>
+        </tr></thead>
+        <tbody>
+          ${pendientes.map(p => `
+            <tr data-id="${p.ID}">
+              <td>${p.Sabor}</td>
+              <td style="color:var(--ink-soft);font-size:12.5px;">${p.Fecha_envio}</td>
+              <td class="num" style="color:var(--ink-soft);">${ent(p.Cantidad_Enviada)}</td>
+              <td style="color:var(--ink-soft);font-size:12.5px;">${p.Vencimiento}</td>
+              <td><input type="number" min="0" step="1" class="inp-recibido" value="${p.Cantidad_Enviada}"></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="actions">
+        <button class="btn" id="btnConfirmarRecepcion">Confirmar recepción</button>
+      </div>
+    `;
+    document.getElementById('btnConfirmarRecepcion').onclick = guardarRecepcion;
+  }catch(err){
+    cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo buscar: ${err.message}</div>`;
+  }
+}
+
+async function guardarRecepcion(){
+  const local = document.getElementById('selLocalRecepcion').value;
+  const responsable = document.getElementById('inpResponsableRecepcion').value.trim();
+  const msg = document.getElementById('msgRecepcion');
+  if(!responsable){
+    msg.className = 'msg err'; msg.textContent = 'Indicá quién está confirmando la recepción.'; return;
+  }
+  const filas = [...document.querySelectorAll('#contenidoRecepcion tr[data-id]')];
+  const confirmaciones = filas.map(tr => ({
+    id: tr.dataset.id,
+    cantidadRecibida: tr.querySelector('.inp-recibido').value
+  })).filter(c => c.cantidadRecibida !== '');
+
+  if(confirmaciones.length === 0){
+    msg.className = 'msg err'; msg.textContent = 'Cargá la cantidad recibida de al menos un producto.'; return;
+  }
+  const btn = document.getElementById('btnConfirmarRecepcion');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try{
+    const r = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'confirmarRecepcion', local, responsable, confirmaciones })
+    });
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    msg.className = 'msg ok';
+    msg.textContent = `Confirmado: ${data.confirmados} producto(s).`;
+    cargarPendientesRecepcion();
+  }catch(err){
+    msg.className = 'msg err'; msg.textContent = 'No se pudo guardar: ' + err.message;
+  }finally{
+    btn.disabled = false; btn.textContent = 'Confirmar recepción';
+  }
 }
 
 /* ---------------------------------------------------------------------
