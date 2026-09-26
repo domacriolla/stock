@@ -221,6 +221,16 @@ function renderHome(){
         <h2>Cargar stock de hoy</h2>
         <p>Registrar cuánto queda de cada sabor, con su fecha de vencimiento.</p>
       </button>
+      <button class="home-card" onclick="irA('recepcion')">
+        <div class="tag">LOCAL</div>
+        <h2>Confirmar recepción</h2>
+        <p>Registrar cuánto llegó realmente de lo que fábrica despachó hoy.</p>
+      </button>
+      <button class="home-card" onclick="irA('historial')">
+        <div class="tag">FÁBRICA / LOCAL</div>
+        <h2>Historial de envíos</h2>
+        <p>Comparar lo enviado contra lo recibido, por local y sabor.</p>
+      </button>
       <button class="home-card" onclick="irA('fabrica')">
         <div class="tag">FÁBRICA</div>
         <h2>Ver qué producir hoy</h2>
@@ -236,25 +246,15 @@ function renderHome(){
         <h2>Despachar envíos</h2>
         <p>Cuánto hay que mandarle hoy a cada local, calculado con lo que vende y lo que ya tiene cargado.</p>
       </button>
-      <button class="home-card" onclick="irA('recepcion')">
-        <div class="tag">LOCAL</div>
-        <h2>Confirmar recepción</h2>
-        <p>Registrar cuánto llegó realmente de lo que fábrica despachó hoy.</p>
+      <button class="home-card" onclick="irA('fichas')">
+        <div class="tag">FÁBRICA</div>
+        <h2>Fichas técnicas</h2>
+        <p>Importar y actualizar las recetas (Rellenos, Preparados, Postres, Dips, Edición Limitada).</p>
       </button>
       <button class="home-card" onclick="irA('planificacion')">
         <div class="tag">PLANIFICACIÓN</div>
         <h2>Editar venta proyectada</h2>
         <p>Actualizar, por local, cuánto se espera vender de cada sabor cada día de la semana.</p>
-      </button>
-      <button class="home-card" onclick="irA('historial')">
-        <div class="tag">FÁBRICA / LOCAL</div>
-        <h2>Historial de envíos</h2>
-        <p>Comparar lo enviado contra lo recibido, por local y sabor.</p>
-      </button>
-      <button class="home-card" onclick="irA('fichas')">
-        <div class="tag">FÁBRICA</div>
-        <h2>Fichas técnicas</h2>
-        <p>Importar y actualizar las recetas (Rellenos, Preparados, Postres, Dips, Edición Limitada).</p>
       </button>
     </div>
     <footer class="note">Doma Criolla — herramienta interna de planificación de producción.</footer>
@@ -649,7 +649,6 @@ function pintarProduccion(data){
 
 /* ---- Pestaña COCINA: todo lo que elabora Cocina hoy — Preparados, Rellenos,
    Dips y Postres (Dips/Postres los arma Cocina, no Producción) ---- */
-let cocinaPctDebounce = null;
 function pintarCocina(data){
   const cont = document.getElementById('contenidoFabrica');
   const filasRelleno = data.cocina.filter(f => f.kilosDeRelleno > 0);
@@ -684,9 +683,9 @@ function pintarCocina(data){
 
   const tablaRellenos = filasRelleno.length === 0 ? '' : `
     <h3 style="font-size:15px;margin:20px 0 8px;">Rellenos</h3>
-    <div class="field-row no-print" style="max-width:320px;">
-      <label>% de venta a cubrir <span style="color:var(--ink-soft);font-weight:400;">(los locales siempre tienen algo de stock — bajalo si no hace falta cubrir el 100%)</span></label>
-      <input type="number" id="inpPctRelleno" min="0" max="200" step="5" value="100" style="width:90px;">
+    <div class="field-row no-print" style="max-width:420px;">
+      <label>% de venta a cubrir <span style="color:var(--ink-soft);font-weight:400;">(los locales siempre tienen algo de stock — bajalo si no hace falta cubrir el 100%). Se guarda por día: una vez guardado queda fijo para hoy (también para Registrar producción) — tocá "Reabrir" si necesitás cambiarlo.</span></label>
+      <div id="pctCocinaControl"></div>
     </div>
     <p style="color:var(--ink-soft);font-size:13px;"><span id="totalKilosCocina"></span> kg de relleno en total</p>
     <table class="prod">
@@ -705,6 +704,11 @@ function pintarCocina(data){
     <div id="gramajeOllasRellenos"></div>`;
 
   cont.className = '';
+  // el % con el que el SERVIDOR ya escaló data.cocina[].kilosDeRelleno (null
+  // = todavía no se guardó nada hoy, se usó 100% de referencia) — lo guardo
+  // en el propio contenedor para que recalcularCocinaPct() sepa contra qué
+  // proporción está previsualizando mientras Carolina todavía no guardó.
+  cont.dataset.pctBase = data.porcentajeCocina || 100;
   cont.innerHTML = tituloSector + `
     <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)}</p>
     <div id="preparadosCocina"></div>
@@ -714,18 +718,58 @@ function pintarCocina(data){
   `;
 
   if(filasRelleno.length > 0){
-    const inpPct = document.getElementById('inpPctRelleno');
-    inpPct.oninput = () => {
-      recalcularCocinaPct();
-      // Preparados y Ollas se recalculan en el servidor con el mismo %
-      // (Dips y Postres no se tocan, siempre van al 100%) — con un pequeño
-      // debounce para no disparar un pedido por cada tecla.
-      clearTimeout(cocinaPctDebounce);
-      cocinaPctDebounce = setTimeout(() => cargarPreparadosCocina(data.fecha, inpPct.value), 400);
-    };
+    pintarControlPctCocina(data.fecha, data.porcentajeCocina);
     recalcularCocinaPct();
   }
-  cargarPreparadosCocina(data.fecha, 100);
+  cargarPreparadosCocina(data.fecha);
+}
+
+// Control del % de venta a cubrir: si ya se guardó HOY, se muestra bloqueado
+// con un botón "Reabrir"; si no, editable con un botón "Guardar %". El valor
+// que de verdad usa el cálculo (Preparados, Ollas, y Registrar producción →
+// Cocina) es el guardado en el servidor — tocar el número acá solo
+// previsualiza los kg de Rellenos de esta tabla, no cambia nada hasta
+// apretar "Guardar %".
+function pintarControlPctCocina(fecha, porcentajeGuardado){
+  const cont = document.getElementById('pctCocinaControl');
+  if(!cont) return;
+  if(porcentajeGuardado != null){
+    cont.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <input type="number" value="${porcentajeGuardado}" disabled style="width:90px;">
+        <button type="button" class="btn secondary" id="btnReabrirPct">Reabrir</button>
+        <span style="color:var(--ink-soft);font-size:12px;">guardado para hoy</span>
+      </div>`;
+    document.getElementById('btnReabrirPct').onclick = () => pintarControlPctCocina(fecha, null);
+  } else {
+    cont.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        <input type="number" id="inpPctRelleno" min="1" max="200" step="5" value="${porcentajeGuardado == null ? 100 : porcentajeGuardado}" style="width:90px;">
+        <button type="button" class="btn" id="btnGuardarPct">Guardar %</button>
+      </div>`;
+    document.getElementById('inpPctRelleno').oninput = recalcularCocinaPct;
+    document.getElementById('btnGuardarPct').onclick = () => guardarPctCocina(fecha);
+  }
+}
+
+async function guardarPctCocina(fecha){
+  const inp = document.getElementById('inpPctRelleno');
+  const pct = Number(inp.value);
+  if(!pct || pct <= 0){ alert('Ingresá un % válido.'); return; }
+  const btn = document.getElementById('btnGuardarPct');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try{
+    const r = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'guardarPorcentajeCocina', fecha, pct })
+    });
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    cargarCalculo(); // recarga todo (Producción/Cocina/Discos) ya con el % guardado
+  }catch(err){
+    btn.disabled = false; btn.textContent = 'Guardar %';
+    alert('No se pudo guardar el %: ' + err.message);
+  }
 }
 
 // pequeño detalle plegable con el gramaje de ingredientes escalado a una
@@ -747,15 +791,14 @@ function bloqueGramajeOllas(items){
 // cuántos lotes de 8 kg de carne cruda arma Cocina, tanto de los Preparados
 // que se comparten entre varios rellenos como de los rellenos que usan un
 // ingrediente crudo directo (ver el comentario de calcularOllas en Code.gs).
-async function cargarPreparadosCocina(fecha, pct){
+async function cargarPreparadosCocina(fecha){
   const cont = document.getElementById('preparadosCocina');
   if(!cont) return;
-  const pctValido = Number(pct) || 100;
   cont.innerHTML = `<h3 style="font-size:15px;margin:0 0 8px;">Preparados</h3><p class="loading">Buscando preparados…</p>`;
   try{
     const [rDem, rOllas] = await Promise.all([
-      fetch(`${APPS_SCRIPT_URL}?action=calcularDemandaPreparados&fecha=${encodeURIComponent(fecha)}&pct=${pctValido}`),
-      fetch(`${APPS_SCRIPT_URL}?action=calcularOllas&fecha=${encodeURIComponent(fecha)}&pct=${pctValido}`)
+      fetch(`${APPS_SCRIPT_URL}?action=calcularDemandaPreparados&fecha=${encodeURIComponent(fecha)}`),
+      fetch(`${APPS_SCRIPT_URL}?action=calcularOllas&fecha=${encodeURIComponent(fecha)}`)
     ]);
     const data = await rDem.json();
     if(data.error) throw new Error(data.error);
@@ -799,19 +842,27 @@ async function cargarPreparadosCocina(fecha, pct){
   }
 }
 
-// el % de venta a cubrir es un ajuste manual de Cocina sobre lo mostrado acá
-// (no toca la fórmula de Producción/Envíos, que sigue siendo venta − stock).
+// el % de venta a cubrir es un ajuste manual de Cocina (no toca la fórmula de
+// Producción/Envíos, que sigue siendo venta − stock). Los kg de relleno que
+// vienen del servidor (data-kilos-base) ya están escalados al % GUARDADO
+// para hoy (cont.dataset.pctBase, 100 si todavía no se guardó nada) — acá
+// solo se previsualiza qué pasaría con el % que se está tipeando ahora,
+// mientras no se guarde, con el factor entre ambos.
 function recalcularCocinaPct(){
-  const pct = Number(document.getElementById('inpPctRelleno').value);
-  const pctValido = isNaN(pct) ? 100 : pct;
+  const cont = document.getElementById('contenidoFabrica');
+  const pctBase = Number(cont.dataset.pctBase) || 100;
+  const inp = document.getElementById('inpPctRelleno');
+  const pctVista = inp ? (Number(inp.value) || pctBase) : pctBase;
+  const factorVista = pctVista / pctBase;
   let total = 0;
   document.querySelectorAll('#contenidoFabrica table.prod tbody tr[data-kilos-base]').forEach(tr => {
     const base = Number(tr.dataset.kilosBase) || 0;
-    const ajustado = base * pctValido / 100;
+    const ajustado = base * factorVista;
     total += ajustado;
     tr.querySelector('.kg-relleno strong').textContent = ent(ajustado);
   });
-  document.getElementById('totalKilosCocina').textContent = ent(total);
+  const totalEl = document.getElementById('totalKilosCocina');
+  if(totalEl) totalEl.textContent = ent(total);
 }
 
 /* ---- Pestaña DISCOS: discos que necesita la tanda de producción de hoy ---- */
