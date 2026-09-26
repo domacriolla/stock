@@ -99,6 +99,11 @@
   .item-extra{color:var(--ink-soft);font-size:12px;font-style:italic;}
   h4.cat-heading{font-size:13px;margin:22px 0 4px;color:var(--crust-dark);
     text-transform:uppercase;letter-spacing:.03em;}
+  /* nombre de la receta (Relleno/Preparado) en Registrar producción → Cocina:
+     más grande que el listado de insumos de abajo, para que se distinga de
+     un vistazo cuál es el título y cuál el detalle. */
+  h4.receta-heading{font-size:17px;text-transform:none;letter-spacing:0;margin-top:28px;}
+  table.lotes.traza td{font-size:13.5px;}
   .cat-nav{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 0;}
   .cat-nav a{font-size:11.5px;color:var(--ink-soft);border:1px solid var(--line);
     padding:4px 9px;border-radius:12px;text-decoration:none;}
@@ -959,13 +964,13 @@ async function pintarRegistroCocinaSector(){
   cont.innerHTML = '';
   const intro = document.createElement('p');
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
-  intro.textContent = `${CALCULO_REGISTRO.dia}, ${fmtFecha(fecha)} — cargá el bruto real de cada insumo (y el rinde real cuando aplique); si no cargás nada, se toma el valor de la ficha.`;
+  intro.textContent = `${CALCULO_REGISTRO.dia}, ${fmtFecha(fecha)} — cargá el bruto real de cada insumo (y el rinde real cuando aplique) sobre el TOTAL de hoy; si no cargás nada, se toma el valor de la ficha.`;
   cont.appendChild(intro);
 
   if((ollasData.preparados || []).length){
     const hPrep = document.createElement('h4');
     hPrep.className = 'cat-heading';
-    hPrep.textContent = 'Preparados en olla (8 kg)';
+    hPrep.textContent = 'Preparados en olla (8 kg) — resumen';
     cont.appendChild(hPrep);
     const tablaPrep = document.createElement('table');
     tablaPrep.className = 'prod';
@@ -973,27 +978,39 @@ async function pintarRegistroCocinaSector(){
       <thead><tr><th>Preparado</th><th class="num">Total</th><th class="num">Ollas</th></tr></thead>
       <tbody>${ollasData.preparados.map(o => `<tr><td><strong>${o.nombre}</strong></td><td class="num">${ent(o.kilos)} KG</td><td class="num"><strong>${o.ollas}</strong></td></tr>`).join('')}</tbody>`;
     cont.appendChild(tablaPrep);
-    const divGramajePrep = document.createElement('div');
-    divGramajePrep.innerHTML = bloqueGramajeOllas(ollasData.preparados);
-    cont.appendChild(divGramajePrep);
   }
 
-  let algunBloque = false;
-  cocina.forEach(f => {
-    const ingredientesReceta = recetas.detalle.filter(d => normalizarFicha(d.Receta) === normalizarFicha(f.relleno));
-    if(ingredientesReceta.length === 0) return;
-    algunBloque = true;
+  // encuentra el rinde de una receta (Relleno o Preparado) EN KG, para poder
+  // escalar su ficha del "un batch" al total que hace falta cocinar hoy.
+  function rindeEnKG(nombreReceta){
+    const cab = recetas.cabecera.find(r => normalizarFicha(r.Receta) === normalizarFicha(nombreReceta));
+    if(!cab) return 0;
+    if(normalizarFicha(cab.RindeUnidad) === 'KG') return Number(cab.RindeCantidad) || 0;
+    if(normalizarFicha(cab.RindeUnidad2) === 'KG') return Number(cab.RindeCantidad2) || 0;
+    return 0;
+  }
+
+  // Bloque de registro de UNA receta (Relleno o Preparado en olla): título
+  // grande, referencia de ollas (colapsable, solo informativa) y la tabla de
+  // insumos — TODOS escalados al total de HOY, no a los valores "de un
+  // batch" que trae la ficha. El registro (Bruto real / Rinde real) es
+  // siempre sobre ese total, nunca por olla.
+  function bloqueRegistroReceta(nombreReceta, cantidadHoy, subtitulo, infoOllasHtml){
+    const ingredientesReceta = recetas.detalle.filter(d => normalizarFicha(d.Receta) === normalizarFicha(nombreReceta));
+    if(ingredientesReceta.length === 0) return false;
+
+    const rinde = rindeEnKG(nombreReceta);
+    const factor = rinde > 0 ? (cantidadHoy / rinde) : 1;
 
     const h = document.createElement('h4');
-    h.className = 'cat-heading';
-    h.textContent = `${f.relleno} — ${ent(f.kilosDeRelleno)} kg calculados hoy`;
+    h.className = 'cat-heading receta-heading';
+    h.textContent = `${nombreReceta} — ${ent(cantidadHoy)} kg calculados hoy${subtitulo || ''}`;
     cont.appendChild(h);
 
-    const infoOllas = (ollasData.rellenos || []).find(o => o.nombre === f.relleno);
-    if(infoOllas){
+    if(infoOllasHtml){
       const divOllas = document.createElement('div');
       divOllas.style.cssText = 'font-size:12.5px;color:var(--ink-soft);margin:2px 0 10px;';
-      divOllas.innerHTML = `<strong>${infoOllas.ollas} olla(s)</strong> de 8 kg (${ent(infoOllas.kilosNecesarios)} kg de ${infoOllas.ingredienteClave} en total)` + bloqueGramajeOllas([infoOllas]);
+      divOllas.innerHTML = infoOllasHtml;
       cont.appendChild(divOllas);
     }
 
@@ -1004,9 +1021,9 @@ async function pintarRegistroCocinaSector(){
     table.innerHTML = `
       <thead><tr>
         <th>Insumo</th>
-        <th class="num">Bruto ficha</th>
+        <th class="num">Bruto ficha (hoy)</th>
         <th class="num">Bruto real</th>
-        <th class="num">Rinde ficha</th>
+        <th class="num">Rinde ficha (hoy)</th>
         <th class="num">Rinde real</th>
         <th></th>
       </tr></thead>
@@ -1014,15 +1031,17 @@ async function pintarRegistroCocinaSector(){
     const tbody = table.querySelector('tbody');
     ingredientesReceta.forEach(ing => {
       const tieneRinde = ing.Rinde !== '' && ing.Rinde != null;
+      const cantidadHoyIng = (Number(ing.Cantidad) || 0) * factor;
+      const rindeHoyIng = tieneRinde ? (Number(ing.Rinde) || 0) * factor : null;
       const tr = document.createElement('tr');
-      tr.dataset.relleno = f.relleno;
+      tr.dataset.relleno = nombreReceta;
       tr.dataset.ingrediente = ing.Ingrediente;
       tr.innerHTML = `
         <td>${ing.Ingrediente}</td>
-        <td class="num" style="color:var(--ink-soft);">${ent(ing.Cantidad)} ${ing.Medida || ''}</td>
-        <td><input type="number" min="0" step="0.01" class="inp-bruto-real" style="width:90px;" placeholder="${ent(ing.Cantidad)}"></td>
-        <td class="num" style="color:var(--ink-soft);">${tieneRinde ? `${ent(ing.Rinde)} ${ing.Medida || ''}` : `<span style="font-size:11px;">sin control de rinde</span>`}</td>
-        <td>${tieneRinde ? `<input type="number" min="0" step="0.01" class="inp-rinde-real" style="width:90px;" placeholder="${ent(ing.Rinde)}">` : ''}</td>
+        <td class="num" style="color:var(--ink-soft);">${ent(cantidadHoyIng)} ${ing.Medida || ''}</td>
+        <td><input type="number" min="0" step="0.01" class="inp-bruto-real" style="width:90px;" placeholder="${ent(cantidadHoyIng)}"></td>
+        <td class="num" style="color:var(--ink-soft);">${tieneRinde ? `${ent(rindeHoyIng)} ${ing.Medida || ''}` : `<span style="font-size:11px;">sin control de rinde</span>`}</td>
+        <td>${tieneRinde ? `<input type="number" min="0" step="0.01" class="inp-rinde-real" style="width:90px;" placeholder="${ent(rindeHoyIng)}">` : ''}</td>
         <td style="white-space:nowrap;">
           <button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;">Guardar</button>
           <button type="button" class="btn secondary btn-editar-item" style="font-size:12px;padding:5px 9px;display:none;">Editar</button>
@@ -1034,6 +1053,28 @@ async function pintarRegistroCocinaSector(){
     });
     wrap.appendChild(table);
     cont.appendChild(wrap);
+    return true;
+  }
+
+  let algunBloque = false;
+
+  // Preparados que se cocinan en olla (Relleno Carne, Pollo Grille): el
+  // registro de insumos va sobre el TOTAL de ESE preparado — las ollas quedan
+  // solo como referencia colapsable arriba de la tabla, no como el campo a
+  // completar (eso ya lo pidió Carolina expresamente: "el registro tiene que
+  // ser sobre el total, con una solapita para ver por olla si hace falta").
+  (ollasData.preparados || []).forEach(o => {
+    const infoOllasHtml = `<strong>Referencia:</strong> hoy arma ${o.ollas} olla(s) de este preparado (una olla completa son 8 kg) — el registro de insumos de abajo es sobre el TOTAL de hoy, no por olla.` + bloqueGramajeOllas([o]);
+    if(bloqueRegistroReceta(o.nombre, o.kilos, ` — Preparado (lo usan: ${(o.usan || []).join(', ')})`, infoOllasHtml)) algunBloque = true;
+  });
+
+  // Rellenos que se cocinan hoy
+  cocina.forEach(f => {
+    const infoOllas = (ollasData.rellenos || []).find(o => o.nombre === f.relleno);
+    const infoOllasHtml = infoOllas
+      ? `<strong>Referencia:</strong> hoy arma ${infoOllas.ollas} olla(s) (usa ${ent(infoOllas.kilosNecesarios)} kg de ${infoOllas.ingredienteClave} — una olla completa son 8 kg) — el registro de insumos de abajo es sobre el TOTAL de hoy, no por olla.` + bloqueGramajeOllas([infoOllas])
+      : '';
+    if(bloqueRegistroReceta(f.relleno, f.kilosDeRelleno, '', infoOllasHtml)) algunBloque = true;
   });
 
   if(!algunBloque){
