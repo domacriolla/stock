@@ -80,6 +80,9 @@
   table.lotes td{padding:6px 8px;border-bottom:1px solid var(--line);vertical-align:middle;}
   table.lotes select{width:100%;}
   table.lotes input{width:100%;}
+  table.traza tr.fila-guardada{background:var(--herb-bg);}
+  table.traza tr.fila-guardada td{color:var(--ink-soft);}
+  .btn-guardar-item:disabled{opacity:.7;}
   .col-cant{width:90px;}
   .col-venc{width:150px;}
   .col-add{width:30px;text-align:center;}
@@ -286,7 +289,7 @@ async function renderLocal(){
     </div>
     <div class="field-row">
       <label>¿Quién está cargando este stock?</label>
-      <select id="inpResponsable"><option value="">Cargando…</option></select>
+      <div id="responsableWrap"><input type="text" id="inpResponsable" placeholder="Nombre y apellido"></div>
     </div>
     <div class="field-row">
       <label>Fecha (por si cargás con atraso)</label>
@@ -310,8 +313,7 @@ async function renderLocal(){
 
   const categorias = await obtenerCategorias();
   const rellenos = await obtenerRellenos();
-  const empleados = await obtenerEmpleados();
-  document.getElementById('inpResponsable').innerHTML = opcionesEmpleados(empleados);
+  let empleados = [];
   const nombresCategorias = Object.keys(categorias);
 
   // según el sector elegido, se carga por Sabor (locales y Fábrica -
@@ -321,6 +323,21 @@ async function renderLocal(){
     if(local === 'Fábrica - Cocina') return 'relleno';
     if(local === 'Fábrica - Discos') return 'disco';
     return 'sabor';
+  }
+
+  // el listado de empleados es solo para Fábrica (Producción/Cocina/Discos);
+  // en los locales el responsable se escribe a mano.
+  function esFabrica(local){ return local.startsWith('Fábrica'); }
+
+  async function pintarResponsable(){
+    const local = document.getElementById('selLocal').value;
+    const wrap = document.getElementById('responsableWrap');
+    if(esFabrica(local)){
+      if(empleados.length === 0) empleados = await obtenerEmpleados();
+      wrap.innerHTML = `<select id="inpResponsable">${opcionesEmpleados(empleados)}</select>`;
+    } else {
+      wrap.innerHTML = `<input type="text" id="inpResponsable" placeholder="Nombre y apellido">`;
+    }
   }
 
   // una fila por producto, siempre visible (aunque quede vacía); el botón "+"
@@ -392,8 +409,9 @@ async function renderLocal(){
     }
   }
 
-  document.getElementById('selLocal').onchange = pintarTabla;
+  document.getElementById('selLocal').onchange = () => { pintarTabla(); pintarResponsable(); };
   pintarTabla(); // arranca mostrando el listado completo del primer local
+  pintarResponsable();
 
   document.getElementById('btnGuardar').onclick = async () => {
     const local = document.getElementById('selLocal').value;
@@ -741,7 +759,7 @@ function pintarRegistroProduccionSector(){
 
   const intro = document.createElement('p');
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
-  intro.textContent = `${data.dia}, ${fmtFecha(data.fecha)} — completá solo los sabores que se armaron este turno. "A producir (calc.)" es de referencia.`;
+  intro.textContent = `${data.dia}, ${fmtFecha(data.fecha)} — completá solo los sabores que se armaron este turno. "A producir (calc.)" es de referencia. Guardá cada sabor con su botón apenas lo termines (no hace falta esperar al final del turno); los puestos y las observaciones se guardan al cerrar el turno, con el botón de abajo.`;
   cont.appendChild(intro);
 
   cont.appendChild(bloquePuestosMaquina('Máquina 1', 'm1', EMPLEADOS_REGISTRO));
@@ -771,6 +789,7 @@ function pintarRegistroProduccionSector(){
       <th>Hora fin</th>
       <th>Total<br>producción</th>
       <th>Discos<br>dañados</th>
+      <th></th>
     </tr></thead>
     <tbody></tbody>`;
   const tbody = table.querySelector('tbody');
@@ -781,7 +800,11 @@ function pintarRegistroProduccionSector(){
     tr.innerHTML = `
       <td>${nombre}</td>
       <td class="num" style="color:var(--ink-soft);">${ref ? ent(ref.aHacerUnidades) : '—'}</td>
-      <td><input type="number" min="0" step="1" class="inp-maq-num" style="width:56px;"></td>
+      <td><select class="inp-maq-num" style="width:56px;">
+        <option value=""></option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+      </select></td>
       <td><input type="text" class="inp-maq-vel" style="width:64px;"></td>
       <td><input type="text" class="inp-disco-lote" style="width:90px;"></td>
       <td><input type="number" min="0" step="0.01" class="inp-peso-prom" style="width:80px;"></td>
@@ -792,7 +815,9 @@ function pintarRegistroProduccionSector(){
       <td><input type="time" class="inp-hora-fin"></td>
       <td><input type="number" min="0" step="1" class="inp-total-prod" style="width:80px;"></td>
       <td><input type="number" min="0" step="1" class="inp-discos-danados" style="width:64px;"></td>
+      <td><button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;white-space:nowrap;">Guardar</button></td>
     `;
+    tr.querySelector('.btn-guardar-item').onclick = () => guardarItemTrazabilidad(tr);
     tbody.appendChild(tr);
   });
   wrap.appendChild(table);
@@ -809,11 +834,57 @@ function pintarRegistroProduccionSector(){
 
   const actions = document.createElement('div');
   actions.className = 'actions';
-  actions.innerHTML = `<button class="btn" id="btnGuardarRegistro">Guardar registro del turno</button>`;
+  actions.innerHTML = `<button class="btn" id="btnGuardarRegistro">Guardar registro final del turno</button>`;
   cont.appendChild(actions);
   document.getElementById('btnGuardarRegistro').onclick = guardarRegistroProduccion;
 }
 
+// arma el objeto "item" de un sabor a partir de su fila en la tabla
+function leerFilaSabor(tr){
+  return {
+    sabor: tr.dataset.sabor,
+    maquinaNumero: tr.querySelector('.inp-maq-num').value,
+    maquinaVelocidad: tr.querySelector('.inp-maq-vel').value,
+    discosLote: tr.querySelector('.inp-disco-lote').value,
+    pesoPromTandaDiscos: tr.querySelector('.inp-peso-prom').value,
+    rellenoFecha: tr.querySelector('.inp-relleno-fecha').value,
+    pesoInicialRelleno: tr.querySelector('.inp-peso-inicial').value,
+    pesoFinalRelleno: tr.querySelector('.inp-peso-final').value,
+    horaInicio: tr.querySelector('.inp-hora-inicio').value,
+    horaFin: tr.querySelector('.inp-hora-fin').value,
+    totalProduccion: tr.querySelector('.inp-total-prod').value,
+    discosDanados: tr.querySelector('.inp-discos-danados').value
+  };
+}
+
+// "preguardar" un sabor apenas se termina, sin esperar al cierre del turno.
+async function guardarItemTrazabilidad(tr){
+  const fecha = document.getElementById('fechaRegistro').value;
+  const item = leerFilaSabor(tr);
+  if(!item.totalProduccion || Number(item.totalProduccion) <= 0){
+    alert('Cargá el total producido de este sabor antes de guardarlo.');
+    return;
+  }
+  const btn = tr.querySelector('.btn-guardar-item');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try{
+    const r = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'registrarTrazabilidadItem', fecha, item })
+    });
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    tr.classList.add('fila-guardada');
+    [...tr.querySelectorAll('input,select')].forEach(el => el.disabled = true);
+    btn.textContent = '✓ Guardado';
+  }catch(err){
+    btn.disabled = false; btn.textContent = 'Guardar';
+    alert('No se pudo guardar este sabor: ' + err.message);
+  }
+}
+
+// cierre del turno: guarda los puestos + observaciones (una vez), y de paso
+// cualquier sabor que haya quedado sin guardar con su botón individual.
 async function guardarRegistroProduccion(){
   const fecha = document.getElementById('fechaRegistro').value;
   const msg = document.getElementById('msgRegistro');
@@ -827,25 +898,10 @@ async function guardarRegistroProduccion(){
   const maquina2 = leerMaquina('m2');
   const observaciones = document.getElementById('inpObservacionesRegistro').value.trim();
 
-  const filas = [...document.querySelectorAll('table.traza tbody tr[data-sabor]')];
-  const items = filas.map(tr => ({
-    sabor: tr.dataset.sabor,
-    maquinaNumero: tr.querySelector('.inp-maq-num').value,
-    maquinaVelocidad: tr.querySelector('.inp-maq-vel').value,
-    discosLote: tr.querySelector('.inp-disco-lote').value,
-    pesoPromTandaDiscos: tr.querySelector('.inp-peso-prom').value,
-    rellenoFecha: tr.querySelector('.inp-relleno-fecha').value,
-    pesoInicialRelleno: tr.querySelector('.inp-peso-inicial').value,
-    pesoFinalRelleno: tr.querySelector('.inp-peso-final').value,
-    horaInicio: tr.querySelector('.inp-hora-inicio').value,
-    horaFin: tr.querySelector('.inp-hora-fin').value,
-    totalProduccion: tr.querySelector('.inp-total-prod').value,
-    discosDanados: tr.querySelector('.inp-discos-danados').value
-  })).filter(it => it.totalProduccion && Number(it.totalProduccion) > 0);
-
-  if(items.length === 0){
-    msg.className = 'msg err'; msg.textContent = 'Cargá el total producido de al menos un sabor.'; return;
-  }
+  // solo los sabores que NO se guardaron ya individualmente durante el turno
+  const filas = [...document.querySelectorAll('table.traza tbody tr[data-sabor]:not(.fila-guardada)')];
+  const items = filas.map(leerFilaSabor)
+    .filter(it => it.totalProduccion && Number(it.totalProduccion) > 0);
 
   const btn = document.getElementById('btnGuardarRegistro');
   btn.disabled = true; btn.textContent = 'Guardando...';
@@ -856,12 +912,19 @@ async function guardarRegistroProduccion(){
     });
     const data = await r.json();
     if(data.error) throw new Error(data.error);
+    filas.forEach(tr => {
+      if(Number(tr.querySelector('.inp-total-prod').value) > 0){
+        tr.classList.add('fila-guardada');
+        [...tr.querySelectorAll('input,select')].forEach(el => el.disabled = true);
+        tr.querySelector('.btn-guardar-item').textContent = '✓ Guardado';
+      }
+    });
     msg.className = 'msg ok';
-    msg.textContent = `Registro guardado: ${data.filas_detalle} sabor(es) con producción.`;
+    msg.textContent = `Turno cerrado. ${data.filas_detalle} sabor(es) más quedaron guardados.`;
   }catch(err){
     msg.className = 'msg err'; msg.textContent = 'No se pudo guardar: ' + err.message;
   }finally{
-    btn.disabled = false; btn.textContent = 'Guardar registro del turno';
+    btn.disabled = false; btn.textContent = 'Guardar registro final del turno';
   }
 }
 
@@ -1175,14 +1238,11 @@ async function renderRecepcion(){
     </div>
     <div class="field-row">
       <label>¿Quién confirma?</label>
-      <select id="inpResponsableRecepcion"><option value="">Cargando…</option></select>
+      <input type="text" id="inpResponsableRecepcion" placeholder="Nombre y apellido">
     </div>
     <div id="contenidoRecepcion" class="loading">Buscando envíos pendientes…</div>
     <div class="msg" id="msgRecepcion"></div>
   `;
-  obtenerEmpleados().then(empleados => {
-    document.getElementById('inpResponsableRecepcion').innerHTML = opcionesEmpleados(empleados);
-  });
   document.getElementById('selLocalRecepcion').onchange = cargarPendientesRecepcion;
   cargarPendientesRecepcion();
 }
