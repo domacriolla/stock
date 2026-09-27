@@ -320,6 +320,45 @@ function opcionesEmpleadosSeleccion(empleados, seleccionado){
   return '<option value="">— Seleccionar —</option>' + empleados.map(n => `<option value="${n}" ${n === seleccionado ? 'selected' : ''}>${n}</option>`).join('');
 }
 
+// guarda (o actualiza) UN lote de "Cargar stock" apenas se termina de cargar,
+// sin esperar a completar el resto de la lista — así, si hay un error de
+// tipeo en la tablet, se corrige y reguarda solo ese lote, sin repetir toda
+// la carga. Confirmado con Carolina (26/09/2026).
+async function guardarItemStock(tr){
+  const local = document.getElementById('selLocal').value;
+  const fecha = document.getElementById('fechaCarga').value;
+  const responsable = document.getElementById('inpResponsable').value.trim();
+  if(!responsable){
+    alert('Indicá quién está cargando este stock antes de guardar (arriba de la lista de productos).');
+    return;
+  }
+  const cantidad = tr.querySelector('.inp-cant').value;
+  const vencimiento = tr.querySelector('.inp-venc').value;
+  if(!cantidad || Number(cantidad) <= 0 || !vencimiento){
+    alert('Cargá cantidad y vencimiento de este lote antes de guardarlo.');
+    return;
+  }
+  const item = { sabor: tr.dataset.item, cantidad, vencimiento };
+  const btn = tr.querySelector('.btn-guardar-item');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try{
+    const r = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'registrarStockItem', local, fecha, responsable, item })
+    });
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    tr.classList.add('fila-guardada');
+    [...tr.querySelectorAll('input')].forEach(el => el.disabled = true);
+    btn.textContent = '✓ Guardado'; btn.style.display = 'none';
+    const btnEditar = tr.querySelector('.btn-editar-item');
+    if(btnEditar) btnEditar.style.display = '';
+  }catch(err){
+    btn.disabled = false; btn.textContent = 'Guardar';
+    alert('No se pudo guardar este lote: ' + err.message);
+  }
+}
+
 async function renderLocal(){
   app.innerHTML = `
     <button class="back" onclick="irA('home')">← Volver</button>
@@ -342,15 +381,17 @@ async function renderLocal(){
 
     <p style="color:var(--ink-soft);font-size:12.5px;max-width:560px;">
       Están listados todos los productos — completá cantidad y vencimiento solo en los que tengas hoy,
-      el resto se deja en blanco. Si un mismo producto tiene más de un lote con vencimientos distintos,
-      usá el botón <strong>+</strong> de esa fila para agregar otra línea.
+      el resto se deja en blanco. Guardá cada lote con su propio botón apenas lo cargues (así, si hay
+      un error de tipeo, se corrige y reguarda solo ese lote, sin tocar el resto). Si un mismo producto
+      tiene más de un lote con vencimientos distintos, usá el botón <strong>+</strong> de esa fila para
+      agregar otra línea.
     </p>
 
     <div id="catNav" class="cat-nav"></div>
-    <div id="tablaLotesContainer"></div>
+    <div id="tablaLotesContainer" class="loading">Cargando…</div>
 
-    <div class="actions">
-      <button class="btn" id="btnGuardar">Guardar stock cargado</button>
+    <div class="actions no-print">
+      <button class="btn" id="btnGuardar">Guardar todo lo que falte</button>
     </div>
     <div class="msg" id="msg"></div>
   `;
@@ -384,17 +425,29 @@ async function renderLocal(){
     }
   }
 
-  // una fila por producto, siempre visible (aunque quede vacía); el botón "+"
-  // agrega otra fila del MISMO producto para cargar un segundo vencimiento.
-  function filaProducto(nombre, esExtra){
+  // una fila por lote. "guardado" (si viene) prellena y bloquea la fila, con
+  // su botón "Editar" para destrabarla puntualmente — igual que en Registrar
+  // producción y Despachar envíos, para que un error de tipeo en la tablet
+  // se corrija guardando de nuevo SOLO ese lote, sin repetir toda la carga.
+  // El botón "+" agrega otra fila del MISMO producto para un segundo
+  // vencimiento (queda vacía y editable, salvo que también venga guardada).
+  function filaProducto(nombre, esExtra, guardado){
+    const g = guardado || {};
+    const yaGuardado = !!guardado;
+    const dis = yaGuardado ? 'disabled' : '';
     const tr = document.createElement('tr');
     tr.dataset.item = nombre;
+    if(yaGuardado) tr.classList.add('fila-guardada');
     tr.innerHTML = `
       <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : nombre}</td>
-      <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0"></td>
-      <td><input type="date" class="inp-venc"></td>
+      <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0" value="${g.cantidad || ''}" ${dis}></td>
+      <td><input type="date" class="inp-venc" value="${g.vencimiento || ''}" ${dis}></td>
       <td class="col-add">${esExtra ? '' : '<button type="button" class="add-lote-btn" title="Agregar otro vencimiento para este producto">+</button>'}</td>
       <td class="col-del">${esExtra ? '<button type="button" class="del-btn" title="Quitar">✕</button>' : ''}</td>
+      <td class="no-print" style="white-space:nowrap;">
+        <button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;${yaGuardado ? 'display:none;' : ''}">Guardar</button>
+        <button type="button" class="btn secondary btn-editar-item" style="font-size:12px;padding:5px 9px;${yaGuardado ? '' : 'display:none;'}">Editar</button>
+      </td>
     `;
     if(esExtra){
       tr.querySelector('.del-btn').onclick = () => tr.remove();
@@ -403,10 +456,15 @@ async function renderLocal(){
         tr.insertAdjacentElement('afterend', filaProducto(nombre, true));
       };
     }
+    tr.querySelector('.btn-guardar-item').onclick = () => guardarItemStock(tr);
+    tr.querySelector('.btn-editar-item').onclick = () => habilitarEdicionFila(tr);
     return tr;
   }
 
-  function tablaDe(labelCantidad, colHeader, items){
+  // arma las filas de un producto: si ya tiene uno o más lotes guardados hoy
+  // (guardadosPorItem), una fila prellenada/bloqueada por cada uno; si no,
+  // una sola fila vacía y editable.
+  function tablaDe(labelCantidad, colHeader, items, guardadosPorItem){
     const table = document.createElement('table');
     table.className = 'lotes';
     table.innerHTML = `
@@ -416,20 +474,47 @@ async function renderLocal(){
         <th class="col-venc">Vencimiento</th>
         <th class="col-add"></th>
         <th class="col-del"></th>
+        <th class="no-print"></th>
       </tr></thead>
       <tbody></tbody>`;
     const tbody = table.querySelector('tbody');
-    items.forEach(nombre => tbody.appendChild(filaProducto(nombre, false)));
+    items.forEach(nombre => {
+      const guardados = (guardadosPorItem && guardadosPorItem[nombre]) || [];
+      if(guardados.length === 0){
+        tbody.appendChild(filaProducto(nombre, false, null));
+      } else {
+        guardados.forEach((g, i) => tbody.appendChild(filaProducto(nombre, i > 0, g)));
+      }
+    });
     return table;
   }
 
-  function pintarTabla(){
-    const modo = modoDeLocal(document.getElementById('selLocal').value);
+  async function pintarTabla(){
+    const local = document.getElementById('selLocal').value;
+    const fecha = document.getElementById('fechaCarga').value;
+    const modo = modoDeLocal(local);
     const labelCantidad = modo === 'relleno' ? 'Kilos' : modo === 'disco' ? 'Docenas' : 'Cantidad';
     const cont = document.getElementById('tablaLotesContainer');
     const nav = document.getElementById('catNav');
-    cont.innerHTML = '';
+    cont.className = 'loading'; cont.textContent = 'Cargando…';
     nav.innerHTML = '';
+
+    let guardadosPorItem = {};
+    try{
+      const r = await fetch(`${APPS_SCRIPT_URL}?action=obtenerStockCargadoDia&local=${encodeURIComponent(local)}&fecha=${fecha}`);
+      const data = await r.json();
+      if(!data.error){
+        (data.items || []).forEach(it => {
+          guardadosPorItem[it.sabor] = guardadosPorItem[it.sabor] || [];
+          guardadosPorItem[it.sabor].push(it);
+        });
+      }
+    }catch(err){ /* si falla la consulta, se sigue con la tabla vacía y editable */ }
+
+    // se cambió de local o de fecha mientras cargaba esta consulta
+    if(document.getElementById('selLocal').value !== local || document.getElementById('fechaCarga').value !== fecha) return;
+
+    cont.className = ''; cont.innerHTML = '';
 
     if(modo === 'sabor'){
       nombresCategorias.forEach((cat, i) => {
@@ -439,7 +524,7 @@ async function renderLocal(){
         h.id = id;
         h.textContent = cat;
         cont.appendChild(h);
-        cont.appendChild(tablaDe(labelCantidad, 'Sabor / ítem', categorias[cat]));
+        cont.appendChild(tablaDe(labelCantidad, 'Sabor / ítem', categorias[cat], guardadosPorItem));
 
         const a = document.createElement('a');
         a.href = `#${id}`;
@@ -447,33 +532,36 @@ async function renderLocal(){
         nav.appendChild(a);
       });
     } else if(modo === 'relleno'){
-      cont.appendChild(tablaDe(labelCantidad, 'Relleno', rellenos));
+      cont.appendChild(tablaDe(labelCantidad, 'Relleno', rellenos, guardadosPorItem));
     } else {
-      cont.appendChild(tablaDe(labelCantidad, 'Tipo de disco', TIPOS_DISCO));
+      cont.appendChild(tablaDe(labelCantidad, 'Tipo de disco', TIPOS_DISCO, guardadosPorItem));
     }
   }
 
   document.getElementById('selLocal').onchange = () => { pintarTabla(); pintarResponsable(); };
+  document.getElementById('fechaCarga').onchange = pintarTabla;
   pintarTabla(); // arranca mostrando el listado completo del primer local
   pintarResponsable();
 
+  // "Guardar todo lo que falte": guarda de una sola vez cualquier lote que
+  // haya quedado sin guardar con su propio botón.
   document.getElementById('btnGuardar').onclick = async () => {
     const local = document.getElementById('selLocal').value;
     const responsable = document.getElementById('inpResponsable').value.trim();
     const fecha = document.getElementById('fechaCarga').value;
-    const filas = [...document.querySelectorAll('#tablaLotesContainer tr[data-item]')];
-    const items = filas.map(tr => ({
-      sabor: tr.dataset.item,
-      cantidad: tr.querySelector('.inp-cant').value,
-      vencimiento: tr.querySelector('.inp-venc').value
-    })).filter(it => it.cantidad && it.vencimiento);
-
     const msg = document.getElementById('msg');
     if(!responsable){
       msg.className = 'msg err'; msg.textContent = 'Indicá quién está cargando este stock.'; return;
     }
+    const filas = [...document.querySelectorAll('#tablaLotesContainer tr[data-item]:not(.fila-guardada)')];
+    const items = filas.map(tr => ({
+      sabor: tr.dataset.item,
+      cantidad: tr.querySelector('.inp-cant').value,
+      vencimiento: tr.querySelector('.inp-venc').value
+    })).filter(it => it.cantidad && Number(it.cantidad) > 0 && it.vencimiento);
+
     if(items.length === 0){
-      msg.className = 'msg err'; msg.textContent = 'Cargá al menos un lote con cantidad y vencimiento.'; return;
+      msg.className = 'msg err'; msg.textContent = 'Cargá al menos un lote con cantidad y vencimiento (los que ya guardaste con su propio botón no hace falta repetirlos).'; return;
     }
     const btn = document.getElementById('btnGuardar');
     btn.disabled = true; btn.textContent = 'Guardando...';
@@ -484,13 +572,22 @@ async function renderLocal(){
       });
       const data = await r.json();
       if(data.error) throw new Error(data.error);
+      filas.forEach(tr => {
+        if(Number(tr.querySelector('.inp-cant').value) > 0 && tr.querySelector('.inp-venc').value){
+          tr.classList.add('fila-guardada');
+          [...tr.querySelectorAll('input')].forEach(el => el.disabled = true);
+          const btnG = tr.querySelector('.btn-guardar-item');
+          if(btnG){ btnG.textContent = '✓ Guardado'; btnG.style.display = 'none'; }
+          const btnE = tr.querySelector('.btn-editar-item');
+          if(btnE) btnE.style.display = '';
+        }
+      });
       msg.className = 'msg ok';
-      msg.textContent = `Guardado: ${data.registros_guardados} lote(s) para ${local}.`;
-      pintarTabla();
+      msg.textContent = `Guardado: ${data.registros_guardados} lote(s) más para ${local}.`;
     }catch(err){
       msg.className = 'msg err'; msg.textContent = 'No se pudo guardar: ' + err.message;
     }finally{
-      btn.disabled = false; btn.textContent = 'Guardar stock cargado';
+      btn.disabled = false; btn.textContent = 'Guardar todo lo que falte';
     }
   };
 }
