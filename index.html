@@ -391,7 +391,7 @@ async function renderLocal(){
     <div id="tablaLotesContainer" class="loading">Cargando…</div>
 
     <div class="actions no-print">
-      <button class="btn" id="btnGuardar">Guardar todo lo que falte</button>
+      <button class="btn" id="btnGuardar">Enviar stock</button>
     </div>
     <div class="msg" id="msg"></div>
   `;
@@ -543,8 +543,8 @@ async function renderLocal(){
   pintarTabla(); // arranca mostrando el listado completo del primer local
   pintarResponsable();
 
-  // "Guardar todo lo que falte": guarda de una sola vez cualquier lote que
-  // haya quedado sin guardar con su propio botón.
+  // "Enviar stock": guarda de una sola vez cualquier lote que haya quedado
+  // sin guardar con su propio botón.
   document.getElementById('btnGuardar').onclick = async () => {
     const local = document.getElementById('selLocal').value;
     const responsable = document.getElementById('inpResponsable').value.trim();
@@ -583,11 +583,11 @@ async function renderLocal(){
         }
       });
       msg.className = 'msg ok';
-      msg.textContent = `Guardado: ${data.registros_guardados} lote(s) más para ${local}.`;
+      msg.textContent = `Enviado: ${data.registros_guardados} lote(s) más para ${local}.`;
     }catch(err){
       msg.className = 'msg err'; msg.textContent = 'No se pudo guardar: ' + err.message;
     }finally{
-      btn.disabled = false; btn.textContent = 'Guardar todo lo que falte';
+      btn.disabled = false; btn.textContent = 'Enviar stock';
     }
   };
 }
@@ -1679,7 +1679,7 @@ async function pintarRegistroProduccionSector(){
   if(!bloqueadoGlobal){
     const actions = document.createElement('div');
     actions.className = 'actions no-print';
-    actions.innerHTML = `<button class="btn" id="btnGuardarRegistro">Guardar registro final del turno</button>`;
+    actions.innerHTML = `<button class="btn" id="btnGuardarRegistro">Enviar registro final del turno</button>`;
     cont.appendChild(actions);
     document.getElementById('btnGuardarRegistro').onclick = guardarRegistroProduccion;
   }
@@ -1783,11 +1783,11 @@ async function guardarRegistroProduccion(){
     const data = await r.json();
     if(data.error) throw new Error(data.error);
     msg.className = 'msg ok';
-    msg.textContent = `Turno cerrado. ${data.filas_detalle} sabor(es) más quedaron guardados.`;
+    msg.textContent = `Turno enviado. ${data.filas_detalle} sabor(es) más quedaron guardados.`;
     pintarRegistroProduccionSector();
   }catch(err){
     msg.className = 'msg err'; msg.textContent = 'No se pudo guardar: ' + err.message;
-    btn.disabled = false; btn.textContent = 'Guardar registro final del turno';
+    btn.disabled = false; btn.textContent = 'Enviar registro final del turno';
   }
 }
 
@@ -2094,7 +2094,7 @@ function pintarEnvioLocal(local, itemsCalculados, data, categorias){
   const actions = document.createElement('div');
   actions.className = 'actions';
   actions.innerHTML = `
-    <button class="btn" id="btnGuardarEnvio-${id}">Guardar despacho a ${local}</button>
+    <button class="btn" id="btnGuardarEnvio-${id}">Enviar despacho a ${local}</button>
     <button class="btn secondary" id="btnImprimirEnvio-${id}">🖶 Imprimir orden de envío</button>
   `;
   div.appendChild(actions);
@@ -2147,7 +2147,7 @@ async function guardarItemEnvio(tr, local, fecha){
   }
 }
 
-// "Guardar despacho a [local]": guarda de una sola vez todo lo que haya
+// "Enviar despacho a [local]": guarda de una sola vez todo lo que haya
 // quedado sin guardar individualmente con su propio botón.
 async function guardarEnvio(local, fecha){
   const { responsable, repartidor, acompanante } = datosComunesEnvio();
@@ -2186,11 +2186,11 @@ async function guardarEnvio(local, fecha){
       }
     });
     msg.className = 'msg ok';
-    msg.textContent = `Despacho guardado: ${data.envios_guardados} producto(s) más enviados a ${local}.`;
+    msg.textContent = `Despacho enviado: ${data.envios_guardados} producto(s) más enviados a ${local}.`;
   }catch(err){
     msg.className = 'msg err'; msg.textContent = 'No se pudo guardar: ' + err.message;
   }finally{
-    btn.disabled = false; btn.textContent = `Guardar despacho a ${local}`;
+    btn.disabled = false; btn.textContent = `Enviar despacho a ${local}`;
   }
 }
 
