@@ -147,8 +147,8 @@
     .back, .fab-toolbar, .tabs, footer.note{display:none !important;}
     body{background:#fff;}
     .wrap{max-width:none;padding:0;}
-    table.prod{font-size:12px;}
-    table.prod tr{break-inside:avoid;}
+    table.prod, table.lotes{font-size:12px;}
+    table.prod tr, table.lotes tr{break-inside:avoid;}
     .alert-box{break-inside:avoid;}
     .no-print{display:none !important;}
   }
@@ -823,6 +823,14 @@ async function cargarPreparadosCocina(fecha){
     const ollasPorNombre = {};
     ollasPrep.forEach(o => { ollasPorNombre[normalizarFicha(o.nombre)] = o; });
 
+    // ojo: acá NO se muestra "Gramaje por olla" de los Preparados en olla —
+    // los 8 kg de la olla son de la MATERIA PRIMA cruda (ej. recortes de
+    // pollo), no del Preparado ya terminado, así que escalar la ficha del
+    // Preparado a 8 kg da un gramaje que no corresponde a lo que realmente
+    // entra en la olla. Confirmado con Carolina (26/09/2026). El detalle de
+    // gramaje SÍ es correcto para los Rellenos directos (arriba,
+    // gramajeRellenosCont) porque ahí los 8 kg son del mismo ingrediente
+    // crudo que se está escalando.
     cont.innerHTML = `
       <h3 style="font-size:15px;margin:0 0 8px;">Preparados</h3>
       <table class="prod">
@@ -834,7 +842,6 @@ async function cargarPreparadosCocina(fecha){
           }).join('')}
         </tbody>
       </table>
-      ${bloqueGramajeOllas(ollasPrep)}
       ${(data.avisos || []).length ? `<p style="color:var(--alert);font-size:12px;margin-top:8px;">${data.avisos.join(' ')}</p>` : ''}
     `;
   }catch(err){
@@ -919,6 +926,7 @@ async function renderRegistroProduccion(){
       <button class="tab-btn active" data-sector="produccion">Producción</button>
       <button class="tab-btn" data-sector="cocina">Cocina</button>
       <button class="tab-btn" data-sector="discos">Discos</button>
+      <button class="btn secondary" id="btnImprimirRegistro" style="margin-left:auto;" onclick="window.print()">🖶 Imprimir</button>
     </div>
     <div id="contenidoRegistro" class="loading">Cargando…</div>
     <div class="msg" id="msgRegistro"></div>
@@ -994,19 +1002,22 @@ async function pintarRegistroCocinaSector(){
 
   const fecha = document.getElementById('fechaRegistro').value;
   const cocina = (CALCULO_REGISTRO.cocina || []).filter(f => f.kilosDeRelleno > 0);
-  if(cocina.length === 0){
-    cont.innerHTML = `<div class="empty">Cocina no elabora ningún relleno el ${CALCULO_REGISTRO.dia.toLowerCase()}.</div>`;
+  const dipsPostres = (CALCULO_REGISTRO.produccion || []).filter(f => f.aHacerUnidades > 0 && (f.rubro === 'Dips' || f.rubro === 'Postres'));
+  if(cocina.length === 0 && dipsPostres.length === 0){
+    cont.innerHTML = `<div class="empty">Cocina no elabora nada el ${CALCULO_REGISTRO.dia.toLowerCase()}.</div>`;
     return;
   }
 
-  const [recetas, ollasResp] = await Promise.all([
+  const [recetas, ollasResp, totalesResp] = await Promise.all([
     obtenerRecetas(),
-    fetch(`${APPS_SCRIPT_URL}?action=calcularOllas&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({}))
+    fetch(`${APPS_SCRIPT_URL}?action=calcularOllas&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({})),
+    fetch(`${APPS_SCRIPT_URL}?action=calcularInsumosRealesDia&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({}))
   ]);
   const ollasData = (ollasResp && !ollasResp.error) ? ollasResp : { preparados: [], rellenos: [] };
+  const totalesData = (totalesResp && !totalesResp.error) ? totalesResp : { totalesPorIngrediente: [] };
   if(recetas.detalle.length === 0){
     cont.innerHTML = `
-      <div class="empty">Todavía no importaste ninguna ficha técnica de Rellenos — sin eso no sé qué insumos controlar acá.</div>
+      <div class="empty">Todavía no importaste ninguna ficha técnica — sin eso no sé qué insumos controlar acá.</div>
       <div class="actions"><button class="btn secondary" onclick="irA('fichas')">Ir a Fichas técnicas</button></div>
     `;
     return;
@@ -1017,6 +1028,26 @@ async function pintarRegistroCocinaSector(){
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
   intro.textContent = `${CALCULO_REGISTRO.dia}, ${fmtFecha(fecha)} — cargá el bruto real de cada insumo (y el rinde real cuando aplique) sobre el TOTAL de hoy; si no cargás nada, se toma el valor de la ficha.`;
   cont.appendChild(intro);
+
+  // Totales del día: suma por insumo de TODO lo que cocina hoy (Preparados +
+  // Rellenos + Dips + Postres) — usa el bruto real cargado donde exista, y
+  // si no se cargó nada para ese insumo puntual, el valor de la ficha.
+  // Confirmado con Carolina (26/09/2026).
+  if((totalesData.totalesPorIngrediente || []).length){
+    const detTot = document.createElement('details');
+    detTot.open = true;
+    detTot.style.cssText = 'margin:10px 0 16px;';
+    detTot.innerHTML = `
+      <summary style="cursor:pointer;font-size:14px;font-weight:600;">Totales del día — insumos reales usados (todo Cocina)</summary>
+      <table class="prod" style="margin-top:8px;">
+        <thead><tr><th>Insumo</th><th class="num">Total usado hoy</th></tr></thead>
+        <tbody>
+          ${totalesData.totalesPorIngrediente.map(t => `<tr><td>${t.ingrediente}</td><td class="num"><strong>${ent(t.cantidad)}</strong> ${t.unidad}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    `;
+    cont.appendChild(detTot);
+  }
 
   if((ollasData.preparados || []).length){
     const hPrep = document.createElement('h4');
@@ -1031,31 +1062,36 @@ async function pintarRegistroCocinaSector(){
     cont.appendChild(tablaPrep);
   }
 
-  // encuentra el rinde de una receta (Relleno o Preparado) EN KG, para poder
-  // escalar su ficha del "un batch" al total que hace falta cocinar hoy.
-  function rindeEnKG(nombreReceta){
+  // encuentra el rinde de una receta (Relleno, Preparado, Dip o Postre) EN LA
+  // UNIDAD pedida (KG para Rellenos/Preparados, UN para Dips/Postres), para
+  // poder escalar su ficha del "un batch" al total que hace falta cocinar
+  // hoy. El rinde de una ficha puede venir cargado en dos unidades a la vez
+  // (ej. Dips: "3 KG" y, debajo, "75 UN") — por eso mira los dos pares.
+  function rindeEnUnidad(nombreReceta, unidadObjetivo){
     const cab = recetas.cabecera.find(r => normalizarFicha(r.Receta) === normalizarFicha(nombreReceta));
     if(!cab) return 0;
-    if(normalizarFicha(cab.RindeUnidad) === 'KG') return Number(cab.RindeCantidad) || 0;
-    if(normalizarFicha(cab.RindeUnidad2) === 'KG') return Number(cab.RindeCantidad2) || 0;
+    if(normalizarFicha(cab.RindeUnidad) === unidadObjetivo) return Number(cab.RindeCantidad) || 0;
+    if(normalizarFicha(cab.RindeUnidad2) === unidadObjetivo) return Number(cab.RindeCantidad2) || 0;
     return 0;
   }
 
-  // Bloque de registro de UNA receta (Relleno o Preparado en olla): título
-  // grande, referencia de ollas (colapsable, solo informativa) y la tabla de
-  // insumos — TODOS escalados al total de HOY, no a los valores "de un
-  // batch" que trae la ficha. El registro (Bruto real / Rinde real) es
-  // siempre sobre ese total, nunca por olla.
-  function bloqueRegistroReceta(nombreReceta, cantidadHoy, subtitulo, infoOllasHtml){
+  // Bloque de registro de UNA receta (Relleno, Preparado en olla, Dip o
+  // Postre): título grande, referencia de ollas (colapsable, solo
+  // informativa, cuando aplica) y la tabla de insumos — TODOS escalados al
+  // total de HOY, no a los valores "de un batch" que trae la ficha. El
+  // registro (Bruto real / Rinde real) es siempre sobre ese total, nunca por
+  // olla. unidadHoy es 'KG' para Rellenos/Preparados y 'UN' para Dips/Postres
+  // (que se miden en unidades, no en kilos).
+  function bloqueRegistroReceta(nombreReceta, cantidadHoy, unidadHoy, subtitulo, infoOllasHtml){
     const ingredientesReceta = recetas.detalle.filter(d => normalizarFicha(d.Receta) === normalizarFicha(nombreReceta));
     if(ingredientesReceta.length === 0) return false;
 
-    const rinde = rindeEnKG(nombreReceta);
+    const rinde = rindeEnUnidad(nombreReceta, unidadHoy);
     const factor = rinde > 0 ? (cantidadHoy / rinde) : 1;
 
     const h = document.createElement('h4');
     h.className = 'cat-heading receta-heading';
-    h.textContent = `${nombreReceta} — ${ent(cantidadHoy)} kg calculados hoy${subtitulo || ''}`;
+    h.textContent = `${nombreReceta} — ${ent(cantidadHoy)} ${unidadHoy === 'UN' ? 'un.' : 'kg'} calculados hoy${subtitulo || ''}`;
     cont.appendChild(h);
 
     if(infoOllasHtml){
@@ -1076,7 +1112,7 @@ async function pintarRegistroCocinaSector(){
         <th class="num">Bruto real</th>
         <th class="num">Rinde ficha (hoy)</th>
         <th class="num">Rinde real</th>
-        <th></th>
+        <th class="no-print"></th>
       </tr></thead>
       <tbody></tbody>`;
     const tbody = table.querySelector('tbody');
@@ -1093,7 +1129,7 @@ async function pintarRegistroCocinaSector(){
         <td><input type="number" min="0" step="0.01" class="inp-bruto-real" style="width:90px;" placeholder="${ent(cantidadHoyIng)}"></td>
         <td class="num" style="color:var(--ink-soft);">${tieneRinde ? `${ent(rindeHoyIng)} ${ing.Medida || ''}` : `<span style="font-size:11px;">sin control de rinde</span>`}</td>
         <td>${tieneRinde ? `<input type="number" min="0" step="0.01" class="inp-rinde-real" style="width:90px;" placeholder="${ent(rindeHoyIng)}">` : ''}</td>
-        <td style="white-space:nowrap;">
+        <td style="white-space:nowrap;" class="no-print">
           <button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;">Guardar</button>
           <button type="button" class="btn secondary btn-editar-item" style="font-size:12px;padding:5px 9px;display:none;">Editar</button>
         </td>
@@ -1111,12 +1147,15 @@ async function pintarRegistroCocinaSector(){
 
   // Preparados que se cocinan en olla (Relleno Carne, Pollo Grille): el
   // registro de insumos va sobre el TOTAL de ESE preparado — las ollas quedan
-  // solo como referencia colapsable arriba de la tabla, no como el campo a
-  // completar (eso ya lo pidió Carolina expresamente: "el registro tiene que
-  // ser sobre el total, con una solapita para ver por olla si hace falta").
+  // solo como referencia (no como el campo a completar; eso ya lo pidió
+  // Carolina expresamente: "el registro tiene que ser sobre el total, con
+  // una solapita para ver por olla si hace falta"). Ojo: acá NO va el
+  // gramaje por olla — los 8 kg de la olla son de la materia prima cruda
+  // (recortes), no del Preparado ya terminado (ver el comentario en
+  // cargarPreparadosCocina). Confirmado con Carolina (26/09/2026).
   (ollasData.preparados || []).forEach(o => {
-    const infoOllasHtml = `<strong>Referencia:</strong> hoy arma ${o.ollas} olla(s) de este preparado (una olla completa son 8 kg) — el registro de insumos de abajo es sobre el TOTAL de hoy, no por olla.` + bloqueGramajeOllas([o]);
-    if(bloqueRegistroReceta(o.nombre, o.kilos, ` — Preparado (lo usan: ${(o.usan || []).join(', ')})`, infoOllasHtml)) algunBloque = true;
+    const infoOllasHtml = `<strong>Referencia:</strong> hoy arma ${o.ollas} olla(s) de este preparado (una olla completa son 8 kg) — el registro de insumos de abajo es sobre el TOTAL de hoy, no por olla.`;
+    if(bloqueRegistroReceta(o.nombre, o.kilos, 'KG', ` — Preparado (lo usan: ${(o.usan || []).join(', ')})`, infoOllasHtml)) algunBloque = true;
   });
 
   // Rellenos que se cocinan hoy
@@ -1125,11 +1164,26 @@ async function pintarRegistroCocinaSector(){
     const infoOllasHtml = infoOllas
       ? `<strong>Referencia:</strong> hoy arma ${infoOllas.ollas} olla(s) (usa ${ent(infoOllas.kilosNecesarios)} kg de ${infoOllas.ingredienteClave} — una olla completa son 8 kg) — el registro de insumos de abajo es sobre el TOTAL de hoy, no por olla.` + bloqueGramajeOllas([infoOllas])
       : '';
-    if(bloqueRegistroReceta(f.relleno, f.kilosDeRelleno, '', infoOllasHtml)) algunBloque = true;
+    if(bloqueRegistroReceta(f.relleno, f.kilosDeRelleno, 'KG', '', infoOllasHtml)) algunBloque = true;
+  });
+
+  // Dips y Postres: los arma Cocina igual que los Rellenos, pero se miden en
+  // UNIDADES — la ficha escala contra el rinde en UN (no en KG). No tienen
+  // ollas. Confirmado con Carolina (26/09/2026).
+  ['Dips', 'Postres'].forEach(rubro => {
+    const items = dipsPostres.filter(f => f.rubro === rubro);
+    if(items.length === 0) return;
+    const hRubro = document.createElement('h4');
+    hRubro.className = 'cat-heading';
+    hRubro.textContent = rubro;
+    cont.appendChild(hRubro);
+    items.forEach(f => {
+      if(bloqueRegistroReceta(f.sabor, f.aHacerUnidades, 'UN', '', '')) algunBloque = true;
+    });
   });
 
   if(!algunBloque){
-    cont.innerHTML += `<div class="empty" style="margin-top:14px;">No encontré la ficha técnica de ninguno de los rellenos de hoy.</div>`;
+    cont.innerHTML += `<div class="empty" style="margin-top:14px;">No encontré la ficha técnica de ninguno de los rellenos, dips o postres de hoy.</div>`;
   }
 }
 
