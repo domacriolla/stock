@@ -1008,13 +1008,26 @@ async function pintarRegistroCocinaSector(){
     return;
   }
 
-  const [recetas, ollasResp, totalesResp] = await Promise.all([
+  const [recetas, ollasResp, trazaResp, finalResp] = await Promise.all([
     obtenerRecetas(),
     fetch(`${APPS_SCRIPT_URL}?action=calcularOllas&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({})),
-    fetch(`${APPS_SCRIPT_URL}?action=calcularInsumosRealesDia&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({}))
+    fetch(`${APPS_SCRIPT_URL}?action=listarTrazabilidadCocinaDia&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({})),
+    fetch(`${APPS_SCRIPT_URL}?action=listarRecetasFinalizadas&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({}))
   ]);
   const ollasData = (ollasResp && !ollasResp.error) ? ollasResp : { preparados: [], rellenos: [] };
-  const totalesData = (totalesResp && !totalesResp.error) ? totalesResp : { totalesPorIngrediente: [] };
+
+  // lo ya guardado hoy por ingrediente (para repintar los inputs con el
+  // valor real cargado, en vez de arrancar en blanco cada vez que se entra o
+  // recarga la pantalla) y las recetas ya "enviadas final" hoy (que quedan
+  // con la tabla entera bloqueada — ver bloqueRegistroReceta).
+  const trazaGuardada = {};
+  ((trazaResp && !trazaResp.error && trazaResp.items) || []).forEach(it => {
+    trazaGuardada[normalizarFicha(it.relleno) + '|' + normalizarFicha(it.ingrediente)] = it;
+  });
+  const recetasFinalizadasSet = new Set(
+    ((finalResp && !finalResp.error && finalResp.recetas) || []).map(r => normalizarFicha(r))
+  );
+
   if(recetas.detalle.length === 0){
     cont.innerHTML = `
       <div class="empty">Todavía no importaste ninguna ficha técnica — sin eso no sé qué insumos controlar acá.</div>
@@ -1028,26 +1041,6 @@ async function pintarRegistroCocinaSector(){
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
   intro.textContent = `${CALCULO_REGISTRO.dia}, ${fmtFecha(fecha)} — cargá el bruto real de cada insumo (y el rinde real cuando aplique) sobre el TOTAL de hoy; si no cargás nada, se toma el valor de la ficha.`;
   cont.appendChild(intro);
-
-  // Totales del día: suma por insumo de TODO lo que cocina hoy (Preparados +
-  // Rellenos + Dips + Postres) — usa el bruto real cargado donde exista, y
-  // si no se cargó nada para ese insumo puntual, el valor de la ficha.
-  // Confirmado con Carolina (26/09/2026).
-  if((totalesData.totalesPorIngrediente || []).length){
-    const detTot = document.createElement('details');
-    detTot.open = true;
-    detTot.style.cssText = 'margin:10px 0 16px;';
-    detTot.innerHTML = `
-      <summary style="cursor:pointer;font-size:14px;font-weight:600;">Totales del día — insumos reales usados (todo Cocina)</summary>
-      <table class="prod" style="margin-top:8px;">
-        <thead><tr><th>Insumo</th><th class="num">Total usado hoy</th></tr></thead>
-        <tbody>
-          ${totalesData.totalesPorIngrediente.map(t => `<tr><td>${t.ingrediente}</td><td class="num"><strong>${ent(t.cantidad)}</strong> ${t.unidad}</td></tr>`).join('')}
-        </tbody>
-      </table>
-    `;
-    cont.appendChild(detTot);
-  }
 
   if((ollasData.preparados || []).length){
     const hPrep = document.createElement('h4');
@@ -1089,10 +1082,29 @@ async function pintarRegistroCocinaSector(){
     const rinde = rindeEnUnidad(nombreReceta, unidadHoy);
     const factor = rinde > 0 ? (cantidadHoy / rinde) : 1;
 
+    const finalizada = recetasFinalizadasSet.has(normalizarFicha(nombreReceta));
+
     const h = document.createElement('h4');
     h.className = 'cat-heading receta-heading';
-    h.textContent = `${nombreReceta} — ${ent(cantidadHoy)} ${unidadHoy === 'UN' ? 'un.' : 'kg'} calculados hoy${subtitulo || ''}`;
+    h.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;';
+    h.innerHTML = `
+      <span>${nombreReceta} — ${ent(cantidadHoy)} ${unidadHoy === 'UN' ? 'un.' : 'kg'} calculados hoy${subtitulo || ''}</span>
+      <span class="no-print">${finalizada
+        ? `<span style="color:#2a7a4a;font-size:12.5px;font-weight:600;margin-right:6px;">✓ Enviado final</span><button type="button" class="btn secondary btn-reabrir-receta" style="font-size:12px;padding:5px 9px;">Reabrir</button>`
+        : `<button type="button" class="btn btn-finalizar-receta" style="font-size:12px;padding:5px 9px;">Enviar final</button>`}</span>
+    `;
     cont.appendChild(h);
+    const btnFinalizar = h.querySelector('.btn-finalizar-receta');
+    if(btnFinalizar) btnFinalizar.onclick = () => finalizarReceta(nombreReceta, fecha);
+    const btnReabrir = h.querySelector('.btn-reabrir-receta');
+    if(btnReabrir) btnReabrir.onclick = () => reabrirReceta(nombreReceta, fecha);
+
+    if(finalizada){
+      const avisoFinal = document.createElement('p');
+      avisoFinal.style.cssText = 'font-size:12px;color:#2a7a4a;margin:0 0 8px;';
+      avisoFinal.textContent = 'Esta receta ya está enviada como final — sus insumos entraron al informe de "Totales del día" y la tabla queda bloqueada. Tocá "Reabrir" para volver a editarla.';
+      cont.appendChild(avisoFinal);
+    }
 
     if(infoOllasHtml){
       const divOllas = document.createElement('div');
@@ -1120,22 +1132,30 @@ async function pintarRegistroCocinaSector(){
       const tieneRinde = ing.Rinde !== '' && ing.Rinde != null;
       const cantidadHoyIng = (Number(ing.Cantidad) || 0) * factor;
       const rindeHoyIng = tieneRinde ? (Number(ing.Rinde) || 0) * factor : null;
+      const guardado = trazaGuardada[normalizarFicha(nombreReceta) + '|' + normalizarFicha(ing.Ingrediente)];
+      const yaGuardado = !!guardado;
+      const bloqueado = finalizada || yaGuardado;
+      const valorBruto = (guardado && guardado.cantidadBrutoReal !== '' && guardado.cantidadBrutoReal != null) ? guardado.cantidadBrutoReal : '';
+      const valorRinde = (guardado && guardado.rindeReal !== '' && guardado.rindeReal != null) ? guardado.rindeReal : '';
       const tr = document.createElement('tr');
       tr.dataset.relleno = nombreReceta;
       tr.dataset.ingrediente = ing.Ingrediente;
+      if(bloqueado) tr.classList.add('fila-guardada');
       tr.innerHTML = `
         <td>${ing.Ingrediente}</td>
         <td class="num" style="color:var(--ink-soft);">${ent(cantidadHoyIng)} ${ing.Medida || ''}</td>
-        <td><input type="number" min="0" step="0.01" class="inp-bruto-real" style="width:90px;" placeholder="${ent(cantidadHoyIng)}"></td>
+        <td><input type="number" min="0" step="0.01" class="inp-bruto-real" style="width:90px;" placeholder="${ent(cantidadHoyIng)}" value="${valorBruto}" ${bloqueado ? 'disabled' : ''}></td>
         <td class="num" style="color:var(--ink-soft);">${tieneRinde ? `${ent(rindeHoyIng)} ${ing.Medida || ''}` : `<span style="font-size:11px;">sin control de rinde</span>`}</td>
-        <td>${tieneRinde ? `<input type="number" min="0" step="0.01" class="inp-rinde-real" style="width:90px;" placeholder="${ent(rindeHoyIng)}">` : ''}</td>
-        <td style="white-space:nowrap;" class="no-print">
-          <button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;">Guardar</button>
-          <button type="button" class="btn secondary btn-editar-item" style="font-size:12px;padding:5px 9px;display:none;">Editar</button>
-        </td>
+        <td>${tieneRinde ? `<input type="number" min="0" step="0.01" class="inp-rinde-real" style="width:90px;" placeholder="${ent(rindeHoyIng)}" value="${valorRinde}" ${bloqueado ? 'disabled' : ''}>` : ''}</td>
+        <td style="white-space:nowrap;" class="no-print">${finalizada ? '' : `
+          <button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;${yaGuardado ? 'display:none;' : ''}">Guardar</button>
+          <button type="button" class="btn secondary btn-editar-item" style="font-size:12px;padding:5px 9px;${yaGuardado ? '' : 'display:none;'}">Editar</button>
+        `}</td>
       `;
-      tr.querySelector('.btn-guardar-item').onclick = () => guardarItemCocina(tr, fecha);
-      tr.querySelector('.btn-editar-item').onclick = () => habilitarEdicionFila(tr);
+      if(!finalizada){
+        tr.querySelector('.btn-guardar-item').onclick = () => guardarItemCocina(tr, fecha);
+        tr.querySelector('.btn-editar-item').onclick = () => habilitarEdicionFila(tr);
+      }
       tbody.appendChild(tr);
     });
     wrap.appendChild(table);
@@ -1217,6 +1237,40 @@ async function guardarItemCocina(tr, fecha){
   }catch(err){
     btn.disabled = false; btn.textContent = 'Guardar';
     alert('No se pudo guardar: ' + err.message);
+  }
+}
+
+// "Enviar final" de una receta completa (Relleno/Preparado/Dip/Postre): a
+// partir de ahí sus insumos entran al informe de "Totales del día" y su
+// tabla queda bloqueada entera. "Reabrir" la vuelve a abrir. Ambas
+// simplemente vuelven a pintar todo el sector para que quede consistente
+// con lo que ya haya guardado por ingrediente.
+async function finalizarReceta(receta, fecha){
+  if(!confirm(`¿Enviar "${receta}" como final? Se va a bloquear toda su tabla de insumos y va a entrar al informe de Totales del día.`)) return;
+  try{
+    const r = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'finalizarRecetaCocina', fecha, receta })
+    });
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    pintarRegistroCocinaSector();
+  }catch(err){
+    alert('No se pudo enviar como final: ' + err.message);
+  }
+}
+
+async function reabrirReceta(receta, fecha){
+  try{
+    const r = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'reabrirRecetaCocina', fecha, receta })
+    });
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    pintarRegistroCocinaSector();
+  }catch(err){
+    alert('No se pudo reabrir: ' + err.message);
   }
 }
 
