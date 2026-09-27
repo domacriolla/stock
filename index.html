@@ -207,6 +207,7 @@ function irA(pantalla){
   if(pantalla === 'historial') renderHistorialEnvios();
   if(pantalla === 'registro') renderRegistroProduccion();
   if(pantalla === 'fichas') renderFichasTecnicas();
+  if(pantalla === 'informes') renderInformes();
 }
 
 function renderHome(){
@@ -256,6 +257,11 @@ function renderHome(){
         <h2>Editar venta proyectada</h2>
         <p>Actualizar, por local, cuánto se espera vender de cada sabor cada día de la semana.</p>
       </button>
+      <button class="home-card" onclick="irA('informes')">
+        <div class="tag">FÁBRICA</div>
+        <h2>Informes</h2>
+        <p>Total real de insumos usados por día, sumado de las recetas ya enviadas como final en Cocina.</p>
+      </button>
     </div>
     <footer class="note">Doma Criolla — herramienta interna de planificación de producción.</footer>
   `;
@@ -304,6 +310,14 @@ function opcionesEmpleados(empleados){
     return '<option value="">(cargá empleados en la hoja "Empleados")</option>';
   }
   return '<option value="">— Seleccionar —</option>' + empleados.map(n => `<option value="${n}">${n}</option>`).join('');
+}
+// igual que opcionesEmpleados pero marcando "selected" el que ya estaba
+// guardado — para prellenar desplegables de Responsable/puestos al recargar.
+function opcionesEmpleadosSeleccion(empleados, seleccionado){
+  if(!empleados || empleados.length === 0){
+    return '<option value="">(cargá empleados en la hoja "Empleados")</option>';
+  }
+  return '<option value="">— Seleccionar —</option>' + empleados.map(n => `<option value="${n}" ${n === seleccionado ? 'selected' : ''}>${n}</option>`).join('');
 }
 
 async function renderLocal(){
@@ -580,12 +594,15 @@ function bloquePrepDiaAnterior(){
   if(rollos <= 0 && canastas.length === 0) return '';
   const filaRollos = rollos > 0 ? `<tr><td>Rollos de Jamón y Queso</td><td class="num"><strong>${ent(rollos)}</strong></td></tr>` : '';
   const filasCanastas = canastas.map(c => `<tr><td>Canasta — ${c.sabor}</td><td class="num"><strong>${ent(c.aHacerUnidades)}</strong></td></tr>`).join('');
+  const notaPct = (prep.porcentajeCocina != null && Number(prep.porcentajeCocina) !== 100)
+    ? `<p style="color:var(--ink-soft);font-size:12px;margin-top:6px;">Ya aplicado el ${ent(prep.porcentajeCocina)}% de venta a cubrir guardado hoy para Cocina.</p>`
+    : '';
   return `
     <h3 style="font-size:15px;margin:20px 0 8px;">Para mañana (${prep.diaManana}, ${fmtFecha(prep.fechaManana)}) — armar/moldear HOY</h3>
     <table class="prod">
       <thead><tr><th>Ítem</th><th class="num">Cantidad</th></tr></thead>
       <tbody>${filaRollos}${filasCanastas}</tbody>
-    </table>`;
+    </table>${notaPct}`;
 }
 
 /* ---- Pestaña PRODUCCIÓN: qué armar hoy, por sabor (todos los rubros) ---- */
@@ -981,7 +998,10 @@ function pintarSectorRegistro(sector){
     pintarRegistroCocinaSector();
     return;
   }
-  cont.innerHTML = `<div class="empty">Todavía no tengo la planilla de este sector — pasámela y lo armamos.</div>`;
+  if(sector === 'discos'){
+    pintarRegistroDiscosSector();
+    return;
+  }
 }
 
 // Registrar producción — sector COCINA: por cada relleno que se cocina hoy,
@@ -1274,10 +1294,71 @@ async function reabrirReceta(receta, fecha){
   }
 }
 
-// arma el bloque "puestos" de una máquina: 5 desplegables (empleado en cada
+/* ---------------------------------------------------------------------
+   Pantalla INFORMES: por ahora, el total REAL de insumos consumidos en un
+   día — suma SOLO las recetas (Rellenos/Preparados/Dips/Postres) que ya se
+   enviaron como final desde "Registrar producción → Cocina" ese día; lo que
+   todavía no se envió como final no cuenta acá. Confirmado con Carolina
+   (26/09/2026).
+   --------------------------------------------------------------------- */
+async function renderInformes(){
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <div class="fab-toolbar">
+      <header class="top" style="margin:0;"><h1>Informes</h1></header>
+      <div class="field-row">
+        <label>Ver para el día</label>
+        <input type="date" id="fechaInforme" value="${hoyISO()}">
+      </div>
+      <button class="btn secondary" id="btnImprimirInforme" style="margin-left:auto;" onclick="window.print()">🖶 Imprimir</button>
+    </div>
+    <div id="contenidoInforme" class="loading">Cargando…</div>
+  `;
+  document.getElementById('fechaInforme').onchange = cargarInformeInsumos;
+  cargarInformeInsumos();
+}
+
+async function cargarInformeInsumos(){
+  const fecha = document.getElementById('fechaInforme').value;
+  const cont = document.getElementById('contenidoInforme');
+  cont.className = 'loading'; cont.textContent = 'Cargando…';
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=calcularInsumosRealesDia&fecha=${encodeURIComponent(fecha)}`);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    cont.className = '';
+    const recetasFinal = data.recetasFinalizadas || [];
+    const totales = data.totalesPorIngrediente || [];
+    if(recetasFinal.length === 0){
+      cont.innerHTML = `
+        <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(fecha)}</p>
+        <div class="empty">Todavía no se envió ninguna receta como final este día en "Registrar producción → Cocina" — este informe solo suma insumos de recetas ya finalizadas.</div>
+      `;
+      return;
+    }
+    cont.innerHTML = `
+      <h2 style="font-size:18px;margin:0 0 6px;">Total real de insumos usados — Cocina</h2>
+      <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(fecha)} — recetas ya finalizadas (${recetasFinal.length}): ${recetasFinal.join(', ')}</p>
+      <table class="prod">
+        <thead><tr><th>Insumo</th><th class="num">Total usado</th></tr></thead>
+        <tbody>
+          ${totales.map(t => `<tr><td>${t.ingrediente}</td><td class="num"><strong>${ent(t.cantidad)}</strong> ${t.unidad}</td></tr>`).join('')}
+        </tbody>
+      </table>
+    `;
+  }catch(err){
+    cont.className = '';
+    cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar: ${err.message}</div>`;
+  }
+}
+
+// arma el bloque "puestos" de una máquina: 3 desplegables (empleado en cada
 // posición, de la hoja "Empleados"), igual a la planilla en papel.
-function bloquePuestosMaquina(titulo, idBase, empleados){
-  const opciones = opcionesEmpleados(empleados);
+// valoresGuardados = { entrada, relleno, salida } ya guardados (o null); si
+// bloqueado, queda todo deshabilitado (turno finalizado).
+function bloquePuestosMaquina(titulo, idBase, empleados, valoresGuardados, bloqueado){
+  const v = valoresGuardados || {};
+  const dis = bloqueado ? 'disabled' : '';
   const div = document.createElement('div');
   div.style.marginBottom = '16px';
   const h = document.createElement('h4');
@@ -1290,51 +1371,15 @@ function bloquePuestosMaquina(titulo, idBase, empleados){
   table.innerHTML = `
     <thead><tr><th>Entrada</th><th>Relleno</th><th>Salida</th></tr></thead>
     <tbody><tr>
-      <td><select class="inp-puesto" data-puesto="entrada">${opciones}</select></td>
-      <td><select class="inp-puesto" data-puesto="relleno">${opciones}</select></td>
-      <td><select class="inp-puesto" data-puesto="salida">${opciones}</select></td>
+      <td><select class="inp-puesto" data-puesto="entrada" ${dis}>${opcionesEmpleadosSeleccion(empleados, v.entrada)}</select></td>
+      <td><select class="inp-puesto" data-puesto="relleno" ${dis}>${opcionesEmpleadosSeleccion(empleados, v.relleno)}</select></td>
+      <td><select class="inp-puesto" data-puesto="salida" ${dis}>${opcionesEmpleadosSeleccion(empleados, v.salida)}</select></td>
     </tr></tbody>`;
   div.appendChild(table);
   return div;
 }
 
-function pintarRegistroProduccionSector(){
-  const cont = document.getElementById('contenidoRegistro');
-  const data = CALCULO_REGISTRO;
-  const prep = PREP_REGISTRO || {};
-  const categorias = CATEGORIAS_REGISTRO || {};
-  const categoriaPorSabor = CATEGORIA_POR_SABOR_REGISTRO || {};
-  // mismo listado de sabores que "Ver qué producir hoy" (Empanadas Horno + Frito),
-  // TODOS, no solo los que calcularon faltante — así no se pierde ningún sabor
-  // que se haya armado igual ese turno. "Rollos de Jamón y Queso" se agrega
-  // aparte: no es un sabor de Ref_Sabores, es la tanda que arma Producción un
-  // día antes de hornear/freír esas empanadas.
-  const sabores = [NOMBRE_ROLLOS_JYQ, ...(categorias['Empanadas Horno'] || []), ...(categorias['Empanadas Frito'] || [])];
-  const porSabor = {};
-  (data.produccion || []).forEach(f => { if(f.tipoCalculo === 'Calendario') porSabor[f.sabor] = f; });
-  const canastaPorSabor = {};
-  (prep.canastas || []).forEach(c => { canastaPorSabor[c.sabor] = c; });
-
-  cont.innerHTML = '';
-
-  const intro = document.createElement('p');
-  intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
-  intro.textContent = `${data.dia}, ${fmtFecha(data.fecha)} — completá solo los sabores que se armaron este turno. "A producir (calc.)" es de referencia (para Canastas y Rollos de Jamón y Queso, es lo que hace falta dejar armado HOY para mañana). Guardá cada sabor con su botón apenas lo termines (no hace falta esperar al final del turno); tocá "Editar" si necesitás corregir algo ya guardado. Los puestos y las observaciones se guardan al cerrar el turno, con el botón de abajo.`;
-  cont.appendChild(intro);
-
-  cont.appendChild(bloquePuestosMaquina('Máquina 1', 'm1', EMPLEADOS_REGISTRO));
-  cont.appendChild(bloquePuestosMaquina('Máquina 2', 'm2', EMPLEADOS_REGISTRO));
-
-  const h = document.createElement('h4');
-  h.className = 'cat-heading';
-  h.textContent = 'Producción por sabor';
-  cont.appendChild(h);
-
-  const wrap = document.createElement('div');
-  wrap.style.overflowX = 'auto';
-  const table = document.createElement('table');
-  table.className = 'lotes traza';
-  table.innerHTML = `
+const THEAD_REGISTRO_PRODUCCION = `
     <thead><tr>
       <th>Sabor</th>
       <th class="num">A producir (calc.)</th>
@@ -1349,78 +1394,198 @@ function pintarRegistroProduccionSector(){
       <th>Hora fin</th>
       <th>Total<br>producción</th>
       <th>Discos<br>dañados</th>
-      <th></th>
-    </tr></thead>
-    <tbody></tbody>`;
-  const tbody = table.querySelector('tbody');
-  sabores.forEach(nombre => {
-    const esRollos = nombre === NOMBRE_ROLLOS_JYQ;
-    const esCanasta = categoriaPorSabor[nombre] === 'Canasta';
+      <th class="no-print"></th>
+    </tr></thead>`;
 
-    let aHacerMostrar = null;
-    let etiquetaExtra = '';
-    if(esRollos){
-      aHacerMostrar = prep.rollosJyQ;
-      etiquetaExtra = ' <span style="color:var(--ink-soft);font-size:11px;">(armar hoy para mañana)</span>';
-    } else if(esCanasta){
-      const c = canastaPorSabor[nombre];
-      aHacerMostrar = c ? c.aHacerUnidades : 0;
-      etiquetaExtra = ' <span style="color:var(--ink-soft);font-size:11px;">(canasta — moldear hoy para mañana)</span>';
-    } else {
-      const ref = porSabor[nombre];
-      aHacerMostrar = ref ? ref.aHacerUnidades : null;
-    }
+function crearTablaRegistroProduccion(){
+  const wrap = document.createElement('div');
+  wrap.style.overflowX = 'auto';
+  const table = document.createElement('table');
+  table.className = 'lotes traza';
+  table.innerHTML = THEAD_REGISTRO_PRODUCCION + '<tbody></tbody>';
+  wrap.appendChild(table);
+  return { wrap, tbody: table.querySelector('tbody') };
+}
 
-    const celdaMaquina = esCanasta
-      ? `<select class="inp-responsable-canasta" style="min-width:130px;">${opcionesEmpleados(EMPLEADOS_REGISTRO)}</select>`
-      : `<select class="inp-maq-num" style="width:56px;">
-          <option value=""></option>
-          <option value="1">1</option>
-          <option value="2">2</option>
-        </select>`;
+// arma una fila de la tabla de Producción, reutilizada por las 3 secciones
+// (Producción por sabor / Canastas completas / Extras de producción).
+// - etiqueta: texto visible en la celda "Sabor".
+// - saborKey: la clave que se guarda como Sabor en TrazabilidadProduccion —
+//   para las filas de "Molde de canasta" es distinta del nombre real del
+//   sabor (para no pisar la fila de la Canasta completa de ese mismo sabor,
+//   ver registrarTrazabilidadItem en Code.gs, que upsertea por Fecha+Sabor).
+// - usaResponsable: true = desplegable de Responsable (Canastas, Rollos de
+//   Jamón y Queso); false = desplegable de Máquina Nº (sabores normales).
+// - guardado: item ya guardado para este saborKey (o undefined).
+// - bloqueadoGlobal: turno ya cerrado -> toda la fila queda de solo lectura,
+//   sin botones de Guardar/Editar.
+function filaRegistroProduccion(etiqueta, saborKey, aHacerMostrar, etiquetaExtra, usaResponsable, empleados, guardado, bloqueadoGlobal){
+  const g = guardado || {};
+  const yaGuardado = !!guardado;
+  const bloqueado = bloqueadoGlobal || yaGuardado;
+  const dis = bloqueado ? 'disabled' : '';
+  const celdaMaquina = usaResponsable
+    ? `<select class="inp-responsable-canasta" style="min-width:130px;" ${dis}>${opcionesEmpleadosSeleccion(empleados, g.responsable)}</select>`
+    : `<select class="inp-maq-num" style="width:56px;" ${dis}>
+        <option value=""></option>
+        <option value="1" ${g.maquinaNumero === '1' ? 'selected' : ''}>1</option>
+        <option value="2" ${g.maquinaNumero === '2' ? 'selected' : ''}>2</option>
+      </select>`;
 
-    const tr = document.createElement('tr');
-    tr.dataset.sabor = nombre;
-    tr.innerHTML = `
-      <td>${nombre}${etiquetaExtra}</td>
-      <td class="num" style="color:var(--ink-soft);">${aHacerMostrar != null ? ent(aHacerMostrar) : '—'}</td>
-      <td>${celdaMaquina}</td>
-      <td><input type="text" class="inp-maq-vel" style="width:64px;"></td>
-      <td><input type="text" class="inp-disco-lote" style="width:90px;"></td>
-      <td><input type="number" min="0" step="0.01" class="inp-peso-prom" style="width:80px;"></td>
-      <td><input type="date" class="inp-relleno-fecha"></td>
-      <td><input type="number" min="0" step="0.01" class="inp-peso-inicial" style="width:80px;"></td>
-      <td><input type="number" min="0" step="0.01" class="inp-peso-final" style="width:80px;"></td>
-      <td><input type="time" class="inp-hora-inicio"></td>
-      <td><input type="time" class="inp-hora-fin"></td>
-      <td><input type="number" min="0" step="1" class="inp-total-prod" style="width:80px;"></td>
-      <td><input type="number" min="0" step="1" class="inp-discos-danados" style="width:64px;"></td>
-      <td style="white-space:nowrap;">
-        <button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;">Guardar</button>
-        <button type="button" class="btn secondary btn-editar-item" style="font-size:12px;padding:5px 9px;display:none;">Editar</button>
-      </td>
-    `;
+  const tr = document.createElement('tr');
+  tr.dataset.sabor = saborKey;
+  if(bloqueado) tr.classList.add('fila-guardada');
+  tr.innerHTML = `
+    <td>${etiqueta}${etiquetaExtra || ''}</td>
+    <td class="num" style="color:var(--ink-soft);">${aHacerMostrar != null ? ent(aHacerMostrar) : '—'}</td>
+    <td>${celdaMaquina}</td>
+    <td><input type="text" class="inp-maq-vel" style="width:64px;" value="${g.maquinaVelocidad || ''}" ${dis}></td>
+    <td><input type="text" class="inp-disco-lote" style="width:90px;" value="${g.discosLote || ''}" ${dis}></td>
+    <td><input type="number" min="0" step="0.01" class="inp-peso-prom" style="width:80px;" value="${g.pesoPromTandaDiscos || ''}" ${dis}></td>
+    <td><input type="date" class="inp-relleno-fecha" value="${g.rellenoFecha || ''}" ${dis}></td>
+    <td><input type="number" min="0" step="0.01" class="inp-peso-inicial" style="width:80px;" value="${g.pesoInicialRelleno || ''}" ${dis}></td>
+    <td><input type="number" min="0" step="0.01" class="inp-peso-final" style="width:80px;" value="${g.pesoFinalRelleno || ''}" ${dis}></td>
+    <td><input type="time" class="inp-hora-inicio" value="${g.horaInicio || ''}" ${dis}></td>
+    <td><input type="time" class="inp-hora-fin" value="${g.horaFin || ''}" ${dis}></td>
+    <td><input type="number" min="0" step="1" class="inp-total-prod" style="width:80px;" value="${g.totalProduccion || ''}" ${dis}></td>
+    <td><input type="number" min="0" step="1" class="inp-discos-danados" style="width:64px;" value="${g.discosDanados || ''}" ${dis}></td>
+    <td class="no-print" style="white-space:nowrap;">${bloqueadoGlobal ? '' : `
+      <button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;${yaGuardado ? 'display:none;' : ''}">Guardar</button>
+      <button type="button" class="btn secondary btn-editar-item" style="font-size:12px;padding:5px 9px;${yaGuardado ? '' : 'display:none;'}">Editar</button>
+    `}</td>
+  `;
+  if(!bloqueadoGlobal){
     tr.querySelector('.btn-guardar-item').onclick = () => guardarItemTrazabilidad(tr);
     tr.querySelector('.btn-editar-item').onclick = () => habilitarEdicionFila(tr);
-    tbody.appendChild(tr);
+  }
+  return tr;
+}
+
+async function pintarRegistroProduccionSector(){
+  const cont = document.getElementById('contenidoRegistro');
+  const fecha = document.getElementById('fechaRegistro').value;
+  cont.innerHTML = '<div class="loading">Cargando…</div>';
+
+  const data = CALCULO_REGISTRO;
+  const prep = PREP_REGISTRO || {};
+  const categorias = CATEGORIAS_REGISTRO || {};
+  const categoriaPorSabor = CATEGORIA_POR_SABOR_REGISTRO || {};
+
+  let estado;
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=obtenerRegistroProduccionDia&fecha=${fecha}`);
+    estado = await r.json();
+    if(estado.error) throw new Error(estado.error);
+  }catch(err){
+    cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar el registro guardado: ${err.message}</div>`;
+    return;
+  }
+  if(SECTOR_REGISTRO_ACTIVO !== 'produccion') return; // cambió de pestaña mientras cargaba
+
+  const guardadoPorSabor = {};
+  (estado.items || []).forEach(it => { guardadoPorSabor[it.sabor] = it; });
+  const bloqueadoGlobal = !!estado.finalizado;
+
+  // sabores normales (Empanadas Horno + Frito) sin las Canastas, que van
+  // aparte en su propia sección más abajo.
+  const todasEmpanadas = [...(categorias['Empanadas Horno'] || []), ...(categorias['Empanadas Frito'] || [])];
+  const sabores = todasEmpanadas.filter(n => categoriaPorSabor[n] !== 'Canasta');
+  const saboresCanasta = todasEmpanadas.filter(n => categoriaPorSabor[n] === 'Canasta');
+
+  const porSabor = {};
+  (data.produccion || []).forEach(f => { if(f.tipoCalculo === 'Calendario') porSabor[f.sabor] = f; });
+  const canastaPorSabor = {};
+  (prep.canastas || []).forEach(c => { canastaPorSabor[c.sabor] = c; });
+
+  cont.innerHTML = '';
+
+  const intro = document.createElement('p');
+  intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
+  intro.textContent = `${data.dia}, ${fmtFecha(data.fecha)} — completá solo los sabores que se armaron este turno. "A producir (calc.)" es de referencia (en Extras de producción es lo que hace falta dejar armado HOY para mañana). Guardá cada sabor con su botón apenas lo termines (no hace falta esperar al final del turno); tocá "Editar" si necesitás corregir algo ya guardado. Los puestos y las observaciones se guardan al cerrar el turno, con el botón de abajo.`;
+  cont.appendChild(intro);
+
+  if(bloqueadoGlobal){
+    const aviso = document.createElement('div');
+    aviso.className = 'msg ok no-print';
+    aviso.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px;';
+    aviso.innerHTML = `<span>✓ Turno cerrado — todo el registro de Producción de este día quedó bloqueado.</span><button type="button" class="btn secondary" id="btnReabrirTurno" style="font-size:12px;padding:5px 9px;">Reabrir</button>`;
+    cont.appendChild(aviso);
+    cont.querySelector('#btnReabrirTurno').onclick = () => reabrirTurnoProduccion(fecha);
+  }
+
+  cont.appendChild(bloquePuestosMaquina('Máquina 1', 'm1', EMPLEADOS_REGISTRO, estado.maquina1, bloqueadoGlobal));
+  cont.appendChild(bloquePuestosMaquina('Máquina 2', 'm2', EMPLEADOS_REGISTRO, estado.maquina2, bloqueadoGlobal));
+
+  // --- Producción por sabor (sabores normales, Máquina Nº) ---
+  const h1 = document.createElement('h4');
+  h1.className = 'cat-heading';
+  h1.textContent = 'Producción por sabor';
+  cont.appendChild(h1);
+  const { wrap: wrap1, tbody: tbody1 } = crearTablaRegistroProduccion();
+  sabores.forEach(nombre => {
+    const ref = porSabor[nombre];
+    const aHacerMostrar = ref ? ref.aHacerUnidades : null;
+    tbody1.appendChild(filaRegistroProduccion(nombre, nombre, aHacerMostrar, '', false, EMPLEADOS_REGISTRO, guardadoPorSabor[nombre], bloqueadoGlobal));
   });
-  wrap.appendChild(table);
-  cont.appendChild(wrap);
+  cont.appendChild(wrap1);
+
+  // --- Canastas completas: hoy arman la canasta entera (disco + relleno +
+  // el molde que dejaron listo el día anterior) — cantidad = lo que sale HOY
+  // de ese sabor, igual que un sabor normal. Responsable en vez de Máquina.
+  if(saboresCanasta.length){
+    const h2 = document.createElement('h4');
+    h2.className = 'cat-heading';
+    h2.textContent = 'Canastas completas';
+    cont.appendChild(h2);
+    const { wrap: wrap2, tbody: tbody2 } = crearTablaRegistroProduccion();
+    saboresCanasta.forEach(nombre => {
+      const ref = porSabor[nombre];
+      const aHacerMostrar = ref ? ref.aHacerUnidades : null;
+      tbody2.appendChild(filaRegistroProduccion(nombre, nombre, aHacerMostrar, '', true, EMPLEADOS_REGISTRO, guardadoPorSabor[nombre], bloqueadoGlobal));
+    });
+    cont.appendChild(wrap2);
+  }
+
+  // --- Extras de producción (para mañana): Rollos de Jamón y Queso y el
+  // Molde de Canasta de cada sabor — ambos se arman HOY para usarse mañana,
+  // y ambos con Responsable (no son un puesto de máquina).
+  const h3 = document.createElement('h4');
+  h3.className = 'cat-heading';
+  h3.textContent = 'Extras de producción (para mañana)';
+  cont.appendChild(h3);
+  if(prep.porcentajeCocina != null && Number(prep.porcentajeCocina) !== 100){
+    const notaPct = document.createElement('p');
+    notaPct.style.cssText = 'color:var(--ink-soft);font-size:12px;margin:-4px 0 8px;';
+    notaPct.textContent = `Ya aplicado el ${ent(prep.porcentajeCocina)}% de venta a cubrir guardado hoy para Cocina.`;
+    cont.appendChild(notaPct);
+  }
+  const { wrap: wrap3, tbody: tbody3 } = crearTablaRegistroProduccion();
+  const etiquetaManana = ' <span style="color:var(--ink-soft);font-size:11px;">(armar hoy para mañana)</span>';
+  tbody3.appendChild(filaRegistroProduccion(NOMBRE_ROLLOS_JYQ, NOMBRE_ROLLOS_JYQ, prep.rollosJyQ, etiquetaManana, true, EMPLEADOS_REGISTRO, guardadoPorSabor[NOMBRE_ROLLOS_JYQ], bloqueadoGlobal));
+  saboresCanasta.forEach(nombre => {
+    const c = canastaPorSabor[nombre];
+    const aHacerMostrar = c ? c.aHacerUnidades : 0;
+    const saborKeyMolde = 'Molde — ' + nombre;
+    tbody3.appendChild(filaRegistroProduccion('Molde de canasta — ' + nombre, saborKeyMolde, aHacerMostrar, etiquetaManana, true, EMPLEADOS_REGISTRO, guardadoPorSabor[saborKeyMolde], bloqueadoGlobal));
+  });
+  cont.appendChild(wrap3);
 
   const obsWrap = document.createElement('div');
   obsWrap.className = 'field-row';
   obsWrap.style.cssText = 'max-width:640px;margin-top:18px;';
   obsWrap.innerHTML = `
     <label>Observaciones generales del turno</label>
-    <textarea id="inpObservacionesRegistro" rows="3" style="width:100%;font-family:inherit;font-size:14px;padding:9px 10px;border:1px solid var(--line);border-radius:3px;"></textarea>
+    <textarea id="inpObservacionesRegistro" rows="3" style="width:100%;font-family:inherit;font-size:14px;padding:9px 10px;border:1px solid var(--line);border-radius:3px;" ${bloqueadoGlobal ? 'disabled' : ''}>${estado.observaciones || ''}</textarea>
   `;
   cont.appendChild(obsWrap);
 
-  const actions = document.createElement('div');
-  actions.className = 'actions';
-  actions.innerHTML = `<button class="btn" id="btnGuardarRegistro">Guardar registro final del turno</button>`;
-  cont.appendChild(actions);
-  document.getElementById('btnGuardarRegistro').onclick = guardarRegistroProduccion;
+  if(!bloqueadoGlobal){
+    const actions = document.createElement('div');
+    actions.className = 'actions no-print';
+    actions.innerHTML = `<button class="btn" id="btnGuardarRegistro">Guardar registro final del turno</button>`;
+    cont.appendChild(actions);
+    document.getElementById('btnGuardarRegistro').onclick = guardarRegistroProduccion;
+  }
 }
 
 // arma el objeto "item" de un sabor a partir de su fila en la tabla. La
@@ -1486,9 +1651,14 @@ async function guardarItemTrazabilidad(tr){
   }
 }
 
-// cierre del turno: guarda los puestos + observaciones (una vez), y de paso
-// cualquier sabor que haya quedado sin guardar con su botón individual.
+// cierre del turno: guarda los puestos + observaciones (una vez), cualquier
+// sabor que haya quedado sin guardar con su botón individual, y bloquea todo
+// el registro de Producción de ese día (ver "Bloqueo total al guardar el
+// registro final del turno" — Tanda 3). Se destraba puntualmente con
+// "Reabrir" (reabrirTurnoProduccion). Confirmado con Carolina (26/09/2026).
 async function guardarRegistroProduccion(){
+  if(!confirm('¿Cerrar el turno? Se va a bloquear todo el registro de Producción de este día — vas a poder destrabarlo puntualmente con el botón "Reabrir" si hace falta corregir algo.')) return;
+
   const fecha = document.getElementById('fechaRegistro').value;
   const msg = document.getElementById('msgRegistro');
 
@@ -1515,22 +1685,125 @@ async function guardarRegistroProduccion(){
     });
     const data = await r.json();
     if(data.error) throw new Error(data.error);
-    filas.forEach(tr => {
-      if(Number(tr.querySelector('.inp-total-prod').value) > 0){
-        tr.classList.add('fila-guardada');
-        [...tr.querySelectorAll('input,select')].forEach(el => el.disabled = true);
-        const btnG = tr.querySelector('.btn-guardar-item');
-        btnG.textContent = '✓ Guardado'; btnG.style.display = 'none';
-        const btnE = tr.querySelector('.btn-editar-item');
-        if(btnE) btnE.style.display = '';
-      }
-    });
     msg.className = 'msg ok';
     msg.textContent = `Turno cerrado. ${data.filas_detalle} sabor(es) más quedaron guardados.`;
+    pintarRegistroProduccionSector();
   }catch(err){
     msg.className = 'msg err'; msg.textContent = 'No se pudo guardar: ' + err.message;
-  }finally{
     btn.disabled = false; btn.textContent = 'Guardar registro final del turno';
+  }
+}
+
+async function reabrirTurnoProduccion(fecha){
+  if(!confirm('¿Reabrir el registro de Producción de este día? Se va a destrabar toda la tabla.')) return;
+  try{
+    const r = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'reabrirTurnoProduccion', fecha })
+    });
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    pintarRegistroProduccionSector();
+  }catch(err){
+    alert('No se pudo reabrir: ' + err.message);
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Registrar producción — sector DISCOS: registro simple por tipo de disco
+   (Horno / Frito / Recorte), con Responsable y cantidad. Sin puestos de
+   máquina ni finalización de turno — es independiente de Producción.
+   --------------------------------------------------------------------- */
+async function pintarRegistroDiscosSector(){
+  const cont = document.getElementById('contenidoRegistro');
+  const fecha = document.getElementById('fechaRegistro').value;
+  cont.innerHTML = '<div class="loading">Cargando…</div>';
+
+  let estado;
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=obtenerRegistroDiscosDia&fecha=${fecha}`);
+    estado = await r.json();
+    if(estado.error) throw new Error(estado.error);
+  }catch(err){
+    cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar: ${err.message}</div>`;
+    return;
+  }
+  if(SECTOR_REGISTRO_ACTIVO !== 'discos') return; // cambió de pestaña mientras cargaba
+
+  const guardadoPorTipo = {};
+  (estado.items || []).forEach(it => { guardadoPorTipo[it.tipo] = it; });
+
+  cont.innerHTML = '';
+  const intro = document.createElement('p');
+  intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
+  intro.textContent = 'Registro simple de discos por tipo — responsable y cantidad usada hoy. Guardá cada tipo con su botón; tocá "Editar" si necesitás corregir algo ya guardado.';
+  cont.appendChild(intro);
+
+  const wrap = document.createElement('div');
+  wrap.style.overflowX = 'auto';
+  const table = document.createElement('table');
+  table.className = 'lotes traza';
+  table.innerHTML = `
+    <thead><tr><th>Tipo</th><th>Responsable</th><th class="num">Cantidad</th><th class="no-print"></th></tr></thead>
+    <tbody></tbody>`;
+  const tbody = table.querySelector('tbody');
+  TIPOS_DISCO.forEach(tipo => {
+    const g = guardadoPorTipo[tipo];
+    const yaGuardado = !!g;
+    const dis = yaGuardado ? 'disabled' : '';
+    const tr = document.createElement('tr');
+    tr.dataset.tipo = tipo;
+    if(yaGuardado) tr.classList.add('fila-guardada');
+    tr.innerHTML = `
+      <td>${tipo}</td>
+      <td><select class="inp-responsable-disco" ${dis}>${opcionesEmpleadosSeleccion(EMPLEADOS_REGISTRO, g ? g.responsable : '')}</select></td>
+      <td><input type="number" min="0" step="1" class="inp-cantidad-disco" style="width:90px;" value="${g ? g.cantidad : ''}" ${dis}></td>
+      <td class="no-print" style="white-space:nowrap;">
+        <button type="button" class="btn secondary btn-guardar-disco" style="font-size:12px;padding:5px 9px;${yaGuardado ? 'display:none;' : ''}">Guardar</button>
+        <button type="button" class="btn secondary btn-editar-disco" style="font-size:12px;padding:5px 9px;${yaGuardado ? '' : 'display:none;'}">Editar</button>
+      </td>
+    `;
+    tr.querySelector('.btn-guardar-disco').onclick = () => guardarItemDiscos(tr, fecha);
+    tr.querySelector('.btn-editar-disco').onclick = () => habilitarEdicionFilaDiscos(tr);
+    tbody.appendChild(tr);
+  });
+  wrap.appendChild(table);
+  cont.appendChild(wrap);
+}
+
+function habilitarEdicionFilaDiscos(tr){
+  tr.classList.remove('fila-guardada');
+  [...tr.querySelectorAll('input,select')].forEach(el => el.disabled = false);
+  const btnGuardar = tr.querySelector('.btn-guardar-disco');
+  if(btnGuardar){ btnGuardar.disabled = false; btnGuardar.textContent = 'Guardar'; btnGuardar.style.display = ''; }
+  const btnEditar = tr.querySelector('.btn-editar-disco');
+  if(btnEditar) btnEditar.style.display = 'none';
+}
+
+async function guardarItemDiscos(tr, fecha){
+  const btn = tr.querySelector('.btn-guardar-disco');
+  const responsable = tr.querySelector('.inp-responsable-disco').value;
+  const cantidad = tr.querySelector('.inp-cantidad-disco').value;
+  if(!cantidad || Number(cantidad) <= 0){
+    alert('Cargá la cantidad antes de guardar.');
+    return;
+  }
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try{
+    const r = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'registrarTrazabilidadDiscosItem', fecha, tipo: tr.dataset.tipo, responsable, cantidad })
+    });
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    tr.classList.add('fila-guardada');
+    [...tr.querySelectorAll('input,select')].forEach(el => el.disabled = true);
+    btn.textContent = '✓ Guardado'; btn.style.display = 'none';
+    const btnEditar = tr.querySelector('.btn-editar-disco');
+    if(btnEditar) btnEditar.style.display = '';
+  }catch(err){
+    btn.disabled = false; btn.textContent = 'Guardar';
+    alert('No se pudo guardar: ' + err.message);
   }
 }
 
