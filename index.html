@@ -26,6 +26,8 @@
     --herb-bg:#E3EAD9;
     --alert:#9A3B2E;
     --alert-bg:#F3DBD4;
+    --pink:#A32B5C;
+    --pink-bg:#F8D7E6;
   }
   *{box-sizing:border-box;}
   html,body{margin:0;padding:0;}
@@ -137,6 +139,14 @@
   .alert-box h3{color:var(--alert);font-size:15px;margin-bottom:8px;}
   .alert-box ul{margin:0;padding-left:18px;font-size:13.5px;color:#5c2b23;}
 
+  /* Informes → Stock por local: semáforo de vencimiento por lote */
+  .fila-vencido td{background:var(--alert-bg);}
+  .fila-vence-hoy td{background:var(--pink-bg);}
+  .fila-vence-manana td{background:var(--herb-bg);}
+  .leyenda-vencimiento{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--ink-soft);margin:2px 0 16px;}
+  .leyenda-vencimiento span{display:inline-flex;align-items:center;gap:6px;}
+  .leyenda-vencimiento i{width:12px;height:12px;border-radius:3px;display:inline-block;}
+
   .empty{color:var(--ink-soft);font-size:14px;padding:30px 0;text-align:center;}
   .loading{color:var(--ink-soft);font-size:14px;}
   footer.note{margin-top:40px;font-size:12px;color:var(--ink-soft);border-top:1px solid var(--line);padding-top:14px;}
@@ -151,6 +161,9 @@
     table.prod tr, table.lotes tr{break-inside:avoid;}
     .alert-box{break-inside:avoid;}
     .no-print{display:none !important;}
+    .fila-vencido td, .fila-vence-hoy td, .fila-vence-manana td, .leyenda-vencimiento i{
+      -webkit-print-color-adjust:exact;print-color-adjust:exact;
+    }
   }
 
   /* Orden de envío imprimible — arma una hoja aparte con solo lo cargado en
@@ -217,6 +230,11 @@ function renderHome(){
       <div class="sub">Stock y producción</div>
     </header>
     <div class="home-grid">
+      <button class="home-card" onclick="irA('informes')">
+        <div class="tag">FÁBRICA / LOCAL</div>
+        <h2>Informes</h2>
+        <p>Consumo real de insumos por día, y análisis de stock por local (vencimientos).</p>
+      </button>
       <button class="home-card" onclick="irA('local')">
         <div class="tag">LOCAL / FÁBRICA</div>
         <h2>Cargar stock de hoy</h2>
@@ -256,11 +274,6 @@ function renderHome(){
         <div class="tag">PLANIFICACIÓN</div>
         <h2>Editar venta proyectada</h2>
         <p>Actualizar, por local, cuánto se espera vender de cada sabor cada día de la semana.</p>
-      </button>
-      <button class="home-card" onclick="irA('informes')">
-        <div class="tag">FÁBRICA</div>
-        <h2>Informes</h2>
-        <p>Total real de insumos usados por día, sumado de las recetas ya enviadas como final en Cocina.</p>
       </button>
     </div>
     <footer class="note">Doma Criolla — herramienta interna de planificación de producción.</footer>
@@ -667,17 +680,6 @@ function fmtFecha(iso){
   return `${m[3]}-${m[2]}-${m[1]}`;
 }
 
-function bloqueAlertas(data){
-  if(!data.alertasVencimiento || !data.alertasVencimiento.length) return '';
-  return `
-    <div class="alert-box">
-      <h3>Vender ya — no llega vivo a la próxima reposición</h3>
-      <ul>
-        ${data.alertasVencimiento.map(a => `<li>${a.sabor} — ${a.local}: ${a.cantidad} u. (vence ${fmtFecha(a.vencimiento)})</li>`).join('')}
-      </ul>
-    </div>`;
-}
-
 // redondeo a entero para mostrar en pantalla (el cálculo interno sigue con decimales)
 function ent(n){ return Math.round(Number(n) || 0).toLocaleString('es-AR'); }
 
@@ -708,14 +710,13 @@ function pintarProduccion(data){
   // Dips y Postres los elabora Cocina (no Producción) — se muestran en la
   // pestaña Cocina, junto con Preparados y Rellenos.
   const filas = data.produccion.filter(f => f.aHacerUnidades > 0 && f.rubro !== 'Dips' && f.rubro !== 'Postres');
-  const alertaHtml = bloqueAlertas(data);
   const prepHtml = bloquePrepDiaAnterior();
 
   const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Producción</h2>`;
 
   if(filas.length === 0){
     cont.className = '';
-    cont.innerHTML = tituloSector + alertaHtml + prepHtml + `<div class="empty">Nada para armar/reponer el ${data.dia.toLowerCase()} — el stock cargado alcanza.</div>`;
+    cont.innerHTML = tituloSector + prepHtml + `<div class="empty">Nada para armar/reponer el ${data.dia.toLowerCase()} — el stock cargado alcanza.</div>`;
     return;
   }
 
@@ -755,7 +756,7 @@ function pintarProduccion(data){
   }).join('');
 
   cont.className = '';
-  cont.innerHTML = tituloSector + alertaHtml + prepHtml + `
+  cont.innerHTML = tituloSector + prepHtml + `
     <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)} — ${filas.length} ítem(s) con faltante</p>
     ${bloques}
   `;
@@ -1398,21 +1399,59 @@ async function reabrirReceta(receta, fecha){
    todavía no se envió como final no cuenta acá. Confirmado con Carolina
    (26/09/2026).
    --------------------------------------------------------------------- */
+let SECTOR_INFORME_ACTIVO = 'consumo';
+let LOCAL_INFORME_ACTIVO = null;
+
 async function renderInformes(){
+  if(!LOCAL_INFORME_ACTIVO) LOCAL_INFORME_ACTIVO = LOCALES_VENTA[0];
   app.innerHTML = `
     <button class="back" onclick="irA('home')">← Volver</button>
     <div class="fab-toolbar">
       <header class="top" style="margin:0;"><h1>Informes</h1></header>
       <div class="field-row">
-        <label>Ver para el día</label>
+        <label>Fecha de consulta</label>
         <input type="date" id="fechaInforme" value="${hoyISO()}">
       </div>
-      <button class="btn secondary" id="btnImprimirInforme" style="margin-left:auto;" onclick="window.print()">🖶 Imprimir</button>
+      <button class="btn secondary no-print" id="btnImprimirInforme" style="margin-left:auto;" onclick="window.print()">🖶 Imprimir</button>
+    </div>
+    <div class="tabs no-print" id="tabsInforme">
+      <button class="tab-btn ${SECTOR_INFORME_ACTIVO === 'consumo' ? 'active' : ''}" data-sector="consumo">Consumo de insumos</button>
+      <button class="tab-btn ${SECTOR_INFORME_ACTIVO === 'stock' ? 'active' : ''}" data-sector="stock">Stock por local</button>
     </div>
     <div id="contenidoInforme" class="loading">Cargando…</div>
   `;
-  document.getElementById('fechaInforme').onchange = cargarInformeInsumos;
-  cargarInformeInsumos();
+  [...document.querySelectorAll('#tabsInforme .tab-btn')].forEach(b => {
+    b.onclick = () => {
+      [...document.querySelectorAll('#tabsInforme .tab-btn')].forEach(x => x.classList.toggle('active', x === b));
+      SECTOR_INFORME_ACTIVO = b.dataset.sector;
+      pintarSectorInforme();
+    };
+  });
+  document.getElementById('fechaInforme').onchange = pintarSectorInforme;
+  pintarSectorInforme();
+}
+
+function pintarSectorInforme(){
+  if(SECTOR_INFORME_ACTIVO === 'consumo'){
+    cargarInformeInsumos();
+    return;
+  }
+  const cont = document.getElementById('contenidoInforme');
+  cont.className = '';
+  cont.innerHTML = `
+    <div class="field-row no-print" style="max-width:280px;">
+      <label>Local</label>
+      <select id="selLocalInforme">
+        ${LOCALES_VENTA.map(l => `<option value="${l}" ${l === LOCAL_INFORME_ACTIVO ? 'selected' : ''}>${l}</option>`).join('')}
+      </select>
+    </div>
+    <div id="contenidoStockLocal" class="loading">Cargando…</div>
+  `;
+  document.getElementById('selLocalInforme').onchange = (e) => {
+    LOCAL_INFORME_ACTIVO = e.target.value;
+    cargarInformeStockLocal();
+  };
+  cargarInformeStockLocal();
 }
 
 async function cargarInformeInsumos(){
@@ -1442,6 +1481,63 @@ async function cargarInformeInsumos(){
           ${totales.map(t => `<tr><td>${t.ingrediente}</td><td class="num"><strong>${ent(t.cantidad)}</strong> ${t.unidad}</td></tr>`).join('')}
         </tbody>
       </table>
+    `;
+  }catch(err){
+    cont.className = '';
+    cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar: ${err.message}</div>`;
+  }
+}
+
+// Informe "Stock por local": todos los productos por categoría, con la
+// última carga de stock de ESE local (cantidad + vencimiento por lote),
+// resaltando según la fecha de consulta — rojo ya venció, rosa vence justo
+// ese día, verde vence al día siguiente. Confirmado con Carolina (27/09/2026).
+async function cargarInformeStockLocal(){
+  const fecha = document.getElementById('fechaInforme').value;
+  const cont = document.getElementById('contenidoStockLocal');
+  cont.className = 'loading'; cont.textContent = 'Cargando…';
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=obtenerStockAnalisisLocal&local=${encodeURIComponent(LOCAL_INFORME_ACTIVO)}&fecha=${encodeURIComponent(fecha)}`);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    cont.className = '';
+    const categorias = data.categorias || {};
+    const nombresCategorias = Object.keys(categorias);
+    const claseFila = { vencido: 'fila-vencido', vence_hoy: 'fila-vence-hoy', vence_manana: 'fila-vence-manana' };
+
+    const leyenda = `
+      <div class="leyenda-vencimiento">
+        <span><i style="background:var(--alert-bg);"></i> Ya venció</span>
+        <span><i style="background:var(--pink-bg);"></i> Vence hoy (${fmtFecha(fecha)})</span>
+        <span><i style="background:var(--herb-bg);"></i> Vence mañana (${fmtFecha(sumarDiasISO(fecha, 1))})</span>
+      </div>`;
+
+    const bloques = nombresCategorias.map(cat => {
+      const items = categorias[cat];
+      const filas = items.map(it => {
+        if(it.lotes.length === 0){
+          return `<tr><td>${it.sabor}</td><td colspan="2" style="color:var(--ink-soft);font-style:italic;">sin stock cargado</td></tr>`;
+        }
+        return it.lotes.map((l, i) => `
+          <tr class="${claseFila[l.estado] || ''}">
+            <td>${i === 0 ? it.sabor : `<span class="item-extra">↳ otro lote</span>`}</td>
+            <td class="num">${ent(l.cantidad)}</td>
+            <td>${fmtFecha(l.vencimiento)}</td>
+          </tr>`).join('');
+      }).join('');
+      return `
+        <h4 class="cat-heading">${cat}</h4>
+        <table class="prod">
+          <thead><tr><th>Sabor / ítem</th><th class="num">Cantidad</th><th>Vencimiento</th></tr></thead>
+          <tbody>${filas}</tbody>
+        </table>`;
+    }).join('');
+
+    cont.innerHTML = `
+      <h2 style="font-size:18px;margin:0 0 6px;">Análisis de stock — ${LOCAL_INFORME_ACTIVO}</h2>
+      <p style="color:var(--ink-soft);font-size:13px;">${data.dia || ''} ${fmtFecha(fecha)} — stock de la última carga de cada producto en ${LOCAL_INFORME_ACTIVO}</p>
+      ${leyenda}
+      ${bloques}
     `;
   }catch(err){
     cont.className = '';
@@ -2825,6 +2921,16 @@ function hoyISO(){
     timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit'
   });
   return fmt.format(new Date()); // en-CA da directamente formato yyyy-MM-dd
+}
+
+// suma "n" días a una fecha 'yyyy-MM-dd' — solo para textos de referencia en
+// pantalla (ej. la leyenda de "Stock por local"), no para cálculos del backend.
+function sumarDiasISO(iso, n){
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate() + n);
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mes}-${dia}`;
 }
 
 irA('home');
