@@ -230,11 +230,6 @@ function renderHome(){
       <div class="sub">Stock y producción</div>
     </header>
     <div class="home-grid">
-      <button class="home-card" onclick="irA('informes')">
-        <div class="tag">FÁBRICA / LOCAL</div>
-        <h2>Informes</h2>
-        <p>Consumo real de insumos por día, y análisis de stock por local (vencimientos).</p>
-      </button>
       <button class="home-card" onclick="irA('local')">
         <div class="tag">LOCAL / FÁBRICA</div>
         <h2>Cargar stock de hoy</h2>
@@ -264,6 +259,11 @@ function renderHome(){
         <div class="tag">FÁBRICA</div>
         <h2>Despachar envíos</h2>
         <p>Cuánto hay que mandarle hoy a cada local, calculado con lo que vende y lo que ya tiene cargado.</p>
+      </button>
+      <button class="home-card" onclick="irA('informes')">
+        <div class="tag">FÁBRICA / LOCAL</div>
+        <h2>Informes</h2>
+        <p>Consumo real de insumos por día, y análisis de stock por local (vencimientos).</p>
       </button>
       <button class="home-card" onclick="irA('fichas')">
         <div class="tag">FÁBRICA</div>
@@ -1462,6 +1462,10 @@ async function cargarInformeInsumos(){
     const r = await fetch(`${APPS_SCRIPT_URL}?action=calcularInsumosRealesDia&fecha=${encodeURIComponent(fecha)}`);
     const data = await r.json();
     if(data.error) throw new Error(data.error);
+    // Guard: si mientras esperaba la respuesta el usuario ya cambió a la
+    // otra solapa (o cambió la fecha), esta respuesta llegó tarde y no debe
+    // pisar lo que se esté mostrando ahora.
+    if(SECTOR_INFORME_ACTIVO !== 'consumo' || document.getElementById('fechaInforme').value !== fecha) return;
     cont.className = '';
     const recetasFinal = data.recetasFinalizadas || [];
     const totales = data.totalesPorIngrediente || [];
@@ -1483,6 +1487,7 @@ async function cargarInformeInsumos(){
       </table>
     `;
   }catch(err){
+    if(SECTOR_INFORME_ACTIVO !== 'consumo') return;
     cont.className = '';
     cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar: ${err.message}</div>`;
   }
@@ -1494,12 +1499,19 @@ async function cargarInformeInsumos(){
 // ese día, verde vence al día siguiente. Confirmado con Carolina (27/09/2026).
 async function cargarInformeStockLocal(){
   const fecha = document.getElementById('fechaInforme').value;
+  const local = LOCAL_INFORME_ACTIVO;
   const cont = document.getElementById('contenidoStockLocal');
+  if(!cont) return; // la solapa ya cambió antes de arrancar el pedido
   cont.className = 'loading'; cont.textContent = 'Cargando…';
   try{
-    const r = await fetch(`${APPS_SCRIPT_URL}?action=obtenerStockAnalisisLocal&local=${encodeURIComponent(LOCAL_INFORME_ACTIVO)}&fecha=${encodeURIComponent(fecha)}`);
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=obtenerStockAnalisisLocal&local=${encodeURIComponent(local)}&fecha=${encodeURIComponent(fecha)}`);
     const data = await r.json();
     if(data.error) throw new Error(data.error);
+    // Guard: si mientras esperaba la respuesta el usuario cambió de solapa,
+    // de local o de fecha, esta respuesta llegó tarde y no debe pisar lo
+    // que se esté mostrando ahora.
+    const contActual = document.getElementById('contenidoStockLocal');
+    if(!contActual || SECTOR_INFORME_ACTIVO !== 'stock' || LOCAL_INFORME_ACTIVO !== local || document.getElementById('fechaInforme').value !== fecha) return;
     cont.className = '';
     const categorias = data.categorias || {};
     const nombresCategorias = Object.keys(categorias);
@@ -1540,6 +1552,8 @@ async function cargarInformeStockLocal(){
       ${bloques}
     `;
   }catch(err){
+    const contActual = document.getElementById('contenidoStockLocal');
+    if(!contActual || SECTOR_INFORME_ACTIVO !== 'stock' || LOCAL_INFORME_ACTIVO !== local) return;
     cont.className = '';
     cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar: ${err.message}</div>`;
   }
