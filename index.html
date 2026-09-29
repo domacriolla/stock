@@ -88,6 +88,8 @@
   table.traza tr.fila-guardada td, table.lotes tr.fila-guardada td{color:var(--ink-soft);}
   /* sello "✓ Guardado 13:52" al lado de Editar, en cada fila guardada */
   .sello-guardado{display:inline-block;font-size:11.5px;font-weight:600;color:var(--herb);margin-right:6px;white-space:nowrap;}
+  .sello-guardado.pendiente{color:#b07000;}
+  table.lotes tr.fila-pendiente, table.traza tr.fila-pendiente{background:#fdf6e3;}
   /* aviso flotante de confirmación (abajo de la pantalla) */
   #aviso-guardado{position:fixed;left:50%;bottom:92px;transform:translateX(-50%) translateY(20px);opacity:0;
     max-width:min(560px,calc(100vw - 32px));padding:14px 18px;border-radius:4px;font-size:14.5px;font-weight:600;
@@ -111,6 +113,15 @@
   .dato-viejo, table.prod td.dato-viejo{background:#fdf0d5 !important;color:#8a5a00;font-size:12.5px;font-weight:600;}
   .resumen-carga{font-size:13.5px;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:10px 12px;margin:6px 0 12px;}
   /* cartel de carga ya enviada (bloqueada) */
+  .pie-receta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 6px;padding:10px 12px;background:var(--panel);border:1px solid var(--line);border-radius:3px;}
+  .pie-receta.fila-guardada{background:var(--herb-bg);}
+  .pie-receta.fila-pendiente{background:#fdf6e3;}
+  .pie-receta .botones-receta{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;}
+  .bloque-receta{margin-bottom:10px;}
+  .fila-agregar{display:flex;gap:8px;align-items:center;margin:10px 0 4px;flex-wrap:wrap;}
+  .fila-agregar select{max-width:340px;}
+  .origen-traspaso{color:#7a3fa0;font-size:12.5px;}
+  .bloque-salidas{margin-top:28px;padding:14px;border:1px dashed #b98bd3;border-radius:4px;background:#faf5fd;}
   .cartel-enviado{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
     background:var(--herb-bg);color:var(--herb);border-radius:3px;padding:12px 14px;margin:10px 0 14px;font-size:14px;font-weight:600;}
   .btn-guardar-item:disabled{opacity:.7;}
@@ -236,9 +247,22 @@ let RECETAS_CACHE = null;
    que pidiendo siempre al servidor.
    --------------------------------------------------------------------- */
 const MEMORIA_MAX_HORAS = 24;
+const MEMORIA_VERSION = 'v2';
+// categorías en orden fijo y productos de la A a la Z (también lo hace el
+// servidor; acá por si la tablet tiene guardada una lista vieja)
+const ORDEN_RUBROS = ['Empanadas Horno', 'Empanadas Frito', 'Dips', 'Postres', 'Toppings', 'Cajita Criolla'];
+function compararTexto(a, b){ return String(a).localeCompare(String(b), 'es', { sensitivity: 'base', numeric: true }); }
+function ordenarCategorias(porCat){
+  const out = {};
+  Object.keys(porCat).sort((a, b) => {
+    const ia = ORDEN_RUBROS.indexOf(a), ib = ORDEN_RUBROS.indexOf(b);
+    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || compararTexto(a, b);
+  }).forEach(c => { out[c] = (porCat[c] || []).slice().sort(compararTexto); });
+  return out;
+}
 function leerMemoria(clave){
   try{
-    const raw = localStorage.getItem('doma:' + clave);
+    const raw = localStorage.getItem('doma:' + MEMORIA_VERSION + ':' + clave);
     if(!raw) return null;
     const m = JSON.parse(raw);
     if(!m || Date.now() - m.t > MEMORIA_MAX_HORAS * 3600 * 1000) return null;
@@ -246,7 +270,7 @@ function leerMemoria(clave){
   }catch(e){ return null; }
 }
 function guardarMemoria(clave, datos){
-  try{ localStorage.setItem('doma:' + clave, JSON.stringify({ t: Date.now(), d: datos })); }catch(e){}
+  try{ localStorage.setItem('doma:' + MEMORIA_VERSION + ':' + clave, JSON.stringify({ t: Date.now(), d: datos })); }catch(e){}
 }
 function borrarMemoria(){
   try{ Object.keys(localStorage).filter(k => k.startsWith('doma:')).forEach(k => localStorage.removeItem(k)); }catch(e){}
@@ -357,8 +381,7 @@ function avisar(texto, tipo){
 // pone (o actualiza) el sello "✓ Guardado HH:MM" de una fila; hora = null
 // para filas que ya venían guardadas al abrir la pantalla.
 function ponerSello(tr, hora){
-  const btnEditar = tr.querySelector('.btn-editar-item, .btn-editar-disco');
-  const celda = btnEditar ? btnEditar.parentElement : tr.lastElementChild;
+  const celda = tr.querySelector('.celda-estado') || tr.lastElementChild;
   if(!celda) return;
   let sello = tr.querySelector('.sello-guardado');
   if(!sello){
@@ -366,19 +389,48 @@ function ponerSello(tr, hora){
     sello.className = 'sello-guardado';
     celda.insertBefore(sello, celda.firstChild);
   }
+  sello.classList.remove('pendiente');
   sello.textContent = hora ? `✓ Guardado ${hora}` : '✓ Guardado';
 }
-// deja una fila como guardada: bloqueada, con "Editar" y el sello con hora.
+// SIN botones Guardar/Editar por fila (pedido por Carolina, 29/09/2026): los
+// campos quedan siempre editables hasta el "Guardar y enviar final", y se
+// guarda todo junto con "Guardado provisorio". Cada fila muestra su estado:
+//   verde + "✓ Guardado HH:MM"  -> lo que se ve es lo que está en la planilla
+//   ámbar + "● sin guardar"      -> se tocó después del último guardado
+// deja una fila como guardada (sin bloquearla).
 function marcarFilaGuardada(tr){
   tr.classList.add('fila-guardada');
-  [...tr.querySelectorAll('input,select')].forEach(el => el.disabled = true);
-  const btnG = tr.querySelector('.btn-guardar-item, .btn-guardar-disco');
-  if(btnG){ btnG.disabled = false; btnG.textContent = 'Guardar'; btnG.style.display = 'none'; }
-  const btnE = tr.querySelector('.btn-editar-item, .btn-editar-disco');
-  if(btnE) btnE.style.display = '';
+  tr.classList.remove('fila-pendiente');
+  tr.dataset.guardado = '1';
   const venc = tr.querySelector('.inp-venc');
-  if(venc) tr.dataset.vencGuardado = venc.value; // para "Editar" cambiando el vencimiento
+  if(venc) tr.dataset.vencGuardado = venc.value; // para cuando se cambia el vencimiento
   ponerSello(tr, horaCorta());
+}
+// fila que estaba guardada y se vació: se borró de la planilla
+function marcarFilaBorrada(tr){
+  tr.classList.remove('fila-guardada', 'fila-pendiente');
+  delete tr.dataset.guardado;
+  delete tr.dataset.vencGuardado;
+  const sello = tr.querySelector('.sello-guardado');
+  if(sello) sello.remove();
+}
+// escucha cualquier cambio en una tabla editable y marca la fila como
+// "sin guardar" hasta el próximo guardado.
+function seguirCambios(contenedor){
+  const marcar = (e) => {
+    const tr = e.target.closest('tr, .pie-receta');
+    if(!tr || e.target.closest('button')) return;
+    tr.classList.add('fila-pendiente');
+    tr.classList.remove('fila-guardada');
+    let sello = tr.querySelector('.sello-guardado');
+    if(!sello){ ponerSello(tr, null); sello = tr.querySelector('.sello-guardado'); }
+    if(sello){ sello.textContent = '● sin guardar'; sello.classList.add('pendiente'); }
+  };
+  contenedor.addEventListener('input', marcar);
+  contenedor.addEventListener('change', marcar);
+}
+function filaTieneDatos(tr){
+  return [...tr.querySelectorAll('input,select')].some(el => el.value && String(el.value).trim() !== '');
 }
 // bloquea TODA una carga ya enviada: sin Guardar/Editar/+/✕.
 function bloquearFilasEnviadas(contenedor){
@@ -506,7 +558,7 @@ let CATEGORIA_POR_SABOR_CACHE = null;
 async function obtenerCategorias(){
   if(SABORES_CACHE) return SABORES_CACHE;
   const data = await datoReferencia('listarSabores');
-  SABORES_CACHE = data.categorias || {};
+  SABORES_CACHE = ordenarCategorias(data.categorias || {});
   CATEGORIA_POR_SABOR_CACHE = data.categoriaPorSabor || {};
   return SABORES_CACHE;
 }
@@ -549,39 +601,6 @@ function opcionesEmpleadosSeleccion(empleados, seleccionado){
   return '<option value="">— Seleccionar —</option>' + empleados.map(n => `<option value="${n}" ${n === seleccionado ? 'selected' : ''}>${n}</option>`).join('');
 }
 
-// guarda (o actualiza) UN lote de "Cargar stock" apenas se termina de cargar,
-// sin esperar a completar el resto de la lista — así, si hay un error de
-// tipeo en la tablet, se corrige y reguarda solo ese lote, sin repetir toda
-// la carga. Confirmado con Carolina (26/09/2026).
-async function guardarItemStock(tr){
-  const local = document.getElementById('selLocal').value;
-  const fecha = document.getElementById('fechaCarga').value;
-  const responsable = document.getElementById('inpResponsable').value.trim();
-  if(!responsable){
-    alert('Indicá quién está cargando este stock antes de guardar (arriba de la lista de productos).');
-    return;
-  }
-  const cantidad = tr.querySelector('.inp-cant').value;
-  const vencimiento = tr.querySelector('.inp-venc').value;
-  if(!cantidad || Number(cantidad) <= 0 || !vencimiento){
-    alert('Cargá cantidad y vencimiento de este lote antes de guardarlo.');
-    return;
-  }
-  const item = { sabor: tr.dataset.item, cantidad, vencimiento };
-  if(tr.dataset.vencGuardado && tr.dataset.vencGuardado !== vencimiento) item.vencimientoAnterior = tr.dataset.vencGuardado;
-  if(!confirmarVencimientos([item], fecha)) return;
-  const btn = tr.querySelector('.btn-guardar-item');
-  btn.disabled = true; btn.textContent = 'Guardando...';
-  try{
-    await postJSON({ action: 'registrarStockItem', local, fecha, responsable, item });
-    marcarFilaGuardada(tr);
-    avisar(`✓ Guardado: ${item.sabor} — ${cantidad} (vence ${fmtFecha(vencimiento)}) · ${horaCorta()}`);
-  }catch(err){
-    btn.disabled = false; btn.textContent = 'Guardar';
-    alert('No se pudo guardar este lote: ' + err.message);
-  }
-}
-
 async function renderLocal(bloque){
   // bloque = 'locales' (Centro/Patagonia/Zelarrayan) o 'fabrica' (sectores de Fábrica)
   const esBloqueFabrica = bloque === 'fabrica';
@@ -606,22 +625,21 @@ async function renderLocal(bloque){
     </div>
 
     <p style="color:var(--ink-soft);font-size:12.5px;max-width:560px;">
-      Están listados todos los productos — completá cantidad y vencimiento solo en los que tengas hoy,
-      el resto se deja en blanco. Guardá cada lote con su propio botón apenas lo cargues (así, si hay
-      un error de tipeo, se corrige y reguarda solo ese lote, sin tocar el resto). Si un mismo producto
-      tiene más de un lote con vencimientos distintos, usá el botón <strong>+</strong> de esa fila para
-      agregar otra línea.
+      Están listados todos los productos — completá cantidad y vencimiento de lo que tengas hoy. Lo que quede
+      en blanco cuenta como <strong>0</strong>. Guardá con <strong>Guardado provisorio</strong> las veces que
+      quieras (podés seguir corrigiendo) y al terminar tocá <strong>Guardar y enviar final</strong>. Si un
+      producto tiene más de un vencimiento, usá el botón <strong>+</strong> de esa fila.
     </p>
 
     <div id="catNav" class="cat-nav"></div>
     <div id="cartelStock"></div>
     <div id="tablaLotesContainer" class="loading">Cargando…</div>
 
-    <div id="barraStock">${htmlBarraFinal('btnProvisorioStock', 'btnGuardar', 'Guardar y enviar stock')}</div>
+    <div id="barraStock">${htmlBarraFinal('btnProvisorioStock', 'btnGuardar', 'Guardar y enviar final')}</div>
     <div class="msg" id="msg"></div>
   `;
 
-  // sabores, rellenos y empleados a la vez (antes era uno detrás del otro)
+  // sabores, rellenos y empleados a la vez
   let categorias, rellenos, empleados = [];
   try{
     [categorias, rellenos, empleados] = await Promise.all([
@@ -634,6 +652,10 @@ async function renderLocal(bloque){
     return;
   }
   const nombresCategorias = Object.keys(categorias);
+  const cont = document.getElementById('tablaLotesContainer');
+  seguirCambios(cont);
+  // filas "otro lote" ya guardadas que se quitan con ✕: se borran al guardar
+  let borradosStock = [];
 
   // según el sector elegido, se carga por Sabor (locales y Fábrica -
   // Producción), por Relleno en kilos (Fábrica - Cocina), o por tipo de
@@ -643,62 +665,55 @@ async function renderLocal(bloque){
     if(local === 'Fábrica - Discos') return 'disco';
     return 'sabor';
   }
-
-  // el listado de empleados es solo para Fábrica (Producción/Cocina/Discos);
-  // en los locales el responsable se escribe a mano.
   function esFabrica(local){ return local.startsWith('Fábrica'); }
 
-  async function pintarResponsable(){
+  // responsable: desplegable de empleados en Fábrica, texto libre en locales;
+  // se prellena con quien ya guardó hoy.
+  function pintarResponsable(valor){
     const local = document.getElementById('selLocal').value;
     const wrap = document.getElementById('responsableWrap');
+    const actual = document.getElementById('inpResponsable');
+    const v = valor != null ? valor : (actual ? actual.value : '');
     if(esFabrica(local)){
-      if(empleados.length === 0) empleados = await obtenerEmpleados();
-      wrap.innerHTML = `<select id="inpResponsable">${opcionesEmpleados(empleados)}</select>`;
+      wrap.innerHTML = `<select id="inpResponsable">${opcionesEmpleadosSeleccion(empleados, v)}</select>`;
     } else {
       wrap.innerHTML = `<input type="text" id="inpResponsable" placeholder="Nombre y apellido">`;
+      document.getElementById('inpResponsable').value = v || '';
     }
   }
 
-  // una fila por lote. "guardado" (si viene) prellena y bloquea la fila, con
-  // su botón "Editar" para destrabarla puntualmente — igual que en Registrar
-  // producción y Despachar envíos, para que un error de tipeo en la tablet
-  // se corrija guardando de nuevo SOLO ese lote, sin repetir toda la carga.
-  // El botón "+" agrega otra fila del MISMO producto para un segundo
-  // vencimiento (queda vacía y editable, salvo que también venga guardada).
+  // una fila por lote, siempre editable. "guardado" (si viene) la prellena.
   function filaProducto(nombre, esExtra, guardado){
     const g = guardado || {};
-    const yaGuardado = !!guardado;
-    const dis = yaGuardado ? 'disabled' : '';
     const tr = document.createElement('tr');
     tr.dataset.item = nombre;
-    if(yaGuardado) tr.classList.add('fila-guardada');
     tr.innerHTML = `
       <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : nombre}</td>
-      <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0" value="${g.cantidad || ''}" ${dis}></td>
-      <td><input type="date" class="inp-venc" value="${g.vencimiento || ''}" ${dis}></td>
+      <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0" value="${g.cantidad || ''}"></td>
+      <td><input type="date" class="inp-venc" value="${g.vencimiento || ''}"></td>
       <td class="col-add">${esExtra ? '' : '<button type="button" class="add-lote-btn" title="Agregar otro vencimiento para este producto">+</button>'}</td>
       <td class="col-del">${esExtra ? '<button type="button" class="del-btn" title="Quitar">✕</button>' : ''}</td>
-      <td class="no-print" style="white-space:nowrap;">
-        <button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;${yaGuardado ? 'display:none;' : ''}">Guardar</button>
-        <button type="button" class="btn secondary btn-editar-item" style="font-size:12px;padding:5px 9px;${yaGuardado ? '' : 'display:none;'}">Editar</button>
-      </td>
+      <td class="no-print celda-estado" style="white-space:nowrap;"></td>
     `;
     if(esExtra){
-      tr.querySelector('.del-btn').onclick = () => tr.remove();
+      tr.querySelector('.del-btn').onclick = () => {
+        if(tr.dataset.guardado) borradosStock.push({ sabor: nombre, vencimiento: tr.dataset.vencGuardado });
+        tr.remove();
+      };
     } else {
       tr.querySelector('.add-lote-btn').onclick = () => {
         tr.insertAdjacentElement('afterend', filaProducto(nombre, true));
       };
     }
-    tr.querySelector('.btn-guardar-item').onclick = () => guardarItemStock(tr);
-    tr.querySelector('.btn-editar-item').onclick = () => habilitarEdicionFila(tr);
-    if(yaGuardado){ tr.dataset.vencGuardado = g.vencimiento || ''; ponerSello(tr, null); }
+    if(guardado){
+      tr.dataset.guardado = '1';
+      tr.dataset.vencGuardado = g.vencimiento || '';
+      tr.classList.add('fila-guardada');
+      ponerSello(tr, null);
+    }
     return tr;
   }
 
-  // arma las filas de un producto: si ya tiene uno o más lotes guardados hoy
-  // (guardadosPorItem), una fila prellenada/bloqueada por cada uno; si no,
-  // una sola fila vacía y editable.
   function tablaDe(labelCantidad, colHeader, items, guardadosPorItem){
     const table = document.createElement('table');
     table.className = 'lotes';
@@ -729,30 +744,39 @@ async function renderLocal(bloque){
     const fecha = document.getElementById('fechaCarga').value;
     const modo = modoDeLocal(local);
     const labelCantidad = modo === 'relleno' ? 'Kilos' : modo === 'disco' ? 'Docenas' : 'Cantidad';
-    const cont = document.getElementById('tablaLotesContainer');
     const nav = document.getElementById('catNav');
     cont.className = 'loading'; cont.textContent = 'Cargando…';
     nav.innerHTML = '';
+    borradosStock = [];
 
     let guardadosPorItem = {};
     let cierre = null;
+    let responsableGuardado = '';
     document.getElementById('cartelStock').innerHTML = '';
     try{
       const r = await fetch(`${APPS_SCRIPT_URL}?action=obtenerStockCargadoDia&local=${encodeURIComponent(local)}&fecha=${fecha}`);
       const data = await r.json();
-      if(!data.error){
-        cierre = data.cierre || null;
-        (data.items || []).forEach(it => {
-          guardadosPorItem[it.sabor] = guardadosPorItem[it.sabor] || [];
-          guardadosPorItem[it.sabor].push(it);
-        });
-      }
-    }catch(err){ /* si falla la consulta, se sigue con la tabla vacía y editable */ }
+      if(data.error) throw new Error(data.error);
+      cierre = data.cierre || null;
+      (data.items || []).forEach(it => {
+        guardadosPorItem[it.sabor] = guardadosPorItem[it.sabor] || [];
+        guardadosPorItem[it.sabor].push(it);
+        if(it.responsable) responsableGuardado = it.responsable;
+      });
+    }catch(err){
+      if(document.getElementById('selLocal').value !== local || document.getElementById('fechaCarga').value !== fecha) return;
+      cont.className = '';
+      cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo leer lo ya guardado: ${err.message}. <button class="btn secondary" style="font-size:12px;padding:5px 9px;margin-left:8px;" id="btnReintentarStock">Reintentar</button></div>`;
+      document.getElementById('btnReintentarStock').onclick = pintarTabla;
+      document.getElementById('barraStock').style.display = 'none';
+      return;
+    }
 
     // se cambió de local o de fecha mientras cargaba esta consulta
     if(document.getElementById('selLocal').value !== local || document.getElementById('fechaCarga').value !== fecha) return;
 
     cont.className = ''; cont.innerHTML = '';
+    if(responsableGuardado) pintarResponsable(responsableGuardado);
 
     if(modo === 'sabor'){
       nombresCategorias.forEach((cat, i) => {
@@ -763,25 +787,24 @@ async function renderLocal(bloque){
         h.textContent = cat;
         cont.appendChild(h);
         cont.appendChild(tablaDe(labelCantidad, 'Sabor / ítem', categorias[cat], guardadosPorItem));
-
         const a = document.createElement('a');
         a.href = `#${id}`;
         a.textContent = cat;
         nav.appendChild(a);
       });
     } else if(modo === 'relleno'){
-      cont.appendChild(tablaDe(labelCantidad, 'Relleno', rellenos, guardadosPorItem));
+      cont.appendChild(tablaDe(labelCantidad, 'Relleno', rellenos.slice().sort(compararTexto), guardadosPorItem));
     } else {
       cont.appendChild(tablaDe(labelCantidad, 'Tipo de disco', TIPOS_DISCO, guardadosPorItem));
     }
 
-    // carga ya enviada ("Guardar y enviar"): todo bloqueado, con Reabrir
+    // carga ya enviada: todo bloqueado, con Reabrir (solo la última)
     const cartel = document.getElementById('cartelStock');
     cartel.innerHTML = '';
     document.getElementById('barraStock').style.display = cierre ? 'none' : '';
     if(cierre){
       bloquearFilasEnviadas(cont);
-      cartel.appendChild(cartelEnviado(cierre, `Stock de ${local}`, async () => {
+      cartel.appendChild(cartelEnviado(cierre, `Stock de ${local}`, cierre.puedeReabrir === false ? null : async () => {
         if(!confirm(`¿Reabrir la carga de stock de ${local}? Se va a destrabar para corregir.`)) return;
         try{
           await postJSON({ action: 'reabrirCarga', pantalla: 'Stock', fecha, clave: local });
@@ -792,16 +815,15 @@ async function renderLocal(bloque){
     }
   }
 
-  document.getElementById('selLocal').onchange = () => { pintarTabla(); pintarResponsable(); };
+  document.getElementById('selLocal').onchange = () => { pintarResponsable(''); pintarTabla(); };
   document.getElementById('fechaCarga').onchange = pintarTabla;
-  pintarTabla(); // arranca mostrando el listado completo del primer local
-  pintarResponsable();
+  pintarResponsable('');
+  pintarTabla();
 
-  // "Guardado provisorio" y "Guardar y enviar stock": guardan de una sola vez
-  // todo lo que haya quedado sin guardar con su propio botón (incluidas las
-  // filas reabiertas con "Editar"). Si una fila está a medio completar
-  // (cantidad sin vencimiento o al revés) se avisa cuál — antes esas filas se
-  // salteaban en silencio. "Guardar y enviar" además cierra la carga.
+  // "Guardado provisorio" y "Guardar y enviar final": guardan TODAS las filas
+  // completas, avisan cuáles quedaron a medio completar, y BORRAN de la
+  // planilla lo que estaba guardado y ahora se dejó en blanco. "Guardar y
+  // enviar final" además cierra la carga.
   async function guardarTodoStock(enviar){
     const local = document.getElementById('selLocal').value;
     const responsable = document.getElementById('inpResponsable').value.trim();
@@ -813,14 +835,15 @@ async function renderLocal(bloque){
       avisar('✗ Falta indicar quién carga el stock.', 'err');
       return;
     }
-    const filas = [...document.querySelectorAll('#tablaLotesContainer tr[data-item]:not(.fila-guardada)')];
-    const completas = [], incompletas = [];
+    const filas = [...cont.querySelectorAll('tr[data-item]')];
+    const completas = [], incompletas = [], vaciadas = [];
     filas.forEach(tr => {
       const cantidad = tr.querySelector('.inp-cant').value;
       const vencimiento = tr.querySelector('.inp-venc').value;
       const tieneCant = cantidad && Number(cantidad) > 0;
       if(tieneCant && vencimiento) completas.push(tr);
       else if(tieneCant || vencimiento) incompletas.push(tr.dataset.item + (tieneCant ? ' (falta vencimiento)' : ' (falta cantidad)'));
+      else if(tr.dataset.guardado) vaciadas.push(tr);
     });
     if(enviar && incompletas.length){
       msg.className = 'msg err';
@@ -833,37 +856,40 @@ async function renderLocal(bloque){
       if(tr.dataset.vencGuardado && tr.dataset.vencGuardado !== it.vencimiento) it.vencimientoAnterior = tr.dataset.vencGuardado;
       return it;
     });
-    if(!confirmarVencimientos(items, fecha)) return;
+    // el aviso de vencimientos raros, solo para lo que se tocó
+    const tocados = completas.filter(tr => !tr.dataset.guardado || tr.classList.contains('fila-pendiente'))
+      .map(tr => ({ sabor: tr.dataset.item, vencimiento: tr.querySelector('.inp-venc').value }));
+    if(!confirmarVencimientos(tocados, fecha)) return;
     if(enviar){
-      // una carga enviada es el recuento COMPLETO: lo que queda en blanco se
-      // toma como 0 (no hay) — se avisa cuáles para que no sea un olvido.
-      const conDato = new Set([...document.querySelectorAll('#tablaLotesContainer tr[data-item]')]
-        .filter(tr => tr.classList.contains('fila-guardada') || completas.includes(tr))
-        .map(tr => tr.dataset.item));
-      const enBlanco = [...new Set([...document.querySelectorAll('#tablaLotesContainer tr[data-item]')].map(tr => tr.dataset.item))]
-        .filter(n => !conDato.has(n));
+      const conDato = new Set(completas.map(tr => tr.dataset.item));
+      const enBlanco = [...new Set(filas.map(tr => tr.dataset.item))].filter(n => !conDato.has(n));
       const listaBlanco = enBlanco.length
         ? `\n\nQuedaron ${enBlanco.length} producto(s) SIN CARGAR — se van a tomar como 0 (no hay):\n${enBlanco.slice(0, 25).map(n => '• ' + n).join('\n')}${enBlanco.length > 25 ? `\n… y ${enBlanco.length - 25} más` : ''}\n\nSi alguno sí tiene stock, tocá "Cancelar" y cargalo.`
         : '';
-      if(!confirm(`¿Guardar y enviar el stock de ${local}? La carga queda cerrada (se puede reabrir si hace falta corregir).${listaBlanco}`)) return;
+      if(!confirm(`¿Guardar y enviar final el stock de ${local}? La carga queda cerrada.${listaBlanco}`)) return;
     }
+    const borrar = vaciadas.map(tr => ({ sabor: tr.dataset.item, vencimiento: tr.dataset.vencGuardado }))
+      .concat(borradosStock);
+
     const btn = document.getElementById(enviar ? 'btnGuardar' : 'btnProvisorioStock');
     const textoOriginal = btn.textContent;
     btn.disabled = true; btn.textContent = 'Guardando...';
     try{
-      const data = await postJSON({ action: 'registrarStock', local, fecha, responsable, items, enviar: !!enviar });
+      const data = await postJSON({ action: 'registrarStock', local, fecha, responsable, items, borrar, enviar: !!enviar });
       completas.forEach(marcarFilaGuardada);
+      vaciadas.forEach(marcarFilaBorrada);
+      borradosStock = [];
       const hora = horaCorta();
+      const borradoTxt = borrar.length ? ` Se borraron ${borrar.length} lote(s) que dejaste en blanco.` : '';
       if(enviar){
         avisar(`✓ Stock de ${local} enviado · ${hora} — ${data.total_dia} lote(s) guardados.`);
         msg.className = 'msg ok';
-        msg.textContent = `✓ Enviado a las ${hora}: quedaron guardados ${data.total_dia} lote(s) de ${local} para el ${fmtFecha(fecha)}.`;
+        msg.textContent = `✓ Enviado a las ${hora}: quedaron guardados ${data.total_dia} lote(s) de ${local} para el ${fmtFecha(fecha)}.${borradoTxt}`;
         pintarTabla(); // vuelve a leer de la planilla y muestra la carga cerrada
       } else {
-        const aviso = items.length ? `${items.length} lote(s) nuevos guardados` : 'no había nada nuevo para guardar';
-        avisar(`✓ Guardado provisorio · ${hora} — ${aviso}. Total de ${local} hoy: ${data.total_dia}.`);
+        avisar(`✓ Guardado provisorio · ${hora} — ${data.total_dia} lote(s) de ${local} guardados.`);
         msg.className = incompletas.length ? 'msg err' : 'msg ok';
-        msg.textContent = `✓ Guardado provisorio a las ${hora}: ${aviso}. En total hay ${data.total_dia} lote(s) de ${local} guardados para el ${fmtFecha(fecha)}. Podés seguir cargando.`
+        msg.textContent = `✓ Guardado provisorio a las ${hora}: hay ${data.total_dia} lote(s) de ${local} guardados para el ${fmtFecha(fecha)}.${borradoTxt} Podés seguir cargando.`
           + (incompletas.length ? ' OJO — no se guardaron porque están a medio completar: ' + incompletas.join(', ') + '.' : '');
       }
     }catch(err){
@@ -876,6 +902,7 @@ async function renderLocal(bloque){
   document.getElementById('btnProvisorioStock').onclick = () => guardarTodoStock(false);
   document.getElementById('btnGuardar').onclick = () => guardarTodoStock(true);
 }
+
 
 /* ---------------------------------------------------------------------
    Pantalla FÁBRICA: qué producir hoy
@@ -1165,7 +1192,7 @@ function bloqueGramajeOllas(items){
   if(!items || items.length === 0) return '';
   return items.map(o => `
     <details style="margin-top:8px;font-size:12.5px;">
-      <summary style="cursor:pointer;color:var(--ink-soft);">Gramaje por olla (8 kg) — ${o.nombre}</summary>
+      <summary style="cursor:pointer;color:var(--ink-soft);">Gramaje por olla — ${o.nombre}</summary>
       <ul style="margin:8px 0 0 18px;">
         ${(o.gramajePorOlla || []).map(g => `<li>${g.ingrediente}: ${ent(g.cantidad)} ${g.medida || ''}</li>`).join('')}
       </ul>
@@ -1198,7 +1225,7 @@ async function cargarPreparadosCocina(fecha){
     ollasRelleno.forEach(o => {
       const fila = [...document.querySelectorAll('tr[data-relleno]')].find(tr => tr.dataset.relleno === o.nombre);
       const celda = fila ? fila.querySelector('.ollas-relleno') : null;
-      if(celda) celda.innerHTML = `<strong>${o.ollas}</strong> <span style="color:var(--ink-soft);font-size:11px;">(${ent(o.kilosNecesarios)} kg de ${o.ingredienteClave})</span>`;
+      if(celda) celda.innerHTML = `<strong>${o.ollas}</strong>`;
     });
     if(gramajeRellenosCont) gramajeRellenosCont.innerHTML = bloqueGramajeOllas(ollasRelleno);
 
@@ -1400,10 +1427,6 @@ async function pintarRegistroCocinaSector(){
   const fecha = document.getElementById('fechaRegistro').value;
   const cocina = (CALCULO_REGISTRO.cocina || []).filter(f => f.kilosDeRelleno > 0);
   const dipsPostres = (CALCULO_REGISTRO.produccion || []).filter(f => f.aHacerUnidades > 0 && (f.rubro === 'Dips' || f.rubro === 'Postres'));
-  if(cocina.length === 0 && dipsPostres.length === 0){
-    cont.innerHTML = `<div class="empty">Cocina no elabora nada el ${CALCULO_REGISTRO.dia.toLowerCase()}.</div>`;
-    return;
-  }
 
   const [recetas, ollasResp, trazaResp, finalResp] = await Promise.all([
     obtenerRecetas(),
@@ -1424,7 +1447,13 @@ async function pintarRegistroCocinaSector(){
   const recetasFinalizadasSet = new Set(
     ((finalResp && !finalResp.error && finalResp.recetas) || []).map(r => normalizarFicha(r))
   );
+  const totalesGuardados = {};
+  ((trazaResp && !trazaResp.error && trazaResp.totales) || []).forEach(t => { totalesGuardados[normalizarFicha(t.receta)] = t; });
+  const MOSTRADAS_COCINA = new Set();
 
+  if(cocina.length === 0 && dipsPostres.length === 0){
+    // no se corta: igual se puede registrar elaboración adicional (abajo)
+  }
   if(recetas.detalle.length === 0){
     cont.innerHTML = `
       <div class="empty">Todavía no importaste ninguna ficha técnica — sin eso no sé qué insumos controlar acá.</div>
@@ -1442,7 +1471,7 @@ async function pintarRegistroCocinaSector(){
   if((ollasData.preparados || []).length){
     const hPrep = document.createElement('h4');
     hPrep.className = 'cat-heading';
-    hPrep.textContent = 'Preparados en olla (8 kg) — resumen';
+    hPrep.textContent = 'Preparados en olla — resumen';
     cont.appendChild(hPrep);
     const tablaPrep = document.createElement('table');
     tablaPrep.className = 'prod';
@@ -1472,42 +1501,39 @@ async function pintarRegistroCocinaSector(){
   // registro (Bruto real / Rinde real) es siempre sobre ese total, nunca por
   // olla. unidadHoy es 'KG' para Rellenos/Preparados y 'UN' para Dips/Postres
   // (que se miden en unidades, no en kilos).
-  function bloqueRegistroReceta(nombreReceta, cantidadHoy, unidadHoy, subtitulo, infoOllasHtml){
+  function bloqueRegistroReceta(nombreReceta, cantidadHoy, unidadHoy, subtitulo, infoOllasHtml, destino){
+    const dest = destino || cont;
     const ingredientesReceta = recetas.detalle.filter(d => normalizarFicha(d.Receta) === normalizarFicha(nombreReceta));
     if(ingredientesReceta.length === 0) return false;
+    MOSTRADAS_COCINA.add(normalizarFicha(nombreReceta));
 
     const rinde = rindeEnUnidad(nombreReceta, unidadHoy);
     const factor = rinde > 0 ? (cantidadHoy / rinde) : 1;
-
     const finalizada = recetasFinalizadasSet.has(normalizarFicha(nombreReceta));
+    const unidadTxt = unidadHoy === 'UN' ? 'un.' : 'kg';
+
+    const bloque = document.createElement('div');
+    bloque.className = 'bloque-receta';
+    bloque.dataset.receta = nombreReceta;
 
     const h = document.createElement('h4');
     h.className = 'cat-heading receta-heading';
     h.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;';
     h.innerHTML = `
-      <span>${nombreReceta} — ${ent(cantidadHoy)} ${unidadHoy === 'UN' ? 'un.' : 'kg'} calculados hoy${subtitulo || ''}</span>
+      <span>${nombreReceta} — ${ent(cantidadHoy)} ${unidadTxt} ${subtitulo === ' — adicional' ? '(1 receta de ficha)' : 'calculados hoy'}${subtitulo || ''}</span>
       <span class="no-print">${finalizada
         ? `<span style="color:#2a7a4a;font-size:12.5px;font-weight:600;margin-right:6px;">✓ Enviada</span><button type="button" class="btn secondary btn-reabrir-receta" style="font-size:12px;padding:5px 9px;">Reabrir</button>`
-        : `<button type="button" class="btn btn-finalizar-receta" style="font-size:12px;padding:5px 9px;">Guardar y enviar</button>`}</span>
+        : ''}</span>
     `;
-    cont.appendChild(h);
-    const btnFinalizar = h.querySelector('.btn-finalizar-receta');
-    if(btnFinalizar) btnFinalizar.onclick = () => finalizarReceta(nombreReceta, fecha);
+    bloque.appendChild(h);
     const btnReabrir = h.querySelector('.btn-reabrir-receta');
     if(btnReabrir) btnReabrir.onclick = () => reabrirReceta(nombreReceta, fecha);
 
-    if(finalizada){
-      const avisoFinal = document.createElement('p');
-      avisoFinal.style.cssText = 'font-size:12px;color:#2a7a4a;margin:0 0 8px;';
-      avisoFinal.textContent = 'Esta receta ya está enviada — sus insumos entraron al informe de "Totales del día" y la tabla queda bloqueada. Tocá "Reabrir" para volver a editarla.';
-      cont.appendChild(avisoFinal);
-    }
-
     if(infoOllasHtml){
       const divOllas = document.createElement('div');
-      divOllas.style.cssText = 'font-size:12.5px;color:var(--ink-soft);margin:2px 0 10px;';
+      divOllas.style.cssText = 'font-size:13px;margin:2px 0 10px;';
       divOllas.innerHTML = infoOllasHtml;
-      cont.appendChild(divOllas);
+      bloque.appendChild(divOllas);
     }
 
     const wrap = document.createElement('div');
@@ -1530,64 +1556,73 @@ async function pintarRegistroCocinaSector(){
       const cantidadHoyIng = (Number(ing.Cantidad) || 0) * factor;
       const rindeHoyIng = tieneRinde ? (Number(ing.Rinde) || 0) * factor : null;
       const guardado = trazaGuardada[normalizarFicha(nombreReceta) + '|' + normalizarFicha(ing.Ingrediente)];
-      const yaGuardado = !!guardado;
-      const bloqueado = finalizada || yaGuardado;
       const valorBruto = (guardado && guardado.cantidadBrutoReal !== '' && guardado.cantidadBrutoReal != null) ? guardado.cantidadBrutoReal : '';
       const valorRinde = (guardado && guardado.rindeReal !== '' && guardado.rindeReal != null) ? guardado.rindeReal : '';
+      const dis = finalizada ? 'disabled' : '';
       const tr = document.createElement('tr');
       tr.dataset.relleno = nombreReceta;
       tr.dataset.ingrediente = ing.Ingrediente;
-      if(bloqueado) tr.classList.add('fila-guardada');
       tr.innerHTML = `
         <td>${ing.Ingrediente}</td>
         <td class="num" style="color:var(--ink-soft);">${ent(cantidadHoyIng)} ${ing.Medida || ''}</td>
-        <td><input type="number" min="0" step="0.01" class="inp-bruto-real" style="width:90px;" placeholder="${ent(cantidadHoyIng)}" value="${valorBruto}" ${bloqueado ? 'disabled' : ''}></td>
+        <td><input type="number" min="0" step="0.01" class="inp-bruto-real" style="width:90px;" placeholder="${ent(cantidadHoyIng)}" value="${valorBruto}" ${dis}></td>
         <td class="num" style="color:var(--ink-soft);">${tieneRinde ? `${ent(rindeHoyIng)} ${ing.Medida || ''}` : `<span style="font-size:11px;">sin control de rinde</span>`}</td>
-        <td>${tieneRinde ? `<input type="number" min="0" step="0.01" class="inp-rinde-real" style="width:90px;" placeholder="${ent(rindeHoyIng)}" value="${valorRinde}" ${bloqueado ? 'disabled' : ''}>` : ''}</td>
-        <td style="white-space:nowrap;" class="no-print">${finalizada ? '' : `
-          <button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;${yaGuardado ? 'display:none;' : ''}">Guardar</button>
-          <button type="button" class="btn secondary btn-editar-item" style="font-size:12px;padding:5px 9px;${yaGuardado ? '' : 'display:none;'}">Editar</button>
-        `}</td>
+        <td>${tieneRinde ? `<input type="number" min="0" step="0.01" class="inp-rinde-real" style="width:90px;" placeholder="${ent(rindeHoyIng)}" value="${valorRinde}" ${dis}>` : ''}</td>
+        <td class="no-print celda-estado" style="white-space:nowrap;"></td>
       `;
-      if(!finalizada){
-        tr.querySelector('.btn-guardar-item').onclick = () => guardarItemCocina(tr, fecha);
-        tr.querySelector('.btn-editar-item').onclick = () => habilitarEdicionFila(tr);
-        if(yaGuardado) ponerSello(tr, null);
-      }
+      if(guardado){ tr.dataset.guardado = '1'; tr.classList.add('fila-guardada'); ponerSello(tr, null); }
       tbody.appendChild(tr);
     });
     wrap.appendChild(table);
-    cont.appendChild(wrap);
+    bloque.appendChild(wrap);
+
+    // total de relleno (o unidades) que SALIÓ de esta receta hoy
+    const totalGuardado = totalesGuardados[normalizarFicha(nombreReceta)];
+    const pie = document.createElement('div');
+    pie.className = 'pie-receta';
+    pie.innerHTML = `
+      <label style="display:inline-block;margin:0 8px 0 0;font-size:13px;color:var(--ink);font-weight:600;">Total elaborado hoy (${unidadTxt})</label>
+      <input type="number" min="0" step="0.01" class="inp-total-receta" style="width:110px;" value="${totalGuardado ? totalGuardado.cantidad : ''}" ${finalizada ? 'disabled' : ''}>
+      <span class="celda-estado"></span>
+      ${finalizada ? '' : `
+        <span class="botones-receta no-print">
+          <button type="button" class="btn secondary btn-prov-receta">Guardado provisorio</button>
+          <button type="button" class="btn btn-enviar-receta">Guardar y enviar final</button>
+        </span>`}`;
+    if(totalGuardado){ pie.dataset.guardado = '1'; ponerSello(pie, null); }
+    bloque.appendChild(pie);
+    if(!finalizada){
+      pie.querySelector('.btn-prov-receta').onclick = () => guardarReceta(bloque, unidadTxt, fecha, false);
+      pie.querySelector('.btn-enviar-receta').onclick = () => guardarReceta(bloque, unidadTxt, fecha, true);
+      seguirCambios(bloque);
+    }
+    if(finalizada){
+      const avisoFinal = document.createElement('p');
+      avisoFinal.style.cssText = 'font-size:12px;color:#2a7a4a;margin:4px 0 8px;';
+      avisoFinal.textContent = 'Receta enviada — sus insumos entraron al informe de "Totales del día" y quedó bloqueada.';
+      bloque.appendChild(avisoFinal);
+    }
+    dest.appendChild(bloque);
     return true;
   }
 
   let algunBloque = false;
 
   // Preparados que se cocinan en olla (Relleno Carne, Pollo Grille): el
-  // registro de insumos va sobre el TOTAL de ESE preparado — las ollas quedan
-  // solo como referencia (no como el campo a completar; eso ya lo pidió
-  // Carolina expresamente: "el registro tiene que ser sobre el total, con
-  // una solapita para ver por olla si hace falta"). Ojo: acá NO va el
-  // gramaje por olla — los 8 kg de la olla son de la materia prima cruda
-  // (recortes), no del Preparado ya terminado (ver el comentario en
-  // cargarPreparadosCocina). Confirmado con Carolina (26/09/2026).
+  // registro de insumos va sobre el TOTAL de ESE preparado.
   (ollasData.preparados || []).forEach(o => {
-    const infoOllasHtml = `<strong>Referencia:</strong> hoy arma ${o.ollas} olla(s) de este preparado (una olla completa son 8 kg) — el registro de insumos de abajo es sobre el TOTAL de hoy, no por olla.`;
+    const infoOllasHtml = `<strong>🍲 Ollas: ${o.ollas}</strong>` + bloqueGramajeOllas([o]);
     if(bloqueRegistroReceta(o.nombre, o.kilos, 'KG', ` — Preparado (lo usan: ${(o.usan || []).join(', ')})`, infoOllasHtml)) algunBloque = true;
   });
 
   // Rellenos que se cocinan hoy
   cocina.forEach(f => {
     const infoOllas = (ollasData.rellenos || []).find(o => o.nombre === f.relleno);
-    const infoOllasHtml = infoOllas
-      ? `<strong>Referencia:</strong> hoy arma ${infoOllas.ollas} olla(s) (usa ${ent(infoOllas.kilosNecesarios)} kg de ${infoOllas.ingredienteClave} — una olla completa son 8 kg) — el registro de insumos de abajo es sobre el TOTAL de hoy, no por olla.` + bloqueGramajeOllas([infoOllas])
-      : '';
+    const infoOllasHtml = infoOllas ? `<strong>🍲 Ollas: ${infoOllas.ollas}</strong>` + bloqueGramajeOllas([infoOllas]) : '';
     if(bloqueRegistroReceta(f.relleno, f.kilosDeRelleno, 'KG', '', infoOllasHtml)) algunBloque = true;
   });
 
-  // Dips y Postres: los arma Cocina igual que los Rellenos, pero se miden en
-  // UNIDADES — la ficha escala contra el rinde en UN (no en KG). No tienen
-  // ollas. Confirmado con Carolina (26/09/2026).
+  // Dips y Postres: se miden en UNIDADES — la ficha escala contra el rinde en UN.
   ['Dips', 'Postres'].forEach(rubro => {
     const items = dipsPostres.filter(f => f.rubro === rubro);
     if(items.length === 0) return;
@@ -1601,105 +1636,106 @@ async function pintarRegistroCocinaSector(){
   });
 
   if(!algunBloque){
-    cont.innerHTML += `<div class="empty" style="margin-top:14px;">No encontré la ficha técnica de ninguno de los rellenos, dips o postres de hoy.</div>`;
-    return;
+    const vacio = document.createElement('div');
+    vacio.className = 'empty';
+    vacio.style.marginTop = '14px';
+    vacio.textContent = 'El cálculo de hoy no pide ningún relleno, dip o postre (o no tienen ficha técnica). Si igual se elaboró algo, agregalo abajo.';
+    cont.appendChild(vacio);
   }
 
-  // Guardado provisorio de TODO Cocina (cada receta se envía con su propio
-  // "Guardar y enviar", arriba de su tabla).
-  const barra = document.createElement('div');
-  barra.innerHTML = htmlBarraFinal('btnProvisorioCocina', null, '',
-    '<strong>Guardado provisorio</strong> (barra de abajo): guarda todos los insumos cargados de todas las recetas y se puede seguir cargando durante toda la jornada. Cada receta se cierra con su botón <strong>Guardar y enviar</strong> (arriba de su tabla): guarda lo que falte de esa receta y la bloquea.');
-  cont.appendChild(barra);
-  document.getElementById('btnProvisorioCocina').onclick = () => guardarProvisorioCocina(fecha);
+  // --- Elaboración adicional: cualquier receta que se hizo aunque el cálculo
+  // del día no la pidiera. Usa la ficha tal cual (1 receta) como referencia.
+  const hAd = document.createElement('h4');
+  hAd.className = 'cat-heading';
+  hAd.style.marginTop = '30px';
+  hAd.textContent = 'Elaboración adicional (fuera del cálculo del día)';
+  cont.appendChild(hAd);
+  const contAdicional = document.createElement('div');
+  cont.appendChild(contAdicional);
+  const unidadDeFicha = (cab) => {
+    if(['DIP', 'POSTRE'].includes(normalizarFicha(cab.TipoFicha))) return 'UN'; // dips y postres van en unidades
+    const u1 = normalizarFicha(cab.RindeUnidad), u2 = normalizarFicha(cab.RindeUnidad2);
+    return (u1 === 'KG' || u2 === 'KG') ? 'KG' : 'UN';
+  };
+  const agregarAdicional = (cab) => {
+    const unidad = unidadDeFicha(cab);
+    const rinde = rindeEnUnidad(cab.Receta, unidad) || 1;
+    bloqueRegistroReceta(cab.Receta, rinde, unidad, ' — adicional', '', contAdicional);
+  };
+  // las adicionales que ya tienen algo guardado hoy
+  const conDatosHoy = new Set(Object.keys(trazaGuardada).map(k => k.split('|')[0])
+    .concat(Object.keys(totalesGuardados)).concat([...recetasFinalizadasSet]));
+  recetas.cabecera.filter(c => conDatosHoy.has(normalizarFicha(c.Receta)) && !MOSTRADAS_COCINA.has(normalizarFicha(c.Receta)))
+    .sort((a, b) => compararTexto(a.Receta, b.Receta)).forEach(agregarAdicional);
+  const selWrap = document.createElement('div');
+  selWrap.className = 'fila-agregar no-print';
+  const opcionesAd = () => recetas.cabecera.filter(c => !MOSTRADAS_COCINA.has(normalizarFicha(c.Receta)))
+    .sort((a, b) => compararTexto(a.Receta, b.Receta))
+    .map(c => `<option value="${c.Receta}">${c.Receta}</option>`).join('');
+  selWrap.innerHTML = `<select id="selAgregarReceta"><option value="">— Elegí una receta para agregar —</option>${opcionesAd()}</select>
+    <button type="button" class="btn secondary" id="btnAgregarReceta">+ Agregar</button>`;
+  cont.appendChild(selWrap);
+  selWrap.querySelector('#btnAgregarReceta').onclick = () => {
+    const nombre = selWrap.querySelector('#selAgregarReceta').value;
+    const cab = recetas.cabecera.find(c => c.Receta === nombre);
+    if(!cab) return;
+    agregarAdicional(cab);
+    selWrap.querySelector('#selAgregarReceta').innerHTML = `<option value="">— Elegí una receta para agregar —</option>${opcionesAd()}`;
+  };
 }
 
-// lee los insumos de Cocina cargados pero todavía sin guardar (de una
-// receta, o de todas si receta = null).
-function insumosCocinaPendientes(receta){
-  const filas = [...document.querySelectorAll('#contenidoRegistro tr[data-relleno]:not(.fila-guardada)')]
-    .filter(tr => receta == null || tr.dataset.relleno === receta);
-  const pendientes = [];
-  filas.forEach(tr => {
-    const inputBruto = tr.querySelector('.inp-bruto-real');
-    const inputRinde = tr.querySelector('.inp-rinde-real');
-    if(!inputBruto || inputBruto.disabled) return;
-    const cantidadBrutoReal = inputBruto.value;
-    const rindeReal = inputRinde ? inputRinde.value : '';
-    if(!cantidadBrutoReal && !rindeReal) return;
-    pendientes.push({ tr, item: { relleno: tr.dataset.relleno, ingrediente: tr.dataset.ingrediente, cantidadBrutoReal, rindeReal } });
-  });
-  return pendientes;
-}
-
-async function guardarProvisorioCocina(fecha){
+// Guardado provisorio / Guardar y enviar final de UNA receta de Cocina:
+// guarda los insumos cargados, borra los que se vaciaron y guarda el total
+// elaborado. "Enviar final" además la cierra (entra a Totales del día).
+async function guardarReceta(bloque, unidadTxt, fecha, enviar){
+  const receta = bloque.dataset.receta;
   const msg = document.getElementById('msgRegistro');
-  const pendientes = insumosCocinaPendientes(null);
-  const btn = document.getElementById('btnProvisorioCocina');
+  const filas = [...bloque.querySelectorAll('tr[data-relleno]')];
+  const items = [], conDato = [], vaciadas = [];
+  filas.forEach(tr => {
+    const b = tr.querySelector('.inp-bruto-real');
+    const rI = tr.querySelector('.inp-rinde-real');
+    const cantidadBrutoReal = b ? b.value : '';
+    const rindeReal = rI ? rI.value : '';
+    if(cantidadBrutoReal || rindeReal){ items.push({ ingrediente: tr.dataset.ingrediente, cantidadBrutoReal, rindeReal }); conDato.push(tr); }
+    else if(tr.dataset.guardado) vaciadas.push(tr);
+  });
+  const pie = bloque.querySelector('.pie-receta');
+  const totalVal = pie.querySelector('.inp-total-receta').value;
+  if(enviar && !(Number(totalVal) > 0)){
+    avisar(`✗ Falta el "Total elaborado hoy" de ${receta}.`, 'err');
+    pie.querySelector('.inp-total-receta').focus();
+    return;
+  }
+  if(enviar && !confirm(`¿Guardar y enviar final "${receta}"? Se bloquea su tabla y entra al informe de Totales del día.`)) return;
+  const btn = pie.querySelector(enviar ? '.btn-enviar-receta' : '.btn-prov-receta');
   const textoOriginal = btn.textContent;
   btn.disabled = true; btn.textContent = 'Guardando...';
+  const cuerpo = {
+    fecha, receta, items,
+    borrar: vaciadas.map(tr => tr.dataset.ingrediente),
+    total: { cantidad: totalVal, unidad: unidadTxt }
+  };
   try{
-    await postJSON({ action: 'registrarTrazabilidadCocinaLote', fecha, items: pendientes.map(p => p.item) });
-    pendientes.forEach(p => marcarFilaGuardada(p.tr));
+    await postJSON(Object.assign({ action: enviar ? 'finalizarRecetaCocina' : 'registrarTrazabilidadCocinaLote' }, cuerpo));
     const hora = horaCorta();
-    const guardados = document.querySelectorAll('#contenidoRegistro tr[data-relleno].fila-guardada').length;
-    const aviso = pendientes.length ? `${pendientes.length} insumo(s) nuevos guardados` : 'no había nada nuevo para guardar';
-    avisar(`✓ Guardado provisorio · ${hora} — ${aviso}.`);
-    msg.className = 'msg ok';
-    msg.textContent = `✓ Guardado provisorio a las ${hora}: ${aviso}. En pantalla hay ${guardados} insumo(s) guardados. Podés seguir cargando.`;
+    if(enviar){
+      avisar(`✓ "${receta}" enviada · ${hora} — ${items.length} insumo(s), total ${totalVal} ${unidadTxt}.`);
+      pintarRegistroCocinaSector();
+    } else {
+      conDato.forEach(marcarFilaGuardada);
+      vaciadas.forEach(marcarFilaBorrada);
+      if(totalVal){ pie.dataset.guardado = '1'; ponerSello(pie, hora); } else { marcarFilaBorrada(pie); }
+      pie.classList.remove('fila-pendiente');
+      avisar(`✓ Guardado provisorio de "${receta}" · ${hora} — ${items.length} insumo(s)${totalVal ? `, total ${totalVal} ${unidadTxt}` : ''}.`);
+      msg.className = 'msg ok';
+      msg.textContent = `✓ "${receta}" guardada (provisorio) a las ${hora}. Podés seguir cargando.`;
+    }
   }catch(err){
-    msg.className = 'msg err'; msg.textContent = '✗ NO se guardó: ' + err.message + ' — revisá la conexión y probá de nuevo.';
-    avisar('✗ NO se guardó — ' + err.message, 'err');
+    msg.className = 'msg err'; msg.textContent = '✗ NO se guardó "' + receta + '": ' + err.message;
+    avisar('✗ NO se guardó "' + receta + '" — ' + err.message, 'err');
   }finally{
-    btn.disabled = false; btn.textContent = textoOriginal;
-  }
-}
-
-async function guardarItemCocina(tr, fecha){
-  const btn = tr.querySelector('.btn-guardar-item');
-  const inputBruto = tr.querySelector('.inp-bruto-real');
-  const inputRinde = tr.querySelector('.inp-rinde-real');
-  const cantidadBrutoReal = inputBruto ? inputBruto.value : '';
-  const rindeReal = inputRinde ? inputRinde.value : '';
-  if(!cantidadBrutoReal && !rindeReal){
-    alert('Cargá el bruto real antes de guardar.');
-    return;
-  }
-  btn.disabled = true; btn.textContent = 'Guardando...';
-  try{
-    const r = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({
-        action: 'registrarTrazabilidadCocinaItem',
-        fecha, relleno: tr.dataset.relleno, ingrediente: tr.dataset.ingrediente,
-        cantidadBrutoReal, rindeReal
-      })
-    });
-    const data = await r.json();
-    if(data.error) throw new Error(data.error);
-    marcarFilaGuardada(tr);
-    avisar(`✓ Guardado: ${tr.dataset.ingrediente} (${tr.dataset.relleno}) · ${horaCorta()}`);
-  }catch(err){
-    btn.disabled = false; btn.textContent = 'Guardar';
-    alert('No se pudo guardar: ' + err.message);
-  }
-}
-
-// "Enviar final" de una receta completa (Relleno/Preparado/Dip/Postre): a
-// partir de ahí sus insumos entran al informe de "Totales del día" y su
-// tabla queda bloqueada entera. "Reabrir" la vuelve a abrir. Ambas
-// simplemente vuelven a pintar todo el sector para que quede consistente
-// con lo que ya haya guardado por ingrediente.
-async function finalizarReceta(receta, fecha){
-  if(!confirm(`¿Guardar y enviar "${receta}"? Se guardan los insumos que falten, se bloquea toda su tabla y entra al informe de Totales del día.`)) return;
-  const pendientes = insumosCocinaPendientes(receta);
-  try{
-    const data = await postJSON({ action: 'finalizarRecetaCocina', fecha, receta, items: pendientes.map(p => ({ ingrediente: p.item.ingrediente, cantidadBrutoReal: p.item.cantidadBrutoReal, rindeReal: p.item.rindeReal })) });
-    const extra = pendientes.length ? ` (se guardaron ${pendientes.length} insumo(s) que faltaban)` : '';
-    avisar(`✓ "${receta}" enviada · ${horaCorta()}${extra}.`);
-    pintarRegistroCocinaSector();
-  }catch(err){
-    avisar('✗ NO se envió "' + receta + '" — ' + err.message, 'err');
+    if(document.body.contains(btn)){ btn.disabled = false; btn.textContent = textoOriginal; }
   }
 }
 
@@ -1855,44 +1891,39 @@ async function cargarInformeStockLocal(){
       </div>`;
 
     const uc = data.ultimaCarga;
-    // "Cargado el": si el dato de un producto es de una carga ANTERIOR a la
-    // última del local (no se cargó en la última), se marca en ámbar.
-    const celdaCargado = (it) => {
-      if(!it.fechaCarga) return '<td style="color:var(--ink-soft);">—</td>';
-      if(it.desactualizado) return `<td class="dato-viejo">${fmtFecha(it.fechaCarga)} — no se cargó el ${fmtFecha(uc.fecha)}</td>`;
-      return `<td style="color:var(--ink-soft);">${fmtFecha(it.fechaCarga)}</td>`;
-    };
-    let viejos = 0;
+    // Cuenta SOLO la carga del día consultado o la de la noche anterior; lo
+    // que no figura en ella es 0 (mismo criterio que la orden de envío y
+    // "Ver qué producir hoy").
+    let enCero = 0;
     const bloques = nombresCategorias.map(cat => {
       const items = categorias[cat];
       const filas = items.map(it => {
-        if(it.desactualizado) viejos++;
         if(it.lotes.length === 0){
-          return `<tr><td>${it.sabor}</td><td colspan="2" style="color:var(--ink-soft);font-style:italic;">${it.ceroEnCargaEnviada ? '0 — no figura en la carga enviada' : 'sin stock cargado'}</td>${celdaCargado(it)}</tr>`;
+          enCero++;
+          return `<tr><td>${it.sabor}</td><td class="num" style="color:var(--ink-soft);">0</td><td style="color:var(--ink-soft);font-style:italic;">${uc ? 'no figura en la carga' : '—'}</td></tr>`;
         }
         return it.lotes.map((l, i) => `
           <tr class="${claseFila[l.estado] || ''}">
             <td>${i === 0 ? it.sabor : `<span class="item-extra">↳ otro lote</span>`}</td>
             <td class="num">${ent(l.cantidad)}</td>
             <td>${fmtFecha(l.vencimiento)}</td>
-            ${i === 0 ? celdaCargado(it) : '<td></td>'}
           </tr>`).join('');
       }).join('');
       return `
         <h4 class="cat-heading">${cat}</h4>
         <table class="prod">
-          <thead><tr><th>Producto</th><th class="num">Cantidad (${data.unidad || 'unidades'})</th><th>Vencimiento</th><th>Cargado el</th></tr></thead>
+          <thead><tr><th>Producto</th><th class="num">Cantidad (${data.unidad || 'unidades'})</th><th>Vencimiento</th></tr></thead>
           <tbody>${filas}</tbody>
         </table>`;
     }).join('');
 
     const resumenCarga = uc
       ? `<div class="resumen-carga">
-          <strong>Última carga de ${LOCAL_INFORME_ACTIVO}: ${fmtFecha(uc.fecha)}</strong>${uc.responsable ? ` · por ${uc.responsable}` : ''} · ${uc.productos} producto(s) cargado(s)
-          · ${uc.enviada ? `✓ enviada${uc.hora ? ' a las ' + uc.hora : ''}` : 'sin "Guardar y enviar" (puede estar incompleta)'}
-          ${viejos ? `<div class="dato-viejo" style="margin-top:6px;padding:6px 8px;border-radius:3px;">⚠ ${viejos} producto(s) no se cargaron el ${fmtFecha(uc.fecha)}: se muestra su último dato, de una carga anterior (marcados en ámbar).</div>` : ''}
+          <strong>Carga que cuenta: ${fmtFecha(uc.fecha)}</strong>${uc.responsable ? ` · por ${uc.responsable}` : ''} · ${uc.productos} producto(s) cargado(s)
+          · ${uc.enviada ? `✓ enviada${uc.hora ? ' a las ' + uc.hora : ''}` : 'sin "Guardar y enviar final"'}
+          ${enCero ? `<div style="margin-top:6px;color:var(--ink-soft);">${enCero} producto(s) no figuran en esa carga → cuentan como 0.</div>` : ''}
         </div>`
-      : `<div class="resumen-carga">${LOCAL_INFORME_ACTIVO} todavía no tiene ninguna carga de stock hasta el ${fmtFecha(fecha)}.</div>`;
+      : `<div class="resumen-carga dato-viejo" style="padding:10px 12px;">⚠ ${LOCAL_INFORME_ACTIVO} no cargó stock el ${fmtFecha(fecha)} ni el día anterior — todo cuenta como 0.${data.cargaVieja ? ` Su última carga fue el ${fmtFecha(data.cargaVieja)} (ya no se usa).` : ''}</div>`;
 
     cont.innerHTML = `
       <h2 style="font-size:18px;margin:0 0 6px;">Análisis de stock — ${LOCAL_INFORME_ACTIVO}</h2>
@@ -1979,7 +2010,7 @@ function crearTablaRegistroProduccion(){
 function filaRegistroProduccion(etiqueta, saborKey, aHacerMostrar, etiquetaExtra, usaResponsable, empleados, guardado, bloqueadoGlobal){
   const g = guardado || {};
   const yaGuardado = !!guardado;
-  const bloqueado = bloqueadoGlobal || yaGuardado;
+  const bloqueado = bloqueadoGlobal; // sin Guardar/Editar por fila: siempre editable hasta el envío final
   const dis = bloqueado ? 'disabled' : '';
   const celdaMaquina = usaResponsable
     ? `<select class="inp-responsable-canasta" style="min-width:130px;" ${dis}>${opcionesEmpleadosSeleccion(empleados, g.responsable)}</select>`
@@ -1991,7 +2022,7 @@ function filaRegistroProduccion(etiqueta, saborKey, aHacerMostrar, etiquetaExtra
 
   const tr = document.createElement('tr');
   tr.dataset.sabor = saborKey;
-  if(bloqueado) tr.classList.add('fila-guardada');
+  if(yaGuardado) tr.classList.add('fila-guardada');
   tr.innerHTML = `
     <td>${etiqueta}${etiquetaExtra || ''}</td>
     <td class="num" style="color:var(--ink-soft);">${aHacerMostrar != null ? ent(aHacerMostrar) : '—'}</td>
@@ -2006,15 +2037,11 @@ function filaRegistroProduccion(etiqueta, saborKey, aHacerMostrar, etiquetaExtra
     <td><input type="time" class="inp-hora-fin" value="${g.horaFin || ''}" ${dis}></td>
     <td><input type="number" min="0" step="1" class="inp-total-prod" style="width:80px;" value="${g.totalProduccion || ''}" ${dis}></td>
     <td><input type="number" min="0" step="1" class="inp-discos-danados" style="width:64px;" value="${g.discosDanados || ''}" ${dis}></td>
-    <td class="no-print" style="white-space:nowrap;">${bloqueadoGlobal ? '' : `
-      <button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;${yaGuardado ? 'display:none;' : ''}">Guardar</button>
-      <button type="button" class="btn secondary btn-editar-item" style="font-size:12px;padding:5px 9px;${yaGuardado ? '' : 'display:none;'}">Editar</button>
-    `}</td>
+    <td class="no-print celda-estado" style="white-space:nowrap;"></td>
   `;
-  if(!bloqueadoGlobal){
-    tr.querySelector('.btn-guardar-item').onclick = () => guardarItemTrazabilidad(tr);
-    tr.querySelector('.btn-editar-item').onclick = () => habilitarEdicionFila(tr);
-    if(yaGuardado) ponerSello(tr, null);
+  if(yaGuardado){
+    tr.dataset.guardado = '1';
+    ponerSello(tr, null);
   }
   return tr;
 }
@@ -2064,7 +2091,7 @@ async function pintarRegistroProduccionSector(){
 
   const intro = document.createElement('p');
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
-  intro.textContent = `${data.dia}, ${fmtFecha(data.fecha)} — completá solo los sabores que se armaron este turno. "A producir (calc.)" es de referencia (en Extras de producción es lo que hace falta dejar armado HOY para mañana). Guardá cada sabor con su botón apenas lo termines (no hace falta esperar al final del turno); tocá "Editar" si necesitás corregir algo ya guardado. Los puestos y las observaciones se guardan con los botones de abajo ("Guardado provisorio" o "Guardar y enviar").`;
+  intro.textContent = `${data.dia}, ${fmtFecha(data.fecha)} — completá solo los sabores que se armaron este turno. "A producir (calc.)" es de referencia (en Extras de producción es lo que hace falta dejar armado HOY para mañana). Guardá con "Guardado provisorio" las veces que quieras durante el turno (todo queda editable) y al terminar tocá "Guardar y enviar final". Si se elaboró algo que no está en la lista, agregalo en "Producción adicional".`;
   cont.appendChild(intro);
 
   if(bloqueadoGlobal){
@@ -2073,9 +2100,11 @@ async function pintarRegistroProduccionSector(){
     aviso.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px;';
     const horaCierre = estado.cierre && estado.cierre.hora ? ` a las ${estado.cierre.hora}` : '';
     const itemsCierre = estado.cierre && estado.cierre.items ? ` — ${estado.cierre.items} ítem(s) guardado(s)` : '';
-    aviso.innerHTML = `<span>✓ Turno enviado${horaCierre}${itemsCierre} — todo el registro de Producción de este día quedó bloqueado.</span><button type="button" class="btn secondary" id="btnReabrirTurno" style="font-size:12px;padding:5px 9px;">Reabrir</button>`;
+    const puedeReabrir = !(estado.cierre && estado.cierre.puedeReabrir === false);
+    aviso.innerHTML = `<span>✓ Turno enviado${horaCierre}${itemsCierre} — todo el registro de Producción de este día quedó bloqueado.${puedeReabrir ? '' : ' (Solo se puede reabrir el último turno enviado.)'}</span>${puedeReabrir ? '<button type="button" class="btn secondary" id="btnReabrirTurno" style="font-size:12px;padding:5px 9px;">Reabrir</button>' : ''}`;
     cont.appendChild(aviso);
-    cont.querySelector('#btnReabrirTurno').onclick = () => reabrirTurnoProduccion(fecha);
+    const bRe = cont.querySelector('#btnReabrirTurno');
+    if(bRe) bRe.onclick = () => reabrirTurnoProduccion(fecha);
   }
 
   cont.appendChild(bloquePuestosMaquina('Máquina 1', 'm1', EMPLEADOS_REGISTRO, estado.maquina1, bloqueadoGlobal));
@@ -2135,6 +2164,39 @@ async function pintarRegistroProduccionSector(){
   });
   cont.appendChild(wrap3);
 
+  // --- Producción adicional: cualquier producto que se elaboró aunque el
+  // cálculo del día no lo pidiera (o que no está en las listas de arriba).
+  const yaListados = new Set([...cont.querySelectorAll('tr[data-sabor]')].map(tr => tr.dataset.sabor));
+  const h4 = document.createElement('h4');
+  h4.className = 'cat-heading';
+  h4.textContent = 'Producción adicional (fuera del cálculo del día)';
+  cont.appendChild(h4);
+  const { wrap: wrap4, tbody: tbody4 } = crearTablaRegistroProduccion();
+  // lo adicional ya guardado hoy
+  Object.keys(guardadoPorSabor).filter(k => !yaListados.has(k)).sort(compararTexto).forEach(k => {
+    tbody4.appendChild(filaRegistroProduccion(k, k, null, '', true, EMPLEADOS_REGISTRO, guardadoPorSabor[k], bloqueadoGlobal));
+  });
+  cont.appendChild(wrap4);
+  if(!bloqueadoGlobal){
+    const todos = Object.values(categorias).flat().sort(compararTexto);
+    const selWrap = document.createElement('div');
+    selWrap.className = 'fila-agregar no-print';
+    selWrap.innerHTML = `
+      <select id="selAgregarProduccion"><option value="">— Elegí un producto para agregar —</option>
+        ${todos.map(n => `<option value="${n}">${n}</option>`).join('')}</select>
+      <button type="button" class="btn secondary" id="btnAgregarProduccion">+ Agregar</button>`;
+    cont.appendChild(selWrap);
+    selWrap.querySelector('#btnAgregarProduccion').onclick = () => {
+      const n = selWrap.querySelector('#selAgregarProduccion').value;
+      if(!n) return;
+      const clave = yaListados.has(n) || [...tbody4.querySelectorAll('tr[data-sabor]')].some(tr => tr.dataset.sabor === n)
+        ? n + ' (adicional)' : n;
+      if([...tbody4.querySelectorAll('tr[data-sabor]')].some(tr => tr.dataset.sabor === clave)){ avisar('Ese producto ya está agregado abajo.', 'err'); return; }
+      tbody4.appendChild(filaRegistroProduccion(clave, clave, null, '', true, EMPLEADOS_REGISTRO, null, false));
+    };
+  }
+
+  seguirCambios(cont);
   const obsWrap = document.createElement('div');
   obsWrap.className = 'field-row';
   obsWrap.style.cssText = 'max-width:640px;margin-top:18px;';
@@ -2146,8 +2208,8 @@ async function pintarRegistroProduccionSector(){
 
   if(!bloqueadoGlobal){
     const actions = document.createElement('div');
-    actions.innerHTML = htmlBarraFinal('btnProvisorioRegistro', 'btnGuardarRegistro', 'Guardar y enviar registro del turno',
-      '<strong>Guardado provisorio</strong>: guarda puestos, observaciones y todos los sabores cargados, y se puede seguir cargando durante el turno. <strong>Guardar y enviar</strong>: guarda todo y cierra el turno (queda bloqueado; se destraba con "Reabrir").');
+    actions.innerHTML = htmlBarraFinal('btnProvisorioRegistro', 'btnGuardarRegistro', 'Guardar y enviar final',
+      '<strong>Guardado provisorio</strong>: guarda puestos, observaciones y todos los sabores cargados, y se puede seguir cargando durante el turno. <strong>Guardar y enviar final</strong>: guarda todo y cierra el turno (queda bloqueado; se puede reabrir solo el último turno enviado).');
     cont.appendChild(actions);
     document.getElementById('btnProvisorioRegistro').onclick = () => guardarRegistroProduccion(false);
     document.getElementById('btnGuardarRegistro').onclick = () => guardarRegistroProduccion(true);
@@ -2177,45 +2239,6 @@ function leerFilaSabor(tr){
   };
 }
 
-// re-habilita una fila ya guardada (Producción o Cocina) para corregirla —
-// al volver a tocar "Guardar" se pisa la misma fila en la planilla, no se
-// duplica (ver upsertFila en Code.gs).
-function habilitarEdicionFila(tr){
-  const sello = tr.querySelector('.sello-guardado');
-  if(sello) sello.remove();
-  tr.classList.remove('fila-guardada');
-  [...tr.querySelectorAll('input,select')].forEach(el => el.disabled = false);
-  const btnGuardar = tr.querySelector('.btn-guardar-item');
-  if(btnGuardar){ btnGuardar.disabled = false; btnGuardar.textContent = 'Guardar'; btnGuardar.style.display = ''; }
-  const btnEditar = tr.querySelector('.btn-editar-item');
-  if(btnEditar) btnEditar.style.display = 'none';
-}
-
-// "preguardar" un sabor apenas se termina, sin esperar al cierre del turno.
-async function guardarItemTrazabilidad(tr){
-  const fecha = document.getElementById('fechaRegistro').value;
-  const item = leerFilaSabor(tr);
-  if(!item.totalProduccion || Number(item.totalProduccion) <= 0){
-    alert('Cargá el total producido de este sabor antes de guardarlo.');
-    return;
-  }
-  const btn = tr.querySelector('.btn-guardar-item');
-  btn.disabled = true; btn.textContent = 'Guardando...';
-  try{
-    await postJSON({ action: 'registrarTrazabilidadItem', fecha, item });
-    marcarFilaGuardada(tr);
-    avisar(`✓ Guardado: ${tr.cells[0].textContent.trim()} — ${item.totalProduccion} producidas · ${horaCorta()}`);
-  }catch(err){
-    btn.disabled = false; btn.textContent = 'Guardar';
-    alert('No se pudo guardar este sabor: ' + err.message);
-  }
-}
-
-// cierre del turno: guarda los puestos + observaciones (una vez), cualquier
-// sabor que haya quedado sin guardar con su botón individual, y bloquea todo
-// el registro de Producción de ese día (ver "Bloqueo total al guardar el
-// registro final del turno" — Tanda 3). Se destraba puntualmente con
-// "Reabrir" (reabrirTurnoProduccion). Confirmado con Carolina (26/09/2026).
 async function guardarRegistroProduccion(enviar){
   const fecha = document.getElementById('fechaRegistro').value;
   const msg = document.getElementById('msgRegistro');
@@ -2230,15 +2253,15 @@ async function guardarRegistroProduccion(enviar){
   const maquina2 = leerMaquina('m2');
   const observaciones = document.getElementById('inpObservacionesRegistro').value.trim();
 
-  // sabores que NO se guardaron con su botón (o que se reabrieron con Editar).
-  // Si una fila tiene datos pero no el total producido, se avisa cuál.
-  const filas = [...document.querySelectorAll('table.traza tbody tr[data-sabor]:not(.fila-guardada)')];
-  const conTotal = [], sinTotal = [];
+  // TODAS las filas: con total -> se guardan; con datos pero sin total -> se
+  // avisa; guardadas y ahora vacías -> se borran de la planilla.
+  const filas = [...document.querySelectorAll('table.traza tbody tr[data-sabor]')];
+  const conTotal = [], sinTotal = [], vaciadas = [];
   filas.forEach(tr => {
     const it = leerFilaSabor(tr);
     if(it.totalProduccion && Number(it.totalProduccion) > 0){ conTotal.push(tr); return; }
-    const algo = [...tr.querySelectorAll('input,select')].some(el => el.value && el.value.trim() !== '');
-    if(algo) sinTotal.push(tr.cells[0].textContent.trim());
+    if(filaTieneDatos(tr)) sinTotal.push(tr.cells[0].textContent.trim());
+    else if(tr.dataset.guardado) vaciadas.push(tr);
   });
   if(enviar && sinTotal.length){
     msg.className = 'msg err';
@@ -2246,14 +2269,16 @@ async function guardarRegistroProduccion(enviar){
     avisar('✗ No se envió: hay sabores sin total producido (ver abajo).', 'err');
     return;
   }
-  if(enviar && !confirm('¿Guardar y enviar el registro del turno? Se va a bloquear todo el registro de Producción de este día — vas a poder destrabarlo con "Reabrir" si hace falta corregir algo.')) return;
+  if(enviar && !confirm('¿Guardar y enviar final el registro del turno? Se va a bloquear todo el registro de Producción de este día.')) return;
   const items = conTotal.map(leerFilaSabor);
 
   const btn = document.getElementById(enviar ? 'btnGuardarRegistro' : 'btnProvisorioRegistro');
   const textoOriginal = btn.textContent;
   btn.disabled = true; btn.textContent = 'Guardando...';
   try{
-    const data = await postJSON({ action: 'registrarTrazabilidadProduccion', fecha, maquina1, maquina2, observaciones, items, provisorio: !enviar });
+    const borrar = vaciadas.map(tr => tr.dataset.sabor);
+    const data = await postJSON({ action: 'registrarTrazabilidadProduccion', fecha, maquina1, maquina2, observaciones, items, borrar, provisorio: !enviar });
+    vaciadas.forEach(marcarFilaBorrada);
     const hora = horaCorta();
     if(enviar){
       avisar(`✓ Turno enviado · ${hora} — ${data.total_dia} ítem(s) de producción guardados.`);
@@ -2318,7 +2343,7 @@ async function pintarRegistroDiscosSector(){
   cont.innerHTML = '';
   const intro = document.createElement('p');
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
-  intro.textContent = 'Registro simple de discos por tipo — responsable y cantidad usada hoy. Guardá cada tipo con su botón (o todo junto con los botones de abajo); tocá "Editar" si necesitás corregir algo ya guardado.';
+  intro.textContent = 'Registro simple de discos por tipo — responsable y cantidad usada hoy. Guardá con "Guardado provisorio" las veces que quieras y al terminar "Guardar y enviar final".';
   cont.appendChild(intro);
 
   const wrap = document.createElement('div');
@@ -2332,31 +2357,25 @@ async function pintarRegistroDiscosSector(){
   TIPOS_DISCO.forEach(tipo => {
     const g = guardadoPorTipo[tipo];
     const yaGuardado = !!g;
-    const dis = yaGuardado ? 'disabled' : '';
     const tr = document.createElement('tr');
     tr.dataset.tipo = tipo;
-    if(yaGuardado) tr.classList.add('fila-guardada');
     tr.innerHTML = `
       <td>${tipo}</td>
-      <td><select class="inp-responsable-disco" ${dis}>${opcionesEmpleadosSeleccion(EMPLEADOS_REGISTRO, g ? g.responsable : '')}</select></td>
-      <td><input type="number" min="0" step="1" class="inp-cantidad-disco" style="width:90px;" value="${g ? g.cantidad : ''}" ${dis}></td>
-      <td class="no-print" style="white-space:nowrap;">
-        <button type="button" class="btn secondary btn-guardar-disco" style="font-size:12px;padding:5px 9px;${yaGuardado ? 'display:none;' : ''}">Guardar</button>
-        <button type="button" class="btn secondary btn-editar-disco" style="font-size:12px;padding:5px 9px;${yaGuardado ? '' : 'display:none;'}">Editar</button>
-      </td>
+      <td><select class="inp-responsable-disco">${opcionesEmpleadosSeleccion(EMPLEADOS_REGISTRO, g ? g.responsable : '')}</select></td>
+      <td><input type="number" min="0" step="1" class="inp-cantidad-disco" style="width:90px;" value="${g ? g.cantidad : ''}"></td>
+      <td class="no-print celda-estado" style="white-space:nowrap;"></td>
     `;
-    tr.querySelector('.btn-guardar-disco').onclick = () => guardarItemDiscos(tr, fecha);
-    tr.querySelector('.btn-editar-disco').onclick = () => habilitarEdicionFilaDiscos(tr);
-    if(yaGuardado) ponerSello(tr, null);
+    if(yaGuardado){ tr.dataset.guardado = '1'; tr.classList.add('fila-guardada'); ponerSello(tr, null); }
     tbody.appendChild(tr);
   });
   wrap.appendChild(table);
   cont.appendChild(wrap);
+  seguirCambios(table);
 
   // ya enviado: todo bloqueado + Reabrir; si no, los 2 botones finales
   if(estado.cierre){
     bloquearFilasEnviadas(table);
-    cont.insertBefore(cartelEnviado(estado.cierre, 'Registro de discos', async () => {
+    cont.insertBefore(cartelEnviado(estado.cierre, 'Registro de discos', estado.cierre.puedeReabrir === false ? null : async () => {
       if(!confirm('¿Reabrir el registro de discos de este día? Se va a destrabar para corregir.')) return;
       try{
         await postJSON({ action: 'reabrirCarga', pantalla: 'Discos', fecha, clave: 'Discos' });
@@ -2366,7 +2385,7 @@ async function pintarRegistroDiscosSector(){
     }), wrap);
   } else {
     const barra = document.createElement('div');
-    barra.innerHTML = htmlBarraFinal('btnProvisorioDiscos', 'btnEnviarDiscos', 'Guardar y enviar discos');
+    barra.innerHTML = htmlBarraFinal('btnProvisorioDiscos', 'btnEnviarDiscos', 'Guardar y enviar final');
     cont.appendChild(barra);
     document.getElementById('btnProvisorioDiscos').onclick = () => guardarTodoDiscos(fecha, false);
     document.getElementById('btnEnviarDiscos').onclick = () => guardarTodoDiscos(fecha, true);
@@ -2376,9 +2395,10 @@ async function pintarRegistroDiscosSector(){
 async function guardarTodoDiscos(fecha, enviar){
   const msg = document.getElementById('msgRegistro');
   msg.className = 'msg'; msg.textContent = '';
-  const filas = [...document.querySelectorAll('#contenidoRegistro tr[data-tipo]:not(.fila-guardada)')];
+  const filas = [...document.querySelectorAll('#contenidoRegistro tr[data-tipo]')];
   const conCantidad = filas.filter(tr => Number(tr.querySelector('.inp-cantidad-disco').value) > 0);
-  if(enviar && !confirm('¿Guardar y enviar el registro de discos de este día? Queda bloqueado (se puede reabrir si hace falta corregir).')) return;
+  const vaciadas = filas.filter(tr => tr.dataset.guardado && !(Number(tr.querySelector('.inp-cantidad-disco').value) > 0));
+  if(enviar && !confirm('¿Guardar y enviar final el registro de discos de este día? Queda bloqueado.')) return;
   const items = conCantidad.map(tr => ({
     tipo: tr.dataset.tipo,
     responsable: tr.querySelector('.inp-responsable-disco').value,
@@ -2388,8 +2408,9 @@ async function guardarTodoDiscos(fecha, enviar){
   const textoOriginal = btn.textContent;
   btn.disabled = true; btn.textContent = 'Guardando...';
   try{
-    const data = await postJSON({ action: 'registrarTrazabilidadDiscosLote', fecha, items, enviar: !!enviar });
+    const data = await postJSON({ action: 'registrarTrazabilidadDiscosLote', fecha, items, borrar: vaciadas.map(tr => tr.dataset.tipo), enviar: !!enviar });
     conCantidad.forEach(marcarFilaGuardada);
+    vaciadas.forEach(marcarFilaBorrada);
     const hora = horaCorta();
     if(enviar){
       avisar(`✓ Discos enviados · ${hora} — ${data.total_dia} tipo(s) guardados.`);
@@ -2410,48 +2431,18 @@ async function guardarTodoDiscos(fecha, enviar){
   }
 }
 
-function habilitarEdicionFilaDiscos(tr){
-  const sello = tr.querySelector('.sello-guardado');
-  if(sello) sello.remove();
-  tr.classList.remove('fila-guardada');
-  [...tr.querySelectorAll('input,select')].forEach(el => el.disabled = false);
-  const btnGuardar = tr.querySelector('.btn-guardar-disco');
-  if(btnGuardar){ btnGuardar.disabled = false; btnGuardar.textContent = 'Guardar'; btnGuardar.style.display = ''; }
-  const btnEditar = tr.querySelector('.btn-editar-disco');
-  if(btnEditar) btnEditar.style.display = 'none';
-}
-
-async function guardarItemDiscos(tr, fecha){
-  const btn = tr.querySelector('.btn-guardar-disco');
-  const responsable = tr.querySelector('.inp-responsable-disco').value;
-  const cantidad = tr.querySelector('.inp-cantidad-disco').value;
-  if(!cantidad || Number(cantidad) <= 0){
-    alert('Cargá la cantidad antes de guardar.');
-    return;
-  }
-  btn.disabled = true; btn.textContent = 'Guardando...';
-  try{
-    const r = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'registrarTrazabilidadDiscosItem', fecha, tipo: tr.dataset.tipo, responsable, cantidad })
-    });
-    const data = await r.json();
-    if(data.error) throw new Error(data.error);
-    marcarFilaGuardada(tr);
-    avisar(`✓ Guardado: discos ${tr.dataset.tipo} — ${cantidad} · ${horaCorta()}`);
-  }catch(err){
-    btn.disabled = false; btn.textContent = 'Guardar';
-    alert('No se pudo guardar: ' + err.message);
-  }
-}
-
 /* ---------------------------------------------------------------------
    Pantalla ENVÍOS (Fábrica): cuánto mandarle hoy a cada local
    --------------------------------------------------------------------- */
 const LOCALES_VENTA = LOCALES.slice(0, 3); // Centro, Patagonia, Zelarrayan — sin sectores de Fábrica
 let TAB_ENVIO_ACTIVO = LOCALES_VENTA[0];
+let TRASPASO_ORIGEN = LOCALES_VENTA[0];
+let TRASPASO_DESTINO = LOCALES_VENTA[1];
+let DATOS_ENVIOS = null; // lo último que se leyó para la fecha (para repintar el traspaso)
 
 function cssId(local){ return local.replace(/[^a-zA-Z0-9]/g, ''); }
+// clave de un despacho: el local (fábrica → local) o "Origen>Destino" (traspaso)
+function claveDespacho(origen, destino){ return origen ? `${origen}>${destino}` : destino; }
 
 async function renderEnvios(){
   app.innerHTML = `
@@ -2477,11 +2468,11 @@ async function renderEnvios(){
         <select id="inpAcompananteEnvio"><option value="">Cargando…</option></select>
       </div>
     </div>
-    <p style="color:var(--ink-soft);font-size:12.5px;max-width:560px;">
-      Están listados todos los productos, igual que en "Cargar stock" — completá "Enviado (real)" y
-      vencimiento solo en lo que mandás hoy. La columna "Orden calculada" es de referencia (venta
-      proyectada de ese local menos lo que ya tiene cargado). Si un mismo producto sale con más de un
-      vencimiento, usá el botón <strong>+</strong> de esa fila para agregar otra línea.
+    <p style="color:var(--ink-soft);font-size:12.5px;max-width:600px;">
+      Completá "Enviado (real)" y vencimiento solo en lo que mandás hoy. "Orden calculada" es de referencia
+      (venta proyectada de ese local menos su stock cargado). Si un producto sale con más de un vencimiento,
+      usá el botón <strong>+</strong>. En <strong>Traspaso entre locales</strong> se carga la mercadería que
+      fábrica retira de un local para llevarla a otro.
     </p>
     <div class="tabs" id="tabsEnvios" style="display:none;"></div>
     <div id="contenidoEnvios" class="loading">Calculando…</div>
@@ -2504,14 +2495,16 @@ async function cargarEnvios(){
       fetch(`${APPS_SCRIPT_URL}?action=calcularEnvios&fecha=${fecha}`),
       obtenerCategorias(),
       obtenerEmpleados(),
-      fetch(`${APPS_SCRIPT_URL}?action=obtenerEnviosDia&fecha=${fecha}`).then(x => x.json()).catch(() => ({}))
+      fetch(`${APPS_SCRIPT_URL}?action=obtenerEnviosDia&fecha=${fecha}`).then(x => x.json())
     ]);
     const data = await r.json();
     if(data.error) throw new Error(data.error);
-    // lo ya guardado hoy (para no arrancar en blanco al recargar)
-    const guardadoPorLocal = (rGuardado && !rGuardado.error && rGuardado.porLocal) || {};
+    if(rGuardado.error) throw new Error(rGuardado.error);
     if(document.getElementById('fechaEnvios').value !== fecha) return; // cambió la fecha mientras cargaba
-    const conDatos = LOCALES_VENTA.map(l => guardadoPorLocal[l]).find(g => g && g.responsable) || {};
+    const guardadoPorLocal = rGuardado.porLocal || {};
+    const traspasos = rGuardado.traspasos || {};
+    DATOS_ENVIOS = { fecha, data, categorias, traspasos };
+    const conDatos = LOCALES_VENTA.map(l => guardadoPorLocal[l]).concat(Object.values(traspasos)).find(g => g && g.responsable) || {};
 
     document.getElementById('inpResponsableEnvio').innerHTML = opcionesEmpleadosSeleccion(empleados, conDatos.responsable);
     document.getElementById('inpRepartidorEnvio').innerHTML = opcionesEmpleadosSeleccion(empleados, conDatos.repartidor);
@@ -2519,168 +2512,188 @@ async function cargarEnvios(){
 
     const tabs = document.getElementById('tabsEnvios');
     tabs.style.display = 'flex';
-    tabs.innerHTML = LOCALES_VENTA.map(l => `<button class="tab-btn ${l===TAB_ENVIO_ACTIVO?'active':''}" data-local="${l}">${l}${guardadoPorLocal[l] && guardadoPorLocal[l].cierre ? ' ✓' : ''}</button>`).join('');
-    [...tabs.querySelectorAll('.tab-btn')].forEach(b => {
-      b.onclick = () => {
-        TAB_ENVIO_ACTIVO = b.dataset.local;
-        [...tabs.querySelectorAll('.tab-btn')].forEach(x => x.classList.toggle('active', x.dataset.local === TAB_ENVIO_ACTIVO));
-        [...document.querySelectorAll('.panel-envio-local')].forEach(p => p.style.display = (p.dataset.local === TAB_ENVIO_ACTIVO ? '' : 'none'));
-      };
-    });
+    const pestañas = LOCALES_VENTA.map(l => ({ id: l, texto: l + (guardadoPorLocal[l] && guardadoPorLocal[l].cierre ? ' ✓' : '') }))
+      .concat([{ id: 'traspaso', texto: 'Traspaso entre locales' }]);
+    tabs.innerHTML = pestañas.map(p => `<button class="tab-btn ${p.id===TAB_ENVIO_ACTIVO?'active':''}" data-tab="${p.id}">${p.texto}</button>`).join('');
+    const mostrar = () => {
+      [...tabs.querySelectorAll('.tab-btn')].forEach(x => x.classList.toggle('active', x.dataset.tab === TAB_ENVIO_ACTIVO));
+      [...cont.querySelectorAll(':scope > .panel-tab')].forEach(p => p.style.display = (p.dataset.tab === TAB_ENVIO_ACTIVO ? '' : 'none'));
+    };
+    [...tabs.querySelectorAll('.tab-btn')].forEach(b => { b.onclick = () => { TAB_ENVIO_ACTIVO = b.dataset.tab; mostrar(); }; });
 
     cont.className = '';
     cont.innerHTML = '';
     LOCALES_VENTA.forEach(local => {
-      cont.appendChild(pintarEnvioLocal(local, data.envios[local] || [], data, categorias, guardadoPorLocal[local] || {}));
+      const wrap = document.createElement('div');
+      wrap.className = 'panel-tab'; wrap.dataset.tab = local;
+      wrap.appendChild(pintarPanelEnvio({ origen: '', destino: local, itemsCalculados: data.envios[local] || [], data, categorias, guardado: guardadoPorLocal[local] || {} }));
+      cont.appendChild(wrap);
     });
-    [...document.querySelectorAll('.panel-envio-local')].forEach(p => p.style.display = (p.dataset.local === TAB_ENVIO_ACTIVO ? '' : 'none'));
-
-    LOCALES_VENTA.forEach(local => {
-      const btn = document.getElementById(`btnGuardarEnvio-${cssId(local)}`);
-      if(btn) btn.onclick = () => guardarEnvio(local, fecha, true);
-      const btnProv = document.getElementById(`btnProvisorioEnvio-${cssId(local)}`);
-      if(btnProv) btnProv.onclick = () => guardarEnvio(local, fecha, false);
-      const btnImprimir = document.getElementById(`btnImprimirEnvio-${cssId(local)}`);
-      if(btnImprimir) btnImprimir.onclick = () => imprimirOrdenEnvio(local, fecha);
-    });
+    const wrapT = document.createElement('div');
+    wrapT.className = 'panel-tab'; wrapT.dataset.tab = 'traspaso';
+    cont.appendChild(wrapT);
+    pintarTraspaso(wrapT);
+    mostrar();
   }catch(err){
-    cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo calcular: ${err.message}</div>`;
+    cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo calcular: ${err.message} <button class="btn secondary" style="font-size:12px;padding:5px 9px;margin-left:8px;" onclick="cargarEnvios()">Reintentar</button></div>`;
   }
 }
 
-// una fila por producto (todos, siempre visibles); el botón "+" agrega otra
-// fila del MISMO producto para cargar un segundo lote con otro vencimiento —
-// mismo patrón que "Cargar stock". Cada fila tiene su propio Guardar/Editar,
-// igual que en Registrar producción.
-function filaEnvio(nombre, ordenCalculada, esExtra, local, fecha, guardado){
+// solapa "Traspaso entre locales": elegir de dónde sale y a dónde va
+function pintarTraspaso(wrap){
+  const { fecha, data, categorias, traspasos } = DATOS_ENVIOS;
+  if(TRASPASO_ORIGEN === TRASPASO_DESTINO) TRASPASO_DESTINO = LOCALES_VENTA.find(l => l !== TRASPASO_ORIGEN);
+  wrap.innerHTML = `
+    <div class="fab-toolbar" style="justify-content:flex-start;">
+      <div class="field-row"><label>Sale de (local)</label>
+        <select id="selTraspasoOrigen">${LOCALES_VENTA.map(l => `<option ${l === TRASPASO_ORIGEN ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+      <div class="field-row"><label>Va a (local)</label>
+        <select id="selTraspasoDestino">${LOCALES_VENTA.filter(l => l !== TRASPASO_ORIGEN).map(l => `<option ${l === TRASPASO_DESTINO ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+    </div>
+    <div class="panel-traspaso"></div>`;
+  wrap.querySelector('#selTraspasoOrigen').onchange = (e) => { TRASPASO_ORIGEN = e.target.value; pintarTraspaso(wrap); };
+  wrap.querySelector('#selTraspasoDestino').onchange = (e) => { TRASPASO_DESTINO = e.target.value; pintarTraspaso(wrap); };
+  const clave = claveDespacho(TRASPASO_ORIGEN, TRASPASO_DESTINO);
+  wrap.querySelector('.panel-traspaso').appendChild(pintarPanelEnvio({
+    origen: TRASPASO_ORIGEN, destino: TRASPASO_DESTINO, itemsCalculados: null, data, categorias, guardado: traspasos[clave] || {}
+  }));
+}
+
+// una fila por producto (todos, siempre visibles y editables); "+" agrega
+// otra fila del MISMO producto para otro vencimiento.
+function filaEnvio(nombre, ordenCalculada, esExtra, guardado, conOrden, panelEstado){
   const g = guardado || {};
-  const yaGuardado = !!guardado;
-  const dis = yaGuardado ? 'disabled' : '';
   const tr = document.createElement('tr');
   tr.dataset.item = nombre;
-  if(yaGuardado) tr.classList.add('fila-guardada');
-  // la orden calculada se guarda en la fila base (no en los "otro lote") para
-  // poder imprimir con este valor cuando todavía no se cargó nada a mano.
   tr.dataset.orden = esExtra ? 0 : (ordenCalculada || 0);
   tr.innerHTML = `
     <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : nombre}</td>
-    <td class="num" style="color:var(--ink-soft);">${esExtra ? '' : ent(ordenCalculada)}</td>
-    <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0" value="${g.cantidad || ''}" ${dis}></td>
-    <td><input type="date" class="inp-venc" value="${g.vencimiento || ''}" ${dis}></td>
+    ${conOrden ? `<td class="num" style="color:var(--ink-soft);">${esExtra ? '' : ent(ordenCalculada)}</td>` : ''}
+    <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0" value="${g.cantidad || ''}"></td>
+    <td><input type="date" class="inp-venc" value="${g.vencimiento || ''}"></td>
     <td class="col-add">${esExtra ? '' : '<button type="button" class="add-lote-btn" title="Agregar otro vencimiento para este producto">+</button>'}</td>
     <td class="col-del">${esExtra ? '<button type="button" class="del-btn" title="Quitar">✕</button>' : ''}</td>
-    <td style="white-space:nowrap;">
-      <button type="button" class="btn secondary btn-guardar-item" style="font-size:12px;padding:5px 9px;${yaGuardado ? 'display:none;' : ''}">Guardar</button>
-      <button type="button" class="btn secondary btn-editar-item" style="font-size:12px;padding:5px 9px;${yaGuardado ? '' : 'display:none;'}">Editar</button>
-    </td>
+    <td class="no-print celda-estado" style="white-space:nowrap;"></td>
   `;
   if(esExtra){
-    tr.querySelector('.del-btn').onclick = () => tr.remove();
+    tr.querySelector('.del-btn').onclick = () => {
+      if(tr.dataset.guardado) panelEstado.borrados.push({ sabor: nombre, vencimiento: tr.dataset.vencGuardado });
+      tr.remove();
+    };
   } else {
     tr.querySelector('.add-lote-btn').onclick = () => {
-      tr.insertAdjacentElement('afterend', filaEnvio(nombre, ordenCalculada, true, local, fecha));
+      tr.insertAdjacentElement('afterend', filaEnvio(nombre, ordenCalculada, true, null, conOrden, panelEstado));
     };
   }
-  tr.querySelector('.btn-guardar-item').onclick = () => guardarItemEnvio(tr, local, fecha);
-  tr.querySelector('.btn-editar-item').onclick = () => habilitarEdicionFila(tr);
-  if(yaGuardado){ tr.dataset.vencGuardado = g.vencimiento || ''; ponerSello(tr, null); }
+  if(guardado){
+    tr.dataset.guardado = '1';
+    tr.dataset.vencGuardado = g.vencimiento || '';
+    tr.classList.add('fila-guardada');
+    ponerSello(tr, g.recibido ? null : null);
+    if(g.recibido){ const s = tr.querySelector('.sello-guardado'); if(s) s.textContent = '✓ Recibido'; }
+  }
   return tr;
 }
 
-function tablaEnvioDe(items, porSabor, local, fecha, guardadosPorItem){
-  const table = document.createElement('table');
-  table.className = 'lotes';
-  table.innerHTML = `
-    <thead><tr>
-      <th>Sabor / ítem</th>
-      <th class="col-cant">Orden calculada</th>
-      <th class="col-cant">Enviado (real)</th>
-      <th class="col-venc">Vencimiento</th>
-      <th class="col-add"></th>
-      <th class="col-del"></th>
-      <th></th>
-    </tr></thead>
-    <tbody></tbody>`;
-  const tbody = table.querySelector('tbody');
-  items.forEach(nombre => {
-    const orden = (porSabor[nombre] && porSabor[nombre].aHacerUnidades) || 0;
-    const guardados = (guardadosPorItem && guardadosPorItem[nombre]) || [];
-    if(guardados.length === 0){
-      tbody.appendChild(filaEnvio(nombre, orden, false, local, fecha, null));
-    } else {
-      guardados.forEach((g, i) => tbody.appendChild(filaEnvio(nombre, orden, i > 0, local, fecha, g)));
-    }
-  });
-  return table;
-}
-
-function pintarEnvioLocal(local, itemsCalculados, data, categorias, guardado){
-  const id = cssId(local);
+function pintarPanelEnvio({ origen, destino, itemsCalculados, data, categorias, guardado }){
+  const clave = claveDespacho(origen, destino);
+  const id = cssId(clave);
+  const conOrden = !origen; // la orden calculada es solo para lo que manda fábrica
+  const porSabor = {};
+  (itemsCalculados || []).forEach(it => { porSabor[it.sabor] = it; });
   const guardadosPorItem = {};
   ((guardado && guardado.items) || []).forEach(it => {
     guardadosPorItem[it.sabor] = guardadosPorItem[it.sabor] || [];
     guardadosPorItem[it.sabor].push(it);
   });
   const cierre = guardado && guardado.cierre;
-  const porSabor = {};
-  itemsCalculados.forEach(it => { porSabor[it.sabor] = it; });
-  const nombresCategorias = Object.keys(categorias);
+  const panelEstado = { borrados: [] };
 
   const div = document.createElement('div');
   div.className = 'panel-envio-local';
-  div.dataset.local = local;
-  div.style.display = 'none';
+  div.dataset.clave = clave;
+  div._estado = panelEstado;
 
   const intro = document.createElement('p');
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
-  intro.textContent = `${data.dia}, ${fmtFecha(data.fecha)} — orden calculada para ${local}`;
+  intro.textContent = origen
+    ? `${data.dia}, ${fmtFecha(data.fecha)} — mercadería que sale de ${origen} y va a ${destino}`
+    : `${data.dia}, ${fmtFecha(data.fecha)} — orden calculada para ${destino}`;
   div.appendChild(intro);
 
   const nav = document.createElement('div');
   nav.className = 'cat-nav';
   div.appendChild(nav);
 
-  nombresCategorias.forEach((cat, i) => {
+  const tablas = document.createElement('div');
+  seguirCambios(tablas);
+  Object.keys(categorias).forEach((cat, i) => {
     const catId = `cat-envio-${id}-${i}`;
     const h = document.createElement('h4');
-    h.className = 'cat-heading';
-    h.id = catId;
-    h.textContent = cat;
-    div.appendChild(h);
-    div.appendChild(tablaEnvioDe(categorias[cat], porSabor, local, data.fecha, guardadosPorItem));
-
+    h.className = 'cat-heading'; h.id = catId; h.textContent = cat;
+    tablas.appendChild(h);
+    const table = document.createElement('table');
+    table.className = 'lotes';
+    table.innerHTML = `
+      <thead><tr>
+        <th>Sabor / ítem</th>
+        ${conOrden ? '<th class="col-cant">Orden calculada</th>' : ''}
+        <th class="col-cant">${origen ? 'Cantidad' : 'Enviado (real)'}</th>
+        <th class="col-venc">Vencimiento</th>
+        <th class="col-add"></th><th class="col-del"></th><th></th>
+      </tr></thead><tbody></tbody>`;
+    const tbody = table.querySelector('tbody');
+    categorias[cat].forEach(nombre => {
+      const orden = (porSabor[nombre] && porSabor[nombre].aHacerUnidades) || 0;
+      const gs = guardadosPorItem[nombre] || [];
+      if(gs.length === 0) tbody.appendChild(filaEnvio(nombre, orden, false, null, conOrden, panelEstado));
+      else gs.forEach((g, k) => tbody.appendChild(filaEnvio(nombre, orden, k > 0, g, conOrden, panelEstado)));
+    });
+    tablas.appendChild(table);
     const a = document.createElement('a');
-    a.href = `#${catId}`;
-    a.textContent = cat;
+    a.href = `#${catId}`; a.textContent = cat;
     nav.appendChild(a);
   });
+  div.appendChild(tablas);
 
+  const titulo = origen ? `traspaso de ${origen} a ${destino}` : `despacho a ${destino}`;
   const actions = document.createElement('div');
   if(cierre){
-    // despacho ya enviado: bloqueado, con Reabrir (solo queda Imprimir)
     bloquearFilasEnviadas(div);
-    div.insertBefore(cartelEnviado(cierre, `Despacho a ${local}`, async () => {
-      if(!confirm(`¿Reabrir el despacho a ${local}? Lo que el local todavía no confirmó deja de aparecerle hasta que se vuelva a enviar.`)) return;
+    div.insertBefore(cartelEnviado(cierre, origen ? `Traspaso ${origen} → ${destino}` : `Despacho a ${destino}`, cierre.puedeReabrir === false ? null : async () => {
+      if(!confirm(`¿Reabrir el ${titulo}? Lo que ${destino} todavía no confirmó deja de aparecerle hasta que se vuelva a enviar.`)) return;
       try{
-        await postJSON({ action: 'reabrirCarga', pantalla: 'Envios', fecha: data.fecha, clave: local });
-        avisar(`Despacho a ${local} reabierto — ya se puede editar.`);
+        await postJSON({ action: 'reabrirCarga', pantalla: 'Envios', fecha: data.fecha, clave });
+        avisar(`${origen ? 'Traspaso' : 'Despacho'} reabierto — ya se puede editar.`);
         cargarEnvios();
       }catch(err){ avisar('✗ No se pudo reabrir: ' + err.message, 'err'); }
-    }), intro.nextSibling);
-    actions.className = 'actions no-print';
-    actions.innerHTML = `<button class="btn secondary" id="btnImprimirEnvio-${id}">🖶 Imprimir orden de envío</button>`;
+    }), nav);
+    if(!origen){
+      actions.className = 'actions no-print';
+      actions.innerHTML = `<button class="btn secondary" id="btnImprimirEnvio-${id}">🖶 Imprimir orden de envío</button>`;
+    }
   } else {
-    actions.innerHTML = htmlBarraFinal(`btnProvisorioEnvio-${id}`, `btnGuardarEnvio-${id}`, `Guardar y enviar despacho a ${local}`,
-      `<strong>Guardado provisorio</strong>: guarda lo cargado y se puede seguir armando el despacho — ${local} todavía NO lo ve. <strong>Guardar y enviar</strong>: guarda todo, cierra el despacho y recién ahí le aparece a ${local} en "Confirmar recepción".`)
-      + `<div class="actions no-print" style="margin-top:10px;"><button class="btn secondary" id="btnImprimirEnvio-${id}">🖶 Imprimir orden de envío</button></div>`;
+    actions.innerHTML = htmlBarraFinal(`btnProvisorioEnvio-${id}`, `btnGuardarEnvio-${id}`, 'Guardar y enviar final',
+      origen
+        ? `<strong>Guardado provisorio</strong>: guarda lo cargado y se puede seguir armando. <strong>Guardar y enviar final</strong>: cierra el traspaso; recién ahí ${origen} lo ve para confirmar que lo entregó y ${destino} para confirmar que lo recibió.`
+        : `<strong>Guardado provisorio</strong>: guarda lo cargado y se puede seguir armando el despacho — ${destino} todavía NO lo ve. <strong>Guardar y enviar final</strong>: guarda todo, cierra el despacho y recién ahí le aparece a ${destino} en "Confirmar recepción".`)
+      + (origen ? '' : `<div class="actions no-print" style="margin-top:10px;"><button class="btn secondary" id="btnImprimirEnvio-${id}">🖶 Imprimir orden de envío</button></div>`);
   }
   div.appendChild(actions);
 
+  // conectar botones (el panel todavía no está en la página: se buscan dentro de él)
+  setTimeout(() => {
+    const bProv = document.getElementById(`btnProvisorioEnvio-${id}`);
+    const bEnv = document.getElementById(`btnGuardarEnvio-${id}`);
+    const bImp = document.getElementById(`btnImprimirEnvio-${id}`);
+    if(bProv) bProv.onclick = () => guardarEnvio(div, origen, destino, data.fecha, false);
+    if(bEnv) bEnv.onclick = () => guardarEnvio(div, origen, destino, data.fecha, true);
+    if(bImp) bImp.onclick = () => imprimirOrdenEnvio(div, destino, data.fecha);
+  }, 0);
   return div;
 }
 
-// lee los 3 campos compartidos del despacho (responsable, repartidor,
-// acompañante) — los pide tanto el guardado por fila como el final.
+// lee los 3 campos compartidos del despacho (responsable, repartidor, acompañante)
 function datosComunesEnvio(){
   return {
     responsable: document.getElementById('inpResponsableEnvio').value.trim(),
@@ -2689,56 +2702,28 @@ function datosComunesEnvio(){
   };
 }
 
-// "preguardar" un producto/lote apenas se carga, sin esperar a terminar
-// todo el despacho de ese local.
-async function guardarItemEnvio(tr, local, fecha){
-  const { responsable, repartidor, acompanante } = datosComunesEnvio();
-  if(!responsable){
-    alert('Indicá quién está despachando este envío antes de guardar (arriba de la lista de productos).');
-    return;
-  }
-  const cantidad = tr.querySelector('.inp-cant').value;
-  const vencimiento = tr.querySelector('.inp-venc').value;
-  if(!cantidad || Number(cantidad) <= 0 || !vencimiento){
-    alert('Cargá cantidad y vencimiento de este producto antes de guardarlo.');
-    return;
-  }
-  const item = { sabor: tr.dataset.item, cantidad, vencimiento };
-  if(tr.dataset.vencGuardado && tr.dataset.vencGuardado !== vencimiento) item.vencimientoAnterior = tr.dataset.vencGuardado;
-  if(!confirmarVencimientos([item], fecha)) return;
-  const btn = tr.querySelector('.btn-guardar-item');
-  btn.disabled = true; btn.textContent = 'Guardando...';
-  try{
-    await postJSON({ action: 'registrarEnvio', local, fecha, responsable, repartidor, acompanante, items: [item] });
-    marcarFilaGuardada(tr);
-    avisar(`✓ Guardado para ${local}: ${item.sabor} — ${cantidad} (vence ${fmtFecha(vencimiento)}) · ${horaCorta()}`);
-  }catch(err){
-    btn.disabled = false; btn.textContent = 'Guardar';
-    alert('No se pudo guardar este producto: ' + err.message);
-  }
-}
-
-// "Guardado provisorio" / "Guardar y enviar despacho a [local]": guardan de
-// una sola vez todo lo que haya quedado sin guardar con su propio botón. Solo
-// "Guardar y enviar" hace que el local vea el despacho en Confirmar recepción.
-async function guardarEnvio(local, fecha, enviar){
+// "Guardado provisorio" / "Guardar y enviar final" de un despacho (fábrica →
+// local) o de un traspaso (local → local). Guarda todas las filas completas
+// y borra de la planilla lo que estaba guardado y se dejó en blanco.
+async function guardarEnvio(panel, origen, destino, fecha, enviar){
   const { responsable, repartidor, acompanante } = datosComunesEnvio();
   const msg = document.getElementById('msgEnvios');
   msg.className = 'msg'; msg.textContent = '';
+  const titulo = origen ? `traspaso de ${origen} a ${destino}` : `despacho a ${destino}`;
   if(!responsable){
-    msg.className = 'msg err'; msg.textContent = 'Indicá quién está despachando este envío (arriba de todo).';
+    msg.className = 'msg err'; msg.textContent = 'Indicá quién está despachando (arriba de todo).';
     avisar('✗ Falta indicar quién despacha.', 'err');
     return;
   }
-  const panel = document.querySelector(`.panel-envio-local[data-local="${local}"]`);
-  const filas = [...panel.querySelectorAll('tr[data-item]:not(.fila-guardada)')];
-  const completas = [], incompletas = [];
+  const filas = [...panel.querySelectorAll('tr[data-item]')];
+  const completas = [], incompletas = [], vaciadas = [];
   filas.forEach(tr => {
     const cantidad = tr.querySelector('.inp-cant').value;
     const vencimiento = tr.querySelector('.inp-venc').value;
     const tieneCant = cantidad && Number(cantidad) > 0;
     if(tieneCant && vencimiento) completas.push(tr);
     else if(tieneCant || vencimiento) incompletas.push(tr.dataset.item + (tieneCant ? ' (falta vencimiento)' : ' (falta cantidad)'));
+    else if(tr.dataset.guardado) vaciadas.push(tr);
   });
   if(enviar && incompletas.length){
     msg.className = 'msg err';
@@ -2746,37 +2731,43 @@ async function guardarEnvio(local, fecha, enviar){
     avisar('✗ No se envió: hay productos a medio completar (ver abajo).', 'err');
     return;
   }
-  const yaGuardados = panel.querySelectorAll('tr[data-item].fila-guardada').length;
-  if(enviar && completas.length === 0 && yaGuardados === 0){
-    msg.className = 'msg err'; msg.textContent = `No hay nada cargado para enviar a ${local}.`;
-    avisar(`✗ No hay nada cargado para enviar a ${local}.`, 'err');
+  if(enviar && completas.length === 0){
+    msg.className = 'msg err'; msg.textContent = `No hay nada cargado en el ${titulo}.`;
+    avisar(`✗ No hay nada cargado en el ${titulo}.`, 'err');
     return;
   }
-  if(enviar && !confirm(`¿Guardar y enviar el despacho a ${local}? Recién ahí le aparece al local para confirmar la recepción.`)) return;
-
   const items = completas.map(tr => {
     const it = { sabor: tr.dataset.item, cantidad: tr.querySelector('.inp-cant').value, vencimiento: tr.querySelector('.inp-venc').value };
     if(tr.dataset.vencGuardado && tr.dataset.vencGuardado !== it.vencimiento) it.vencimientoAnterior = tr.dataset.vencGuardado;
     return it;
   });
-  if(!confirmarVencimientos(items, fecha)) return;
-  const btn = document.getElementById(enviar ? `btnGuardarEnvio-${cssId(local)}` : `btnProvisorioEnvio-${cssId(local)}`);
+  const tocados = completas.filter(tr => !tr.dataset.guardado || tr.classList.contains('fila-pendiente'))
+    .map(tr => ({ sabor: tr.dataset.item, vencimiento: tr.querySelector('.inp-venc').value }));
+  if(!confirmarVencimientos(tocados, fecha)) return;
+  if(enviar && !confirm(`¿Guardar y enviar final el ${titulo}? ${origen ? `Recién ahí ${origen} y ${destino} lo ven para confirmar.` : `Recién ahí le aparece a ${destino} para confirmar la recepción.`}`)) return;
+  const borrar = vaciadas.map(tr => ({ sabor: tr.dataset.item, vencimiento: tr.dataset.vencGuardado })).concat(panel._estado.borrados);
+
+  const id = cssId(claveDespacho(origen, destino));
+  const btn = document.getElementById(enviar ? `btnGuardarEnvio-${id}` : `btnProvisorioEnvio-${id}`);
   const textoOriginal = btn.textContent;
   btn.disabled = true; btn.textContent = 'Guardando...';
   try{
-    const data = await postJSON({ action: 'registrarEnvio', local, fecha, responsable, repartidor, acompanante, items, enviar: !!enviar });
+    const resp = await postJSON({ action: 'registrarEnvio', origen, local: destino, fecha, responsable, repartidor, acompanante, items, borrar, enviar: !!enviar });
     completas.forEach(marcarFilaGuardada);
+    vaciadas.forEach(marcarFilaBorrada);
+    panel._estado.borrados = [];
     const hora = horaCorta();
+    const extra = (resp.borrados ? ` Se borraron ${resp.borrados} producto(s) que dejaste en blanco.` : '')
+      + (resp.no_borrados ? ` ${resp.no_borrados} no se borraron porque el local ya los recibió.` : '');
     if(enviar){
-      avisar(`✓ Despacho a ${local} enviado · ${hora} — ${data.total_dia} producto(s).`);
+      avisar(`✓ ${origen ? 'Traspaso' : 'Despacho'} enviado · ${hora} — ${resp.total_dia} producto(s).`);
+      await cargarEnvios(); // vuelve a leer de la planilla y muestra el despacho cerrado (limpia el mensaje)
       msg.className = 'msg ok';
-      msg.textContent = `✓ Despacho a ${local} enviado a las ${hora}: ${data.total_dia} producto(s) guardados. El local ya lo ve en "Confirmar recepción".`;
-      cargarEnvios(); // vuelve a leer de la planilla y muestra el despacho cerrado
+      msg.textContent = `✓ ${titulo[0].toUpperCase() + titulo.slice(1)} enviado a las ${hora}: ${resp.total_dia} producto(s) guardados.${extra}`;
     } else {
-      const aviso = items.length ? `${items.length} producto(s) nuevos guardados` : 'no había nada nuevo para guardar';
-      avisar(`✓ Guardado provisorio (${local}) · ${hora} — ${aviso}. Total: ${data.total_dia}.`);
+      avisar(`✓ Guardado provisorio · ${hora} — ${resp.total_dia} producto(s) en el ${titulo}.`);
       msg.className = incompletas.length ? 'msg err' : 'msg ok';
-      msg.textContent = `✓ Guardado provisorio a las ${hora}: ${aviso}. En total hay ${data.total_dia} producto(s) guardados para ${local}. Todavía NO se envió — el local no lo ve hasta "Guardar y enviar".`
+      msg.textContent = `✓ Guardado provisorio a las ${hora}: hay ${resp.total_dia} producto(s) guardados en el ${titulo}.${extra} Todavía NO se envió.`
         + (incompletas.length ? ' OJO — no se guardaron porque están a medio completar: ' + incompletas.join(', ') + '.' : '');
     }
   }catch(err){
@@ -2787,14 +2778,10 @@ async function guardarEnvio(local, fecha, enviar){
   }
 }
 
-// Arma una hoja de "Orden de envío" imprimible para UN local. Si ya cargaron
-// cantidad a mano, imprime eso; si no (todavía no tiene tablet a mano quien
-// prepara el pedido), imprime la orden CALCULADA, así sirve de planilla en
-// papel para armar el envío y cargarlo después. Se salta cualquier producto
-// sin nada (ni cargado ni calculado) y la categoría entera si ninguno de sus
-// productos tiene algo para enviar.
-function imprimirOrdenEnvio(local, fecha){
-  const panel = document.querySelector(`.panel-envio-local[data-local="${local}"]`);
+// Hoja de "Orden de envío" imprimible para UN local. Si ya cargaron cantidad
+// a mano, imprime eso; si no, imprime la orden CALCULADA (sirve de planilla
+// en papel para armar el envío y cargarlo después).
+function imprimirOrdenEnvio(panel, local, fecha){
   const filas = [...panel.querySelectorAll('tr[data-item]')];
   const porSabor = {};
   filas.forEach(tr => {
@@ -2822,7 +2809,7 @@ function imprimirOrdenEnvio(local, fecha){
   let filasHtml = '';
   Object.keys(categorias).forEach(cat => {
     const nombres = categorias[cat].filter(n => porSabor[n] && porSabor[n].cantidadImprimir > 0);
-    if(nombres.length === 0) return; // sin nada que enviar en esta categoría: no se imprime
+    if(nombres.length === 0) return;
     filasHtml += `
       <h3>${cat}</h3>
       <table class="print-tabla">
@@ -2887,43 +2874,113 @@ async function cargarPendientesRecepcion(){
   msg.className = 'msg'; msg.textContent = '';
 
   try{
-    const r = await fetch(`${APPS_SCRIPT_URL}?action=listarEnviosPendientes&local=${encodeURIComponent(local)}`);
-    const data = await r.json();
+    const [r, categorias] = await Promise.all([
+      fetch(`${APPS_SCRIPT_URL}?action=listarEnviosPendientes&local=${encodeURIComponent(local)}`).then(x => x.json()),
+      obtenerCategorias()
+    ]);
+    const data = r;
     if(data.error) throw new Error(data.error);
+    if(document.getElementById('selLocalRecepcion').value !== local) return;
     const pendientes = data.pendientes || [];
+    const salidas = data.salidas || [];
     cont.className = '';
+
+    // agrupar por categoría (en el orden de siempre) y de la A a la Z
+    const catDe = {};
+    Object.keys(categorias).forEach(c => categorias[c].forEach(n => { catDe[n] = c; }));
+    const ordenCats = Object.keys(categorias);
+    const agrupar = (lista) => {
+      const grupos = {};
+      lista.forEach(p => { const c = catDe[p.Sabor] || 'Otros'; (grupos[c] = grupos[c] || []).push(p); });
+      return ordenCats.concat(['Otros']).filter(c => grupos[c]).map(c => ({ cat: c, items: grupos[c].sort((a, b) => compararTexto(a.Sabor, b.Sabor)) }));
+    };
+
+    let html = '';
     if(pendientes.length === 0){
-      cont.innerHTML = `<div class="empty">No hay envíos pendientes de confirmar para ${local}.</div>`;
-      return;
+      html += `<div class="empty">No hay envíos pendientes de recibir en ${local}.</div>`;
+    } else {
+      html += `<h3 style="font-size:16px;margin:8px 0 0;">Mercadería que llega a ${local}</h3>`;
+      agrupar(pendientes).forEach(g => {
+        html += `<h4 class="cat-heading">${g.cat}</h4>
+          <table class="lotes">
+            <thead><tr><th>Sabor / ítem</th><th>Viene de</th><th>Enviado el</th><th class="col-cant">Cant. enviada</th><th>Vencimiento</th><th class="col-cant">Cant. recibida</th><th></th></tr></thead>
+            <tbody>
+              ${g.items.map(p => `
+                <tr data-id="${p.ID}">
+                  <td>${p.Sabor}</td>
+                  <td>${p.Origen ? `<strong class="origen-traspaso">Ingresa desde ${p.Origen}</strong>` : '<span style="color:var(--ink-soft);">Fábrica</span>'}</td>
+                  <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Fecha_envio)}</td>
+                  <td class="num" style="color:var(--ink-soft);">${ent(p.Cantidad_Enviada)}</td>
+                  <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Vencimiento)}</td>
+                  <td><input type="number" min="0" step="1" class="inp-recibido" style="max-width:90px;" value="${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? p.Cantidad_Recibida : p.Cantidad_Enviada}"></td>
+                  <td class="celda-estado" style="white-space:nowrap;">${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? '<span class="sello-guardado">✓ Guardado</span>' : ''}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>`;
+      });
+      html += htmlBarraFinal('btnProvisorioRecepcion', 'btnConfirmarRecepcion', 'Guardar y confirmar recepción',
+        '<strong>Guardado provisorio</strong>: guarda las cantidades recibidas cargadas hasta ahora (se pueden seguir corrigiendo). <strong>Guardar y confirmar recepción</strong>: guarda todo y da por recibido el envío.');
     }
-    cont.innerHTML = `
-      <table class="lotes">
-        <thead><tr>
-          <th>Sabor / ítem</th>
-          <th>Enviado el</th>
-          <th class="col-cant">Cant. enviada</th>
-          <th>Vencimiento</th>
-          <th class="col-cant">Cant. recibida</th>
-        </tr></thead>
-        <tbody>
-          ${pendientes.map(p => `
-            <tr data-id="${p.ID}">
-              <td>${p.Sabor}</td>
-              <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Fecha_envio)}</td>
-              <td class="num" style="color:var(--ink-soft);">${ent(p.Cantidad_Enviada)}</td>
-              <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Vencimiento)}</td>
-              <td style="white-space:nowrap;"><input type="number" min="0" step="1" class="inp-recibido" style="max-width:90px;" value="${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? p.Cantidad_Recibida : p.Cantidad_Enviada}">
-                ${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? '<span class="sello-guardado" style="margin-left:6px;">✓ Guardado</span>' : ''}</td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-      ${htmlBarraFinal('btnProvisorioRecepcion', 'btnConfirmarRecepcion', 'Guardar y confirmar recepción',
-        '<strong>Guardado provisorio</strong>: guarda las cantidades recibidas cargadas hasta ahora (se pueden seguir corrigiendo). <strong>Guardar y confirmar recepción</strong>: guarda todo y da por recibido el envío.')}
-    `;
-    document.getElementById('btnProvisorioRecepcion').onclick = () => guardarRecepcion(false);
-    document.getElementById('btnConfirmarRecepcion').onclick = () => guardarRecepcion(true);
+
+    // TRASPASOS: lo que sale de este local hacia otro — el local confirma que lo entregó
+    if(salidas.length){
+      html += `<div class="bloque-salidas">
+        <h3 style="font-size:16px;margin:0 0 4px;">Mercadería que sale de ${local} hacia otro local</h3>
+        <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 6px;">Fábrica la retira para llevarla a otro local. Confirmá que la entregaste.</p>`;
+      agrupar(salidas).forEach(g => {
+        html += `<h4 class="cat-heading">${g.cat}</h4>
+          <table class="lotes">
+            <thead><tr><th>Sabor / ítem</th><th>Va a</th><th>Fecha</th><th class="col-cant">Cantidad</th><th>Vencimiento</th></tr></thead>
+            <tbody>
+              ${g.items.map(p => `
+                <tr data-salida="${p.ID}">
+                  <td>${p.Sabor}</td>
+                  <td><strong class="origen-traspaso">Sale hacia ${p.Local}</strong></td>
+                  <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Fecha_envio)}</td>
+                  <td class="num">${ent(p.Cantidad_Enviada)}</td>
+                  <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Vencimiento)}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>`;
+      });
+      html += `<div class="actions"><button class="btn" id="btnConfirmarEntrega">Confirmar que entregué esta mercadería</button></div></div>`;
+    }
+    cont.innerHTML = html;
+    seguirCambios(cont);
+    const bP = document.getElementById('btnProvisorioRecepcion');
+    if(bP) bP.onclick = () => guardarRecepcion(false);
+    const bC = document.getElementById('btnConfirmarRecepcion');
+    if(bC) bC.onclick = () => guardarRecepcion(true);
+    const bE = document.getElementById('btnConfirmarEntrega');
+    if(bE) bE.onclick = confirmarEntregaSalidas;
   }catch(err){
     cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo buscar: ${err.message}</div>`;
+  }
+}
+
+async function confirmarEntregaSalidas(){
+  const local = document.getElementById('selLocalRecepcion').value;
+  const responsable = document.getElementById('inpResponsableRecepcion').value.trim();
+  const msg = document.getElementById('msgRecepcion');
+  if(!responsable){
+    msg.className = 'msg err'; msg.textContent = 'Indicá quién entrega (arriba de todo).';
+    avisar('✗ Falta indicar quién entrega.', 'err');
+    return;
+  }
+  const ids = [...document.querySelectorAll('#contenidoRecepcion tr[data-salida]')].map(tr => tr.dataset.salida);
+  if(!confirm(`¿Confirmar que ${local} entregó ${ids.length} producto(s) para llevar a otro local?`)) return;
+  const btn = document.getElementById('btnConfirmarEntrega');
+  btn.disabled = true; btn.textContent = 'Guardando...';
+  try{
+    const data = await postJSON({ action: 'confirmarEntregaTraspaso', local, responsable, fecha: hoyISO(), ids });
+    await cargarPendientesRecepcion();
+    const hora = horaCorta();
+    msg.className = 'msg ok';
+    msg.textContent = `✓ Entrega confirmada a las ${hora}: ${data.confirmados} producto(s).`;
+    avisar(`✓ Entrega confirmada · ${hora} — ${data.confirmados} producto(s).`);
+  }catch(err){
+    btn.disabled = false; btn.textContent = 'Confirmar que entregué esta mercadería';
+    avisar('✗ NO se guardó — ' + err.message, 'err');
   }
 }
 
@@ -3011,6 +3068,7 @@ async function cargarHistorialEnvios(){
       <table class="prod">
         <thead><tr>
           <th>Fecha envío</th>
+          <th>Origen</th>
           <th>Local</th>
           <th>Sabor</th>
           <th class="num">Enviado</th>
@@ -3023,6 +3081,7 @@ async function cargarHistorialEnvios(){
           ${envios.map(f => `
             <tr>
               <td>${fmtFecha(f.Fecha_envio)}</td>
+              <td>${f.Origen ? `<span class="origen-traspaso">${f.Origen}</span>` : 'Fábrica'}</td>
               <td>${f.Local}</td>
               <td>${f.Sabor}</td>
               <td class="num">${ent(f.Cantidad_Enviada)}</td>
