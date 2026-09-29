@@ -226,10 +226,55 @@ let SABORES_CACHE = null;
 let RELLENOS_CACHE = null;
 let RECETAS_CACHE = null;
 
+/* ---------------------------------------------------------------------
+   DATOS DE REFERENCIA CON MEMORIA EN LA TABLET (para que las pantallas abran
+   rápido): sabores, rellenos, empleados y recetas cambian poco, así que se
+   guardan en la tablet y se usan al instante al abrir cualquier pantalla —
+   y en segundo plano se vuelven a pedir al servidor para la próxima vez.
+   "Refrescar datos de la planilla" e importar una ficha borran esta memoria.
+   Si la tablet no deja guardar (modo privado, etc.) funciona igual, solo
+   que pidiendo siempre al servidor.
+   --------------------------------------------------------------------- */
+const MEMORIA_MAX_HORAS = 24;
+function leerMemoria(clave){
+  try{
+    const raw = localStorage.getItem('doma:' + clave);
+    if(!raw) return null;
+    const m = JSON.parse(raw);
+    if(!m || Date.now() - m.t > MEMORIA_MAX_HORAS * 3600 * 1000) return null;
+    return m.d;
+  }catch(e){ return null; }
+}
+function guardarMemoria(clave, datos){
+  try{ localStorage.setItem('doma:' + clave, JSON.stringify({ t: Date.now(), d: datos })); }catch(e){}
+}
+function borrarMemoria(){
+  try{ Object.keys(localStorage).filter(k => k.startsWith('doma:')).forEach(k => localStorage.removeItem(k)); }catch(e){}
+}
+const PEDIDOS_EN_CURSO = {};
+async function pedirReferencia(action){
+  if(!PEDIDOS_EN_CURSO[action]){
+    PEDIDOS_EN_CURSO[action] = fetch(`${APPS_SCRIPT_URL}?action=${action}`)
+      .then(r => r.json())
+      .then(data => { if(data.error) throw new Error(data.error); guardarMemoria(action, data); return data; })
+      .finally(() => { delete PEDIDOS_EN_CURSO[action]; });
+  }
+  return PEDIDOS_EN_CURSO[action];
+}
+// devuelve lo que haya en memoria al instante (y actualiza en segundo plano);
+// si no hay nada guardado, espera la respuesta del servidor.
+async function datoReferencia(action){
+  const enMemoria = leerMemoria(action);
+  if(enMemoria){
+    pedirReferencia(action).catch(() => {});
+    return enMemoria;
+  }
+  return pedirReferencia(action);
+}
+
 async function obtenerRecetas(){
   if(RECETAS_CACHE) return RECETAS_CACHE;
-  const r = await fetch(`${APPS_SCRIPT_URL}?action=listarRecetas`);
-  const data = await r.json();
+  const data = await datoReferencia('listarRecetas');
   RECETAS_CACHE = { cabecera: data.recetas || [], detalle: data.detalle || [] };
   return RECETAS_CACHE;
 }
@@ -408,6 +453,7 @@ async function refrescarDatosPlanilla(){
     if(data.error) throw new Error(data.error);
     SABORES_CACHE = null; CATEGORIA_POR_SABOR_CACHE = null;
     RELLENOS_CACHE = null; RECETAS_CACHE = null; EMPLEADOS_CACHE = null;
+    borrarMemoria();
     if(p) p.textContent = '✓ Listo — la app ya está leyendo los datos actualizados de la planilla.';
   }catch(err){
     if(p) p.textContent = 'No se pudo refrescar: ' + err.message;
@@ -459,8 +505,7 @@ function renderHome(){
 let CATEGORIA_POR_SABOR_CACHE = null;
 async function obtenerCategorias(){
   if(SABORES_CACHE) return SABORES_CACHE;
-  const r = await fetch(`${APPS_SCRIPT_URL}?action=listarSabores`);
-  const data = await r.json();
+  const data = await datoReferencia('listarSabores');
   SABORES_CACHE = data.categorias || {};
   CATEGORIA_POR_SABOR_CACHE = data.categoriaPorSabor || {};
   return SABORES_CACHE;
@@ -475,8 +520,7 @@ async function obtenerCategoriaPorSabor(){
 
 async function obtenerRellenos(){
   if(RELLENOS_CACHE) return RELLENOS_CACHE;
-  const r = await fetch(`${APPS_SCRIPT_URL}?action=listarRellenos`);
-  const data = await r.json();
+  const data = await datoReferencia('listarRellenos');
   RELLENOS_CACHE = data.rellenos || [];
   return RELLENOS_CACHE;
 }
@@ -486,8 +530,7 @@ async function obtenerRellenos(){
 let EMPLEADOS_CACHE = null;
 async function obtenerEmpleados(){
   if(EMPLEADOS_CACHE) return EMPLEADOS_CACHE;
-  const r = await fetch(`${APPS_SCRIPT_URL}?action=listarEmpleados`);
-  const data = await r.json();
+  const data = await datoReferencia('listarEmpleados');
   EMPLEADOS_CACHE = data.empleados || [];
   return EMPLEADOS_CACHE;
 }
@@ -578,9 +621,18 @@ async function renderLocal(bloque){
     <div class="msg" id="msg"></div>
   `;
 
-  const categorias = await obtenerCategorias();
-  const rellenos = await obtenerRellenos();
-  let empleados = [];
+  // sabores, rellenos y empleados a la vez (antes era uno detrás del otro)
+  let categorias, rellenos, empleados = [];
+  try{
+    [categorias, rellenos, empleados] = await Promise.all([
+      obtenerCategorias(), obtenerRellenos(), esBloqueFabrica ? obtenerEmpleados() : Promise.resolve([])
+    ]);
+  }catch(err){
+    const c = document.getElementById('tablaLotesContainer');
+    c.className = '';
+    c.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar la lista de productos: ${err.message}. <button class="btn secondary" style="font-size:12px;padding:5px 9px;margin-left:8px;" onclick="renderLocal('${bloque}')">Reintentar</button></div>`;
+    return;
+  }
   const nombresCategorias = Object.keys(categorias);
 
   // según el sector elegido, se carga por Sabor (locales y Fábrica -
@@ -1245,6 +1297,7 @@ let CATEGORIA_POR_SABOR_REGISTRO = null;
 let EMPLEADOS_REGISTRO = null;
 let PREP_REGISTRO = null;
 let SECTOR_REGISTRO_ACTIVO = 'produccion';
+let PREPEDIDO_REGISTRO = null;
 const NOMBRE_ROLLOS_JYQ = 'Rollos de Jamón y Queso';
 
 async function renderRegistroProduccion(){
@@ -1282,6 +1335,12 @@ async function cargarRegistroProduccion(){
   cont.className = 'loading'; cont.textContent = 'Cargando…';
   const msg = document.getElementById('msgRegistro');
   msg.className = 'msg'; msg.textContent = '';
+  // lo guardado del turno se pide A LA VEZ que el cálculo (antes se pedía
+  // recién después, un viaje más al servidor)
+  if(SECTOR_REGISTRO_ACTIVO === 'produccion'){
+    PREPEDIDO_REGISTRO = { fecha, promesa: fetch(`${APPS_SCRIPT_URL}?action=obtenerRegistroProduccionDia&fecha=${fecha}`).then(x => x.json()) };
+    PREPEDIDO_REGISTRO.promesa.catch(() => {});
+  }
   try{
     const [r, rPrep, categorias, categoriaPorSabor, empleados] = await Promise.all([
       fetch(`${APPS_SCRIPT_URL}?action=calcularTodo&fecha=${fecha}`),
@@ -1972,8 +2031,13 @@ async function pintarRegistroProduccionSector(){
 
   let estado;
   try{
-    const r = await fetch(`${APPS_SCRIPT_URL}?action=obtenerRegistroProduccionDia&fecha=${fecha}`);
-    estado = await r.json();
+    if(PREPEDIDO_REGISTRO && PREPEDIDO_REGISTRO.fecha === fecha){
+      const pre = PREPEDIDO_REGISTRO; PREPEDIDO_REGISTRO = null;
+      estado = await pre.promesa;
+    } else {
+      const r = await fetch(`${APPS_SCRIPT_URL}?action=obtenerRegistroProduccionDia&fecha=${fecha}`);
+      estado = await r.json();
+    }
     if(estado.error) throw new Error(estado.error);
   }catch(err){
     cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar el registro guardado: ${err.message}</div>`;
@@ -3324,7 +3388,7 @@ function mostrarRevisionFicha(tipoFicha, recetas, salteadas, referencia){
       if(resp.error) throw new Error(resp.error);
       msgC.className = 'msg ok';
       msgC.textContent = `Importadas ${resp.recetasImportadas.length} receta(s): ${resp.recetasImportadas.join(', ')}.`;
-      RECETAS_CACHE = null; // que Cocina/Informes usen las recetas recién importadas
+      RECETAS_CACHE = null; borrarMemoria(); // que Cocina/Informes usen las recetas recién importadas
       cargarRecetasCargadas();
     }catch(err){
       msgC.className = 'msg err'; msgC.textContent = 'No se pudo importar: ' + err.message;
