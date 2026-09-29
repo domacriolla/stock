@@ -38,7 +38,7 @@
     -webkit-font-smoothing:antialiased;
   }
   h1,h2,h3{font-family:'Cinzel',serif;font-weight:600;margin:0;letter-spacing:.01em;}
-  .wrap{max-width:920px;margin:0 auto;padding:28px 20px 80px;}
+  .wrap{max-width:920px;margin:0 auto;padding:28px 20px 150px;}
   header.top{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:28px;flex-wrap:wrap;gap:8px;}
   header.top h1{font-size:26px;color:var(--crust-dark);text-transform:uppercase;}
   header.top .sub{font-family:'Poppins',sans-serif;color:var(--accent);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;}
@@ -89,7 +89,7 @@
   /* sello "✓ Guardado 13:52" al lado de Editar, en cada fila guardada */
   .sello-guardado{display:inline-block;font-size:11.5px;font-weight:600;color:var(--herb);margin-right:6px;white-space:nowrap;}
   /* aviso flotante de confirmación (abajo de la pantalla) */
-  #aviso-guardado{position:fixed;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);opacity:0;
+  #aviso-guardado{position:fixed;left:50%;bottom:92px;transform:translateX(-50%) translateY(20px);opacity:0;
     max-width:min(560px,calc(100vw - 32px));padding:14px 18px;border-radius:4px;font-size:14.5px;font-weight:600;
     box-shadow:0 6px 24px rgba(0,0,0,.18);transition:opacity .2s,transform .2s;z-index:1000;pointer-events:none;}
   #aviso-guardado.visible{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
@@ -97,9 +97,19 @@
   #aviso-guardado.err{background:#b3261e;color:#fff;}
   #aviso-guardado .cerrar{background:none;border:none;color:#fff;font-size:13px;text-decoration:underline;margin-left:10px;padding:0;}
   /* barra final: Guardado provisorio + Guardar y enviar */
-  .barra-final{margin-top:24px;padding-top:16px;border-top:1px solid var(--line);}
-  .barra-final .actions{margin-top:0;flex-wrap:wrap;}
-  .barra-final .ayuda{font-size:12px;color:var(--ink-soft);margin:8px 0 0;max-width:620px;line-height:1.5;}
+  .barra-final{margin-top:24px;padding-top:12px;border-top:1px solid var(--line);}
+  .barra-final .ayuda{font-size:12px;color:var(--ink-soft);margin:0;max-width:620px;line-height:1.5;}
+  /* botones de guardado SIEMPRE a mano: barra fija abajo de la pantalla, así
+     se puede guardar en cualquier momento del turno sin bajar hasta el final */
+  .barra-fija{position:fixed;left:0;right:0;bottom:0;z-index:900;background:var(--panel);
+    border-top:1px solid var(--line);box-shadow:0 -4px 16px rgba(0,0,0,.08);}
+  .barra-fija .interior{max-width:920px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .barra-fija .ultimo-guardado{font-size:12.5px;color:var(--ink-soft);flex:1 1 220px;min-width:0;}
+  .barra-fija .ultimo-guardado.ok{color:var(--herb);font-weight:600;}
+  .barra-fija .botones{display:flex;gap:10px;flex-wrap:wrap;}
+  /* informe de stock: dato de una carga anterior a la última del local */
+  .dato-viejo, table.prod td.dato-viejo{background:#fdf0d5 !important;color:#8a5a00;font-size:12.5px;font-weight:600;}
+  .resumen-carga{font-size:13.5px;background:var(--panel);border:1px solid var(--line);border-radius:3px;padding:10px 12px;margin:6px 0 12px;}
   /* cartel de carga ya enviada (bloqueada) */
   .cartel-enviado{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
     background:var(--herb-bg);color:var(--herb);border-radius:3px;padding:12px 14px;margin:10px 0 14px;font-size:14px;font-weight:600;}
@@ -245,6 +255,7 @@ function irA(pantalla){
   if(pantalla === 'fichas') renderFichasTecnicas();
   // Informes: cada bloque abre directo su propio informe (sin solapas).
   if(pantalla === 'informeStock') renderInformes('stock');
+  if(pantalla === 'informeStockFabrica') renderInformes('stockFabrica');
   if(pantalla === 'informeInsumos') renderInformes('consumo');
 }
 
@@ -289,6 +300,13 @@ function avisar(texto, tipo){
     el.appendChild(b);
   } else {
     TIMER_AVISO = setTimeout(() => el.classList.remove('visible'), 5000);
+    // la barra fija de abajo recuerda el último guardado (no desaparece)
+    if(texto.startsWith('✓')){
+      document.querySelectorAll('.ultimo-guardado').forEach(u => {
+        u.classList.add('ok');
+        u.textContent = texto;
+      });
+    }
   }
 }
 // pone (o actualiza) el sello "✓ Guardado HH:MM" de una fila; hora = null
@@ -324,15 +342,23 @@ function bloquearFilasEnviadas(contenedor){
     [...tr.querySelectorAll('.btn-guardar-item,.btn-editar-item,.btn-guardar-disco,.btn-editar-disco,.add-lote-btn,.del-btn')].forEach(b => b.style.display = 'none');
   });
 }
-// barra de abajo con los 2 botones finales.
+// barra con los botones de guardado: la ayuda queda al final del contenido y
+// los botones van en una barra FIJA abajo de la pantalla (siempre visibles,
+// para ir guardando durante todo el turno). idEnviar = null -> solo
+// "Guardado provisorio" (Cocina, donde cada receta se envía por separado).
 function htmlBarraFinal(idProvisorio, idEnviar, textoEnviar, ayuda){
   return `
     <div class="barra-final no-print">
-      <div class="actions">
-        <button class="btn secondary" id="${idProvisorio}">Guardado provisorio</button>
-        <button class="btn" id="${idEnviar}">${textoEnviar}</button>
+      <p class="ayuda">${ayuda || '<strong>Guardado provisorio</strong>: guarda todo lo que cargaste hasta ahora y podés seguir cargando o corrigiendo durante toda la jornada. <strong>Guardar y enviar</strong>: guarda todo y cierra la carga (queda bloqueada; se destraba con "Reabrir").'}</p>
+      <div class="barra-fija">
+        <div class="interior">
+          <span class="ultimo-guardado">Guardá cuando quieras — los botones quedan siempre acá abajo.</span>
+          <div class="botones">
+            <button class="btn secondary" id="${idProvisorio}">Guardado provisorio</button>
+            ${idEnviar ? `<button class="btn" id="${idEnviar}">${textoEnviar}</button>` : ''}
+          </div>
+        </div>
       </div>
-      <p class="ayuda">${ayuda || '<strong>Guardado provisorio</strong>: guarda todo lo que cargaste hasta ahora y podés seguir cargando o corrigiendo. <strong>Guardar y enviar</strong>: guarda todo y cierra la carga (queda bloqueada; se destraba con "Reabrir").'}</p>
     </div>`;
 }
 // cartel de carga enviada, con botón Reabrir.
@@ -352,6 +378,17 @@ function cartelEnviado(cierre, que, onReabrir){
   }
   return div;
 }
+// Control de vencimientos mal tipeados: si alguno es ANTERIOR a la fecha de
+// carga, pide confirmar antes de guardar (ej. "01/09" en vez de "01/10" —
+// ese lote cuenta como vencido y no se descuenta del stock). Devuelve true
+// si se puede seguir. Pedido por Carolina (29/09/2026).
+function confirmarVencimientos(items, fecha){
+  const raros = items.filter(it => it.vencimiento && fecha && it.vencimiento < fecha);
+  if(raros.length === 0) return true;
+  const lista = raros.map(it => `• ${it.sabor}: vence ${fmtFecha(it.vencimiento)}`).join('\n');
+  return confirm(`OJO — estos vencimientos son ANTERIORES a la fecha de carga (${fmtFecha(fecha)}):\n\n${lista}\n\n¿Está bien así? Si fue un error de tipeo, tocá "Cancelar" y corregilo (si no, ese lote cuenta como vencido).`);
+}
+
 async function postJSON(body){
   const r = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(body) });
   const data = await r.json();
@@ -399,6 +436,7 @@ function renderHome(){
       ${tarjetaHome('registro', 'Registrar producción', 'Trazabilidad del turno: máquina, disco, relleno, horas y total producido por sabor.')}
       ${tarjetaHome('envios', 'Despachar envíos', 'Cuánto hay que mandarle hoy a cada local, calculado con lo que vende y lo que ya tiene cargado.')}
       ${tarjetaHome('historial', 'Historial de envíos', 'Comparar lo enviado contra lo recibido, por local y sabor.')}
+      ${tarjetaHome('informeStockFabrica', 'Informe: Stock de fábrica', 'Última carga de stock de Producción, Cocina y Discos, con semáforo de vencimientos.')}
       ${tarjetaHome('informeInsumos', 'Informe: Consumo de insumos', 'Consumo real de insumos de Cocina por día.')}
     </div>
 
@@ -488,6 +526,7 @@ async function guardarItemStock(tr){
   }
   const item = { sabor: tr.dataset.item, cantidad, vencimiento };
   if(tr.dataset.vencGuardado && tr.dataset.vencGuardado !== vencimiento) item.vencimientoAnterior = tr.dataset.vencGuardado;
+  if(!confirmarVencimientos([item], fecha)) return;
   const btn = tr.querySelector('.btn-guardar-item');
   btn.disabled = true; btn.textContent = 'Guardando...';
   try{
@@ -737,13 +776,25 @@ async function renderLocal(bloque){
       avisar('✗ No se envió: hay filas a medio completar (ver abajo).', 'err');
       return;
     }
-    if(enviar && !confirm(`¿Guardar y enviar el stock de ${local}? La carga queda cerrada (se puede reabrir si hace falta corregir).`)) return;
-
     const items = completas.map(tr => {
       const it = { sabor: tr.dataset.item, cantidad: tr.querySelector('.inp-cant').value, vencimiento: tr.querySelector('.inp-venc').value };
       if(tr.dataset.vencGuardado && tr.dataset.vencGuardado !== it.vencimiento) it.vencimientoAnterior = tr.dataset.vencGuardado;
       return it;
     });
+    if(!confirmarVencimientos(items, fecha)) return;
+    if(enviar){
+      // una carga enviada es el recuento COMPLETO: lo que queda en blanco se
+      // toma como 0 (no hay) — se avisa cuáles para que no sea un olvido.
+      const conDato = new Set([...document.querySelectorAll('#tablaLotesContainer tr[data-item]')]
+        .filter(tr => tr.classList.contains('fila-guardada') || completas.includes(tr))
+        .map(tr => tr.dataset.item));
+      const enBlanco = [...new Set([...document.querySelectorAll('#tablaLotesContainer tr[data-item]')].map(tr => tr.dataset.item))]
+        .filter(n => !conDato.has(n));
+      const listaBlanco = enBlanco.length
+        ? `\n\nQuedaron ${enBlanco.length} producto(s) SIN CARGAR — se van a tomar como 0 (no hay):\n${enBlanco.slice(0, 25).map(n => '• ' + n).join('\n')}${enBlanco.length > 25 ? `\n… y ${enBlanco.length - 25} más` : ''}\n\nSi alguno sí tiene stock, tocá "Cancelar" y cargalo.`
+        : '';
+      if(!confirm(`¿Guardar y enviar el stock de ${local}? La carga queda cerrada (se puede reabrir si hace falta corregir).${listaBlanco}`)) return;
+    }
     const btn = document.getElementById(enviar ? 'btnGuardar' : 'btnProvisorioStock');
     const textoOriginal = btn.textContent;
     btn.disabled = true; btn.textContent = 'Guardando...';
@@ -1498,10 +1549,8 @@ async function pintarRegistroCocinaSector(){
   // Guardado provisorio de TODO Cocina (cada receta se envía con su propio
   // "Guardar y enviar", arriba de su tabla).
   const barra = document.createElement('div');
-  barra.className = 'barra-final no-print';
-  barra.innerHTML = `
-    <div class="actions"><button class="btn secondary" id="btnProvisorioCocina">Guardado provisorio (todas las recetas)</button></div>
-    <p class="ayuda"><strong>Guardado provisorio</strong>: guarda todos los insumos cargados de todas las recetas y se puede seguir cargando. Cada receta se cierra con su botón <strong>Guardar y enviar</strong> (arriba de su tabla): guarda lo que falte de esa receta y la bloquea.</p>`;
+  barra.innerHTML = htmlBarraFinal('btnProvisorioCocina', null, '',
+    '<strong>Guardado provisorio</strong> (barra de abajo): guarda todos los insumos cargados de todas las recetas y se puede seguir cargando durante toda la jornada. Cada receta se cierra con su botón <strong>Guardar y enviar</strong> (arriba de su tabla): guarda lo que falte de esa receta y la bloquea.');
   cont.appendChild(barra);
   document.getElementById('btnProvisorioCocina').onclick = () => guardarProvisorioCocina(fecha);
 }
@@ -1624,9 +1673,11 @@ async function renderInformes(sector){
   // Cada bloque del inicio abre su propio informe: 'stock' (Locales) o
   // 'consumo' (Fábrica). SECTOR_INFORME_ACTIVO se sigue usando en los
   // chequeos de "respuesta tardía" de cada informe.
-  SECTOR_INFORME_ACTIVO = sector === 'stock' ? 'stock' : 'consumo';
-  if(!LOCAL_INFORME_ACTIVO) LOCAL_INFORME_ACTIVO = LOCALES_VENTA[0];
-  const titulo = SECTOR_INFORME_ACTIVO === 'stock' ? 'Stock por local' : 'Consumo de insumos';
+  SECTOR_INFORME_ACTIVO = (sector === 'stock' || sector === 'stockFabrica') ? sector : 'consumo';
+  const opciones = lugaresInformeStock();
+  if(opciones.length && opciones.indexOf(LOCAL_INFORME_ACTIVO) === -1) LOCAL_INFORME_ACTIVO = opciones[0];
+  const titulo = SECTOR_INFORME_ACTIVO === 'stock' ? 'Stock por local'
+    : SECTOR_INFORME_ACTIVO === 'stockFabrica' ? 'Stock de fábrica' : 'Consumo de insumos';
   app.innerHTML = `
     <button class="back" onclick="irA('home')">← Volver</button>
     <div class="fab-toolbar">
@@ -1643,6 +1694,14 @@ async function renderInformes(sector){
   pintarSectorInforme();
 }
 
+// locales (informe de Locales) o sectores de fábrica (informe de Fábrica)
+function lugaresInformeStock(){
+  if(SECTOR_INFORME_ACTIVO === 'stockFabrica') return LOCALES.filter(l => l.startsWith('Fábrica'));
+  if(SECTOR_INFORME_ACTIVO === 'stock') return LOCALES_VENTA;
+  return [];
+}
+function esInformeStock(){ return SECTOR_INFORME_ACTIVO === 'stock' || SECTOR_INFORME_ACTIVO === 'stockFabrica'; }
+
 function pintarSectorInforme(){
   if(SECTOR_INFORME_ACTIVO === 'consumo'){
     cargarInformeInsumos();
@@ -1652,9 +1711,9 @@ function pintarSectorInforme(){
   cont.className = '';
   cont.innerHTML = `
     <div class="field-row no-print" style="max-width:280px;">
-      <label>Local</label>
+      <label>${SECTOR_INFORME_ACTIVO === 'stockFabrica' ? 'Sector' : 'Local'}</label>
       <select id="selLocalInforme">
-        ${LOCALES_VENTA.map(l => `<option value="${l}" ${l === LOCAL_INFORME_ACTIVO ? 'selected' : ''}>${l}</option>`).join('')}
+        ${lugaresInformeStock().map(l => `<option value="${l}" ${l === LOCAL_INFORME_ACTIVO ? 'selected' : ''}>${l}</option>`).join('')}
       </select>
     </div>
     <div id="contenidoStockLocal" class="loading">Cargando…</div>
@@ -1723,7 +1782,7 @@ async function cargarInformeStockLocal(){
     // de local o de fecha, esta respuesta llegó tarde y no debe pisar lo
     // que se esté mostrando ahora.
     const contActual = document.getElementById('contenidoStockLocal');
-    if(!contActual || SECTOR_INFORME_ACTIVO !== 'stock' || LOCAL_INFORME_ACTIVO !== local || document.getElementById('fechaInforme').value !== fecha) return;
+    if(!contActual || !esInformeStock() || LOCAL_INFORME_ACTIVO !== local || document.getElementById('fechaInforme').value !== fecha) return;
     cont.className = '';
     const categorias = data.categorias || {};
     const nombresCategorias = Object.keys(categorias);
@@ -1736,36 +1795,56 @@ async function cargarInformeStockLocal(){
         <span><i style="background:var(--herb-bg);"></i> Vence mañana (${fmtFecha(sumarDiasISO(fecha, 1))})</span>
       </div>`;
 
+    const uc = data.ultimaCarga;
+    // "Cargado el": si el dato de un producto es de una carga ANTERIOR a la
+    // última del local (no se cargó en la última), se marca en ámbar.
+    const celdaCargado = (it) => {
+      if(!it.fechaCarga) return '<td style="color:var(--ink-soft);">—</td>';
+      if(it.desactualizado) return `<td class="dato-viejo">${fmtFecha(it.fechaCarga)} — no se cargó el ${fmtFecha(uc.fecha)}</td>`;
+      return `<td style="color:var(--ink-soft);">${fmtFecha(it.fechaCarga)}</td>`;
+    };
+    let viejos = 0;
     const bloques = nombresCategorias.map(cat => {
       const items = categorias[cat];
       const filas = items.map(it => {
+        if(it.desactualizado) viejos++;
         if(it.lotes.length === 0){
-          return `<tr><td>${it.sabor}</td><td colspan="2" style="color:var(--ink-soft);font-style:italic;">sin stock cargado</td></tr>`;
+          return `<tr><td>${it.sabor}</td><td colspan="2" style="color:var(--ink-soft);font-style:italic;">${it.ceroEnCargaEnviada ? '0 — no figura en la carga enviada' : 'sin stock cargado'}</td>${celdaCargado(it)}</tr>`;
         }
         return it.lotes.map((l, i) => `
           <tr class="${claseFila[l.estado] || ''}">
             <td>${i === 0 ? it.sabor : `<span class="item-extra">↳ otro lote</span>`}</td>
             <td class="num">${ent(l.cantidad)}</td>
             <td>${fmtFecha(l.vencimiento)}</td>
+            ${i === 0 ? celdaCargado(it) : '<td></td>'}
           </tr>`).join('');
       }).join('');
       return `
         <h4 class="cat-heading">${cat}</h4>
         <table class="prod">
-          <thead><tr><th>Sabor / ítem</th><th class="num">Cantidad</th><th>Vencimiento</th></tr></thead>
+          <thead><tr><th>Producto</th><th class="num">Cantidad (${data.unidad || 'unidades'})</th><th>Vencimiento</th><th>Cargado el</th></tr></thead>
           <tbody>${filas}</tbody>
         </table>`;
     }).join('');
 
+    const resumenCarga = uc
+      ? `<div class="resumen-carga">
+          <strong>Última carga de ${LOCAL_INFORME_ACTIVO}: ${fmtFecha(uc.fecha)}</strong>${uc.responsable ? ` · por ${uc.responsable}` : ''} · ${uc.productos} producto(s) cargado(s)
+          · ${uc.enviada ? `✓ enviada${uc.hora ? ' a las ' + uc.hora : ''}` : 'sin "Guardar y enviar" (puede estar incompleta)'}
+          ${viejos ? `<div class="dato-viejo" style="margin-top:6px;padding:6px 8px;border-radius:3px;">⚠ ${viejos} producto(s) no se cargaron el ${fmtFecha(uc.fecha)}: se muestra su último dato, de una carga anterior (marcados en ámbar).</div>` : ''}
+        </div>`
+      : `<div class="resumen-carga">${LOCAL_INFORME_ACTIVO} todavía no tiene ninguna carga de stock hasta el ${fmtFecha(fecha)}.</div>`;
+
     cont.innerHTML = `
       <h2 style="font-size:18px;margin:0 0 6px;">Análisis de stock — ${LOCAL_INFORME_ACTIVO}</h2>
-      <p style="color:var(--ink-soft);font-size:13px;">${data.dia || ''} ${fmtFecha(fecha)} — stock de la última carga de cada producto en ${LOCAL_INFORME_ACTIVO}</p>
+      <p style="color:var(--ink-soft);font-size:13px;">${data.dia || ''} ${fmtFecha(fecha)}</p>
+      ${resumenCarga}
       ${leyenda}
       ${bloques}
     `;
   }catch(err){
     const contActual = document.getElementById('contenidoStockLocal');
-    if(!contActual || SECTOR_INFORME_ACTIVO !== 'stock' || LOCAL_INFORME_ACTIVO !== local) return;
+    if(!contActual || !esInformeStock() || LOCAL_INFORME_ACTIVO !== local) return;
     cont.className = '';
     cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar: ${err.message}</div>`;
   }
@@ -2562,6 +2641,7 @@ async function guardarItemEnvio(tr, local, fecha){
   }
   const item = { sabor: tr.dataset.item, cantidad, vencimiento };
   if(tr.dataset.vencGuardado && tr.dataset.vencGuardado !== vencimiento) item.vencimientoAnterior = tr.dataset.vencGuardado;
+  if(!confirmarVencimientos([item], fecha)) return;
   const btn = tr.querySelector('.btn-guardar-item');
   btn.disabled = true; btn.textContent = 'Guardando...';
   try{
@@ -2615,6 +2695,7 @@ async function guardarEnvio(local, fecha, enviar){
     if(tr.dataset.vencGuardado && tr.dataset.vencGuardado !== it.vencimiento) it.vencimientoAnterior = tr.dataset.vencGuardado;
     return it;
   });
+  if(!confirmarVencimientos(items, fecha)) return;
   const btn = document.getElementById(enviar ? `btnGuardarEnvio-${cssId(local)}` : `btnProvisorioEnvio-${cssId(local)}`);
   const textoOriginal = btn.textContent;
   btn.disabled = true; btn.textContent = 'Guardando...';
@@ -2767,26 +2848,30 @@ async function cargarPendientesRecepcion(){
               <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Fecha_envio)}</td>
               <td class="num" style="color:var(--ink-soft);">${ent(p.Cantidad_Enviada)}</td>
               <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Vencimiento)}</td>
-              <td><input type="number" min="0" step="1" class="inp-recibido" value="${p.Cantidad_Enviada}"></td>
+              <td style="white-space:nowrap;"><input type="number" min="0" step="1" class="inp-recibido" style="max-width:90px;" value="${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? p.Cantidad_Recibida : p.Cantidad_Enviada}">
+                ${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? '<span class="sello-guardado" style="margin-left:6px;">✓ Guardado</span>' : ''}</td>
             </tr>`).join('')}
         </tbody>
       </table>
-      <div class="actions">
-        <button class="btn" id="btnConfirmarRecepcion">Confirmar recepción</button>
-      </div>
+      ${htmlBarraFinal('btnProvisorioRecepcion', 'btnConfirmarRecepcion', 'Guardar y confirmar recepción',
+        '<strong>Guardado provisorio</strong>: guarda las cantidades recibidas cargadas hasta ahora (se pueden seguir corrigiendo). <strong>Guardar y confirmar recepción</strong>: guarda todo y da por recibido el envío.')}
     `;
-    document.getElementById('btnConfirmarRecepcion').onclick = guardarRecepcion;
+    document.getElementById('btnProvisorioRecepcion').onclick = () => guardarRecepcion(false);
+    document.getElementById('btnConfirmarRecepcion').onclick = () => guardarRecepcion(true);
   }catch(err){
     cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo buscar: ${err.message}</div>`;
   }
 }
 
-async function guardarRecepcion(){
+async function guardarRecepcion(confirmar){
   const local = document.getElementById('selLocalRecepcion').value;
   const responsable = document.getElementById('inpResponsableRecepcion').value.trim();
   const msg = document.getElementById('msgRecepcion');
+  msg.className = 'msg'; msg.textContent = '';
   if(!responsable){
-    msg.className = 'msg err'; msg.textContent = 'Indicá quién está confirmando la recepción.'; return;
+    msg.className = 'msg err'; msg.textContent = 'Indicá quién está recibiendo (arriba de todo).';
+    avisar('✗ Falta indicar quién recibe.', 'err');
+    return;
   }
   const filas = [...document.querySelectorAll('#contenidoRecepcion tr[data-id]')];
   const confirmaciones = filas.map(tr => ({
@@ -2797,25 +2882,29 @@ async function guardarRecepcion(){
   if(confirmaciones.length === 0){
     msg.className = 'msg err'; msg.textContent = 'Cargá la cantidad recibida de al menos un producto.'; return;
   }
-  const btn = document.getElementById('btnConfirmarRecepcion');
+  if(confirmar && !confirm(`¿Confirmar la recepción de ${confirmaciones.length} producto(s) en ${local}? Quedan como recibidos.`)) return;
+  const btn = document.getElementById(confirmar ? 'btnConfirmarRecepcion' : 'btnProvisorioRecepcion');
+  const textoOriginal = btn.textContent;
   btn.disabled = true; btn.textContent = 'Guardando...';
   try{
-    const r = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'confirmarRecepcion', local, responsable, confirmaciones })
-    });
-    const data = await r.json();
-    if(data.error) throw new Error(data.error);
-    await cargarPendientesRecepcion(); // (esto limpia el mensaje, por eso va antes)
+    const data = await postJSON({ action: 'confirmarRecepcion', local, responsable, confirmaciones, provisorio: !confirmar });
     const hora = horaCorta();
-    msg.className = 'msg ok';
-    msg.textContent = `✓ Recepción confirmada a las ${hora}: ${data.confirmados} producto(s) guardados.`;
-    avisar(`✓ Recepción confirmada · ${hora} — ${data.confirmados} producto(s).`);
+    if(confirmar){
+      await cargarPendientesRecepcion(); // (esto limpia el mensaje, por eso va antes)
+      msg.className = 'msg ok';
+      msg.textContent = `✓ Recepción confirmada a las ${hora}: ${data.confirmados} producto(s) guardados como recibidos.`;
+      avisar(`✓ Recepción confirmada · ${hora} — ${data.confirmados} producto(s).`);
+    } else {
+      filas.forEach(tr => { if(tr.querySelector('.inp-recibido').value !== '') ponerSello(tr, hora); });
+      msg.className = 'msg ok';
+      msg.textContent = `✓ Guardado provisorio a las ${hora}: ${data.confirmados} cantidad(es) recibida(s) guardadas. Todavía falta "Guardar y confirmar recepción".`;
+      avisar(`✓ Guardado provisorio · ${hora} — ${data.confirmados} producto(s). Falta confirmar.`);
+    }
   }catch(err){
-    msg.className = 'msg err'; msg.textContent = '✗ NO se guardó: ' + err.message;
+    msg.className = 'msg err'; msg.textContent = '✗ NO se guardó: ' + err.message + ' — revisá la conexión y probá de nuevo.';
     avisar('✗ NO se guardó la recepción — ' + err.message, 'err');
   }finally{
-    btn.disabled = false; btn.textContent = 'Confirmar recepción';
+    if(document.body.contains(btn)){ btn.disabled = false; btn.textContent = textoOriginal; }
   }
 }
 
