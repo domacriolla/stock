@@ -118,6 +118,17 @@
   .pie-receta.fila-pendiente{background:#fdf6e3;}
   .pie-receta .botones-receta{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;}
   .bloque-receta{margin-bottom:10px;}
+  /* Registrar producción: encabezado y columna "Sabor" inmovilizados */
+  .tabla-fija{max-height:calc(100vh - 190px);overflow:auto;border:1px solid var(--line);border-radius:3px;background:var(--panel);margin-top:10px;}
+  .tabla-fija table.lotes{margin-top:0;}
+  .tabla-fija thead th{position:sticky;top:0;z-index:3;background:var(--panel);box-shadow:inset 0 -1px 0 var(--line);}
+  .tabla-fija tbody td:first-child{position:sticky;left:0;z-index:2;background:var(--panel);min-width:170px;box-shadow:inset -1px 0 0 var(--line);}
+  .tabla-fija thead th:first-child{left:0;z-index:4;}
+  .tabla-fija tr.fila-guardada td:first-child{background:var(--herb-bg);}
+  .tabla-fija tr.fila-pendiente td:first-child{background:#fdf6e3;}
+  .tabla-fija tr.fila-grupo td{background:#efe6d3;font-weight:700;font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--crust-dark);padding:8px;}
+  .tabla-fija tr.fila-grupo td:first-child{background:#efe6d3;}
+  @media print{.tabla-fija{max-height:none;overflow:visible;}}
   .fila-agregar{display:flex;gap:8px;align-items:center;margin:10px 0 4px;flex-wrap:wrap;}
   .fila-agregar select{max-width:340px;}
   .origen-traspaso{color:#7a3fa0;font-size:12.5px;}
@@ -991,7 +1002,11 @@ function bloquePrepDiaAnterior(){
   const canastas = (prep.canastas || []).filter(c => c.aHacerUnidades > 0);
   if(rollos <= 0 && canastas.length === 0) return '';
   const filaRollos = rollos > 0 ? `<tr><td>Rollos de Jamón y Queso</td><td class="num"><strong>${ent(rollos)}</strong></td></tr>` : '';
-  const filasCanastas = canastas.map(c => `<tr><td>Canasta — ${c.sabor}</td><td class="num"><strong>${ent(c.aHacerUnidades)}</strong></td></tr>`).join('');
+  // un solo molde para todas las canastas: se muestra el total (con el detalle por sabor al lado)
+  const totalMoldes = canastas.reduce((a, c) => a + (Number(c.aHacerUnidades) || 0), 0);
+  const filasCanastas = canastas.length
+    ? `<tr><td>Molde de canasta <span style="color:var(--ink-soft);font-size:11px;">(${canastas.map(c => `${c.sabor}: ${ent(c.aHacerUnidades)}`).join(' · ')})</span></td><td class="num"><strong>${ent(totalMoldes)}</strong></td></tr>`
+    : '';
   const notaPct = (prep.porcentajeCocina != null && Number(prep.porcentajeCocina) !== 100)
     ? `<p style="color:var(--ink-soft);font-size:12px;margin-top:6px;">Ya aplicado el ${ent(prep.porcentajeCocina)}% de venta a cubrir guardado hoy para Cocina.</p>`
     : '';
@@ -1326,6 +1341,7 @@ let PREP_REGISTRO = null;
 let SECTOR_REGISTRO_ACTIVO = 'produccion';
 let PREPEDIDO_REGISTRO = null;
 const NOMBRE_ROLLOS_JYQ = 'Rollos de Jamón y Queso';
+const NOMBRE_MOLDE_CANASTA = 'Molde de canasta'; // uno solo para todas las canastas
 
 async function renderRegistroProduccion(){
   app.innerHTML = `
@@ -1987,7 +2003,7 @@ const THEAD_REGISTRO_PRODUCCION = `
 
 function crearTablaRegistroProduccion(){
   const wrap = document.createElement('div');
-  wrap.style.overflowX = 'auto';
+  wrap.className = 'tabla-fija';
   const table = document.createElement('table');
   table.className = 'lotes traza';
   table.innerHTML = THEAD_REGISTRO_PRODUCCION + '<tbody></tbody>';
@@ -2110,89 +2126,76 @@ async function pintarRegistroProduccionSector(){
   cont.appendChild(bloquePuestosMaquina('Máquina 1', 'm1', EMPLEADOS_REGISTRO, estado.maquina1, bloqueadoGlobal));
   cont.appendChild(bloquePuestosMaquina('Máquina 2', 'm2', EMPLEADOS_REGISTRO, estado.maquina2, bloqueadoGlobal));
 
-  // --- Producción por sabor (sabores normales, Máquina Nº) ---
-  const h1 = document.createElement('h4');
-  h1.className = 'cat-heading';
-  h1.textContent = 'Producción por sabor';
-  cont.appendChild(h1);
-  const { wrap: wrap1, tbody: tbody1 } = crearTablaRegistroProduccion();
-  sabores.forEach(nombre => {
-    const ref = porSabor[nombre];
-    const aHacerMostrar = ref ? ref.aHacerUnidades : null;
-    tbody1.appendChild(filaRegistroProduccion(nombre, nombre, aHacerMostrar, '', false, EMPLEADOS_REGISTRO, guardadoPorSabor[nombre], bloqueadoGlobal));
-  });
-  cont.appendChild(wrap1);
-
-  // --- Canastas completas: hoy arman la canasta entera (disco + relleno +
-  // el molde que dejaron listo el día anterior) — cantidad = lo que sale HOY
-  // de ese sabor, igual que un sabor normal. Responsable en vez de Máquina.
-  if(saboresCanasta.length){
-    const h2 = document.createElement('h4');
-    h2.className = 'cat-heading';
-    h2.textContent = 'Canastas completas';
-    cont.appendChild(h2);
-    const { wrap: wrap2, tbody: tbody2 } = crearTablaRegistroProduccion();
-    saboresCanasta.forEach(nombre => {
+  // UNA sola tabla con encabezado y columna "Sabor" inmovilizados (se ven
+  // siempre al desplazarse, también en notebook), agrupada por categoría y
+  // con los productos de la A a la Z. Pedido por Carolina (29/09/2026).
+  const { wrap, tbody } = crearTablaRegistroProduccion();
+  const filaGrupo = (titulo, nota) => {
+    const tr = document.createElement('tr');
+    tr.className = 'fila-grupo';
+    tr.innerHTML = `<td>${titulo}</td><td colspan="13">${nota || ''}</td>`;
+    tbody.appendChild(tr);
+  };
+  const saboresHorno = (categorias['Empanadas Horno'] || []).filter(n => categoriaPorSabor[n] !== 'Canasta');
+  const saboresFrito = (categorias['Empanadas Frito'] || []).filter(n => categoriaPorSabor[n] !== 'Canasta');
+  [['Empanadas Horno', saboresHorno], ['Empanadas Frito', saboresFrito]].forEach(([titulo, lista]) => {
+    if(!lista.length) return;
+    filaGrupo(titulo);
+    lista.slice().sort(compararTexto).forEach(nombre => {
       const ref = porSabor[nombre];
-      const aHacerMostrar = ref ? ref.aHacerUnidades : null;
-      tbody2.appendChild(filaRegistroProduccion(nombre, nombre, aHacerMostrar, '', true, EMPLEADOS_REGISTRO, guardadoPorSabor[nombre], bloqueadoGlobal));
+      tbody.appendChild(filaRegistroProduccion(nombre, nombre, ref ? ref.aHacerUnidades : null, '', false, EMPLEADOS_REGISTRO, guardadoPorSabor[nombre], bloqueadoGlobal));
     });
-    cont.appendChild(wrap2);
+  });
+
+  // Canastas completas: hoy arman la canasta entera (disco + relleno + el
+  // molde que dejaron listo el día anterior). Responsable en vez de Máquina.
+  if(saboresCanasta.length){
+    filaGrupo('Canastas completas');
+    saboresCanasta.slice().sort(compararTexto).forEach(nombre => {
+      const ref = porSabor[nombre];
+      tbody.appendChild(filaRegistroProduccion(nombre, nombre, ref ? ref.aHacerUnidades : null, '', true, EMPLEADOS_REGISTRO, guardadoPorSabor[nombre], bloqueadoGlobal));
+    });
   }
 
-  // --- Extras de producción (para mañana): Rollos de Jamón y Queso y el
-  // Molde de Canasta de cada sabor — ambos se arman HOY para usarse mañana,
-  // y ambos con Responsable (no son un puesto de máquina).
-  const h3 = document.createElement('h4');
-  h3.className = 'cat-heading';
-  h3.textContent = 'Extras de producción (para mañana)';
-  cont.appendChild(h3);
-  if(prep.porcentajeCocina != null && Number(prep.porcentajeCocina) !== 100){
-    const notaPct = document.createElement('p');
-    notaPct.style.cssText = 'color:var(--ink-soft);font-size:12px;margin:-4px 0 8px;';
-    notaPct.textContent = `Ya aplicado el ${ent(prep.porcentajeCocina)}% de venta a cubrir guardado hoy para Cocina.`;
-    cont.appendChild(notaPct);
-  }
-  const { wrap: wrap3, tbody: tbody3 } = crearTablaRegistroProduccion();
+  // Extras para mañana: Rollos de Jamón y Queso y UN solo "Molde de canasta"
+  // (es el mismo molde para todas las canastas — se suma lo de todas).
+  const notaPct = (prep.porcentajeCocina != null && Number(prep.porcentajeCocina) !== 100)
+    ? `<span style="color:var(--ink-soft);font-size:11.5px;font-weight:400;">Ya aplicado el ${ent(prep.porcentajeCocina)}% de venta a cubrir de Cocina.</span>` : '';
+  filaGrupo('Extras de producción (para mañana)', notaPct);
   const etiquetaManana = ' <span style="color:var(--ink-soft);font-size:11px;">(armar hoy para mañana)</span>';
-  tbody3.appendChild(filaRegistroProduccion(NOMBRE_ROLLOS_JYQ, NOMBRE_ROLLOS_JYQ, prep.rollosJyQ, etiquetaManana, true, EMPLEADOS_REGISTRO, guardadoPorSabor[NOMBRE_ROLLOS_JYQ], bloqueadoGlobal));
-  saboresCanasta.forEach(nombre => {
-    const c = canastaPorSabor[nombre];
-    const aHacerMostrar = c ? c.aHacerUnidades : 0;
-    const saborKeyMolde = 'Molde — ' + nombre;
-    tbody3.appendChild(filaRegistroProduccion('Molde de canasta — ' + nombre, saborKeyMolde, aHacerMostrar, etiquetaManana, true, EMPLEADOS_REGISTRO, guardadoPorSabor[saborKeyMolde], bloqueadoGlobal));
-  });
-  cont.appendChild(wrap3);
+  tbody.appendChild(filaRegistroProduccion(NOMBRE_ROLLOS_JYQ, NOMBRE_ROLLOS_JYQ, prep.rollosJyQ, etiquetaManana, true, EMPLEADOS_REGISTRO, guardadoPorSabor[NOMBRE_ROLLOS_JYQ], bloqueadoGlobal));
+  if(saboresCanasta.length){
+    const totalMoldes = saboresCanasta.reduce((acc, n) => acc + ((canastaPorSabor[n] && Number(canastaPorSabor[n].aHacerUnidades)) || 0), 0);
+    tbody.appendChild(filaRegistroProduccion(NOMBRE_MOLDE_CANASTA, NOMBRE_MOLDE_CANASTA, totalMoldes, etiquetaManana, true, EMPLEADOS_REGISTRO, guardadoPorSabor[NOMBRE_MOLDE_CANASTA], bloqueadoGlobal));
+  }
 
-  // --- Producción adicional: cualquier producto que se elaboró aunque el
+  // Producción adicional: cualquier producto que se elaboró aunque el
   // cálculo del día no lo pidiera (o que no está en las listas de arriba).
-  const yaListados = new Set([...cont.querySelectorAll('tr[data-sabor]')].map(tr => tr.dataset.sabor));
-  const h4 = document.createElement('h4');
-  h4.className = 'cat-heading';
-  h4.textContent = 'Producción adicional (fuera del cálculo del día)';
-  cont.appendChild(h4);
-  const { wrap: wrap4, tbody: tbody4 } = crearTablaRegistroProduccion();
-  // lo adicional ya guardado hoy
-  Object.keys(guardadoPorSabor).filter(k => !yaListados.has(k)).sort(compararTexto).forEach(k => {
-    tbody4.appendChild(filaRegistroProduccion(k, k, null, '', true, EMPLEADOS_REGISTRO, guardadoPorSabor[k], bloqueadoGlobal));
+  const yaListados = new Set([...tbody.querySelectorAll('tr[data-sabor]')].map(tr => tr.dataset.sabor));
+  filaGrupo('Producción adicional (fuera del cálculo)');
+  const adicionalesGuardados = Object.keys(guardadoPorSabor).filter(k => !yaListados.has(k)).sort(compararTexto);
+  adicionalesGuardados.forEach(k => {
+    tbody.appendChild(filaRegistroProduccion(k, k, null, '', true, EMPLEADOS_REGISTRO, guardadoPorSabor[k], bloqueadoGlobal));
   });
-  cont.appendChild(wrap4);
+  cont.appendChild(wrap);
   if(!bloqueadoGlobal){
     const todos = Object.values(categorias).flat().sort(compararTexto);
     const selWrap = document.createElement('div');
     selWrap.className = 'fila-agregar no-print';
     selWrap.innerHTML = `
-      <select id="selAgregarProduccion"><option value="">— Elegí un producto para agregar —</option>
+      <select id="selAgregarProduccion"><option value="">— Agregar producción adicional: elegí un producto —</option>
         ${todos.map(n => `<option value="${n}">${n}</option>`).join('')}</select>
       <button type="button" class="btn secondary" id="btnAgregarProduccion">+ Agregar</button>`;
     cont.appendChild(selWrap);
     selWrap.querySelector('#btnAgregarProduccion').onclick = () => {
       const n = selWrap.querySelector('#selAgregarProduccion').value;
       if(!n) return;
-      const clave = yaListados.has(n) || [...tbody4.querySelectorAll('tr[data-sabor]')].some(tr => tr.dataset.sabor === n)
-        ? n + ' (adicional)' : n;
-      if([...tbody4.querySelectorAll('tr[data-sabor]')].some(tr => tr.dataset.sabor === clave)){ avisar('Ese producto ya está agregado abajo.', 'err'); return; }
-      tbody4.appendChild(filaRegistroProduccion(clave, clave, null, '', true, EMPLEADOS_REGISTRO, null, false));
+      const existentes = new Set([...tbody.querySelectorAll('tr[data-sabor]')].map(tr => tr.dataset.sabor));
+      const clave = existentes.has(n) ? n + ' (adicional)' : n;
+      if(existentes.has(clave)){ avisar('Ese producto ya está agregado en "Producción adicional".', 'err'); return; }
+      const tr = filaRegistroProduccion(clave, clave, null, '', true, EMPLEADOS_REGISTRO, null, false);
+      tbody.appendChild(tr);
+      tr.scrollIntoView({ block: 'nearest' });
     };
   }
 
