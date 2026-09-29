@@ -43,7 +43,9 @@
   header.top h1{font-size:26px;color:var(--crust-dark);text-transform:uppercase;}
   header.top .sub{font-family:'Poppins',sans-serif;color:var(--accent);font-size:13px;font-weight:600;text-transform:uppercase;letter-spacing:.08em;}
 
-  .home-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:24px;}
+  .home-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:12px;}
+  .home-seccion{font-size:15px;color:var(--accent);text-transform:uppercase;letter-spacing:.08em;margin:32px 0 0;padding-bottom:8px;border-bottom:1px solid var(--line);}
+  .home-seccion:first-of-type{margin-top:8px;}
   @media (max-width:640px){.home-grid{grid-template-columns:1fr;}}
   .home-card{
     background:var(--panel);border:1px solid var(--line);border-radius:4px;
@@ -212,7 +214,11 @@ const app = document.getElementById('app');
    --------------------------------------------------------------------- */
 function irA(pantalla){
   if(pantalla === 'home') renderHome();
-  if(pantalla === 'local') renderLocal();
+  // Cargar stock: se entra desde el bloque LOCALES o desde el bloque FÁBRICA,
+  // y el selector "¿Dónde estás cargando?" muestra solo los de ese bloque.
+  if(pantalla === 'stockLocales') renderLocal('locales');
+  if(pantalla === 'stockFabrica') renderLocal('fabrica');
+  if(pantalla === 'local') renderLocal('locales');
   if(pantalla === 'fabrica') renderFabrica();
   if(pantalla === 'planificacion') renderPlanificacion();
   if(pantalla === 'envios') renderEnvios();
@@ -220,7 +226,17 @@ function irA(pantalla){
   if(pantalla === 'historial') renderHistorialEnvios();
   if(pantalla === 'registro') renderRegistroProduccion();
   if(pantalla === 'fichas') renderFichasTecnicas();
-  if(pantalla === 'informes') renderInformes();
+  // Informes: cada bloque abre directo su propio informe (sin solapas).
+  if(pantalla === 'informeStock') renderInformes('stock');
+  if(pantalla === 'informeInsumos') renderInformes('consumo');
+}
+
+function tarjetaHome(destino, titulo, texto){
+  return `
+      <button class="home-card" onclick="irA('${destino}')">
+        <h2>${titulo}</h2>
+        <p>${texto}</p>
+      </button>`;
 }
 
 function renderHome(){
@@ -229,52 +245,29 @@ function renderHome(){
       <h1>Doma Criolla</h1>
       <div class="sub">Stock y producción</div>
     </header>
+
+    <h3 class="home-seccion">Locales</h3>
     <div class="home-grid">
-      <button class="home-card" onclick="irA('local')">
-        <div class="tag">LOCAL / FÁBRICA</div>
-        <h2>Cargar stock de hoy</h2>
-        <p>Registrar cuánto queda de cada sabor, con su fecha de vencimiento.</p>
-      </button>
-      <button class="home-card" onclick="irA('recepcion')">
-        <div class="tag">LOCAL</div>
-        <h2>Confirmar recepción</h2>
-        <p>Registrar cuánto llegó realmente de lo que fábrica despachó hoy.</p>
-      </button>
-      <button class="home-card" onclick="irA('historial')">
-        <div class="tag">FÁBRICA / LOCAL</div>
-        <h2>Historial de envíos</h2>
-        <p>Comparar lo enviado contra lo recibido, por local y sabor.</p>
-      </button>
-      <button class="home-card" onclick="irA('fabrica')">
-        <div class="tag">FÁBRICA</div>
-        <h2>Ver qué producir hoy</h2>
-        <p>Calculado a partir del stock cargado y la venta estimada de cada sabor.</p>
-      </button>
-      <button class="home-card" onclick="irA('registro')">
-        <div class="tag">FÁBRICA</div>
-        <h2>Registrar producción</h2>
-        <p>Trazabilidad del turno: máquina, disco, relleno, horas y total producido por sabor.</p>
-      </button>
-      <button class="home-card" onclick="irA('envios')">
-        <div class="tag">FÁBRICA</div>
-        <h2>Despachar envíos</h2>
-        <p>Cuánto hay que mandarle hoy a cada local, calculado con lo que vende y lo que ya tiene cargado.</p>
-      </button>
-      <button class="home-card" onclick="irA('informes')">
-        <div class="tag">FÁBRICA / LOCAL</div>
-        <h2>Informes</h2>
-        <p>Consumo real de insumos por día, y análisis de stock por local (vencimientos).</p>
-      </button>
-      <button class="home-card" onclick="irA('fichas')">
-        <div class="tag">FÁBRICA</div>
-        <h2>Fichas técnicas</h2>
-        <p>Importar y actualizar las recetas (Rellenos, Preparados, Postres, Dips, Edición Limitada).</p>
-      </button>
-      <button class="home-card" onclick="irA('planificacion')">
-        <div class="tag">PLANIFICACIÓN</div>
-        <h2>Editar venta proyectada</h2>
-        <p>Actualizar, por local, cuánto se espera vender de cada sabor cada día de la semana.</p>
-      </button>
+      ${tarjetaHome('stockLocales', 'Cargar stock del local', 'Registrar cuánto queda de cada sabor, con su fecha de vencimiento.')}
+      ${tarjetaHome('recepcion', 'Confirmar recepción', 'Registrar cuánto llegó realmente de lo que fábrica despachó hoy.')}
+      ${tarjetaHome('historial', 'Historial de envíos', 'Comparar lo enviado contra lo recibido, por local y sabor.')}
+      ${tarjetaHome('informeStock', 'Informe: Stock por local', 'Última carga de stock de cada local, con semáforo de vencimientos.')}
+    </div>
+
+    <h3 class="home-seccion">Fábrica</h3>
+    <div class="home-grid">
+      ${tarjetaHome('stockFabrica', 'Cargar stock de fábrica', 'Stock de Producción, Cocina (rellenos en kilos) y Discos.')}
+      ${tarjetaHome('fabrica', 'Ver qué producir hoy', 'Calculado a partir del stock cargado y la venta estimada de cada sabor.')}
+      ${tarjetaHome('registro', 'Registrar producción', 'Trazabilidad del turno: máquina, disco, relleno, horas y total producido por sabor.')}
+      ${tarjetaHome('envios', 'Despachar envíos', 'Cuánto hay que mandarle hoy a cada local, calculado con lo que vende y lo que ya tiene cargado.')}
+      ${tarjetaHome('historial', 'Historial de envíos', 'Comparar lo enviado contra lo recibido, por local y sabor.')}
+      ${tarjetaHome('informeInsumos', 'Informe: Consumo de insumos', 'Consumo real de insumos de Cocina por día.')}
+    </div>
+
+    <h3 class="home-seccion">Actualizar datos</h3>
+    <div class="home-grid">
+      ${tarjetaHome('fichas', 'Fichas técnicas', 'Importar y actualizar las recetas (Rellenos, Preparados, Postres, Dips, Edición Limitada).')}
+      ${tarjetaHome('planificacion', 'Editar venta proyectada', 'Actualizar, por local, cuánto se espera vender de cada sabor cada día de la semana.')}
     </div>
     <footer class="note">Doma Criolla — herramienta interna de planificación de producción.</footer>
   `;
@@ -372,15 +365,18 @@ async function guardarItemStock(tr){
   }
 }
 
-async function renderLocal(){
+async function renderLocal(bloque){
+  // bloque = 'locales' (Centro/Patagonia/Zelarrayan) o 'fabrica' (sectores de Fábrica)
+  const esBloqueFabrica = bloque === 'fabrica';
+  const opcionesSector = LOCALES.filter(l => l.startsWith('Fábrica') === esBloqueFabrica);
   app.innerHTML = `
     <button class="back" onclick="irA('home')">← Volver</button>
-    <header class="top"><h1>Cargar stock</h1></header>
+    <header class="top"><h1>${esBloqueFabrica ? 'Cargar stock de fábrica' : 'Cargar stock del local'}</h1></header>
 
     <div class="field-row">
-      <label>¿Dónde estás cargando este stock?</label>
+      <label>${esBloqueFabrica ? '¿De qué sector estás cargando este stock?' : '¿Dónde estás cargando este stock?'}</label>
       <select id="selLocal">
-        ${LOCALES.map(l => `<option value="${l}">${l}</option>`).join('')}
+        ${opcionesSector.map(l => `<option value="${l}">${l}</option>`).join('')}
       </select>
     </div>
     <div class="field-row">
@@ -1402,31 +1398,25 @@ async function reabrirReceta(receta, fecha){
 let SECTOR_INFORME_ACTIVO = 'consumo';
 let LOCAL_INFORME_ACTIVO = null;
 
-async function renderInformes(){
+async function renderInformes(sector){
+  // Cada bloque del inicio abre su propio informe: 'stock' (Locales) o
+  // 'consumo' (Fábrica). SECTOR_INFORME_ACTIVO se sigue usando en los
+  // chequeos de "respuesta tardía" de cada informe.
+  SECTOR_INFORME_ACTIVO = sector === 'stock' ? 'stock' : 'consumo';
   if(!LOCAL_INFORME_ACTIVO) LOCAL_INFORME_ACTIVO = LOCALES_VENTA[0];
+  const titulo = SECTOR_INFORME_ACTIVO === 'stock' ? 'Stock por local' : 'Consumo de insumos';
   app.innerHTML = `
     <button class="back" onclick="irA('home')">← Volver</button>
     <div class="fab-toolbar">
-      <header class="top" style="margin:0;"><h1>Informes</h1></header>
+      <header class="top" style="margin:0;"><h1>${titulo}</h1></header>
       <div class="field-row">
         <label>Fecha de consulta</label>
         <input type="date" id="fechaInforme" value="${hoyISO()}">
       </div>
       <button class="btn secondary no-print" id="btnImprimirInforme" style="margin-left:auto;" onclick="window.print()">🖶 Imprimir</button>
     </div>
-    <div class="tabs no-print" id="tabsInforme">
-      <button class="tab-btn ${SECTOR_INFORME_ACTIVO === 'consumo' ? 'active' : ''}" data-sector="consumo">Consumo de insumos</button>
-      <button class="tab-btn ${SECTOR_INFORME_ACTIVO === 'stock' ? 'active' : ''}" data-sector="stock">Stock por local</button>
-    </div>
     <div id="contenidoInforme" class="loading">Cargando…</div>
   `;
-  [...document.querySelectorAll('#tabsInforme .tab-btn')].forEach(b => {
-    b.onclick = () => {
-      [...document.querySelectorAll('#tabsInforme .tab-btn')].forEach(x => x.classList.toggle('active', x === b));
-      SECTOR_INFORME_ACTIVO = b.dataset.sector;
-      pintarSectorInforme();
-    };
-  });
   document.getElementById('fechaInforme').onchange = pintarSectorInforme;
   pintarSectorInforme();
 }
