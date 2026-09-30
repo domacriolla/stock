@@ -636,8 +636,8 @@ async function renderLocal(bloque){
     </div>
 
     <p style="color:var(--ink-soft);font-size:12.5px;max-width:560px;">
-      Están listados todos los productos — completá cantidad y vencimiento de lo que tengas hoy. Lo que quede
-      en blanco cuenta como <strong>0</strong>. Guardá con <strong>Guardado provisorio</strong> las veces que
+      Están listados todos los productos — completá cantidad y vencimiento de lo que tengas hoy. Si de un producto
+      no queda nada, poné <strong>0</strong> (no hace falta vencimiento); lo que quede en blanco también cuenta como 0. Guardá con <strong>Guardado provisorio</strong> las veces que
       quieras (podés seguir corrigiendo) y al terminar tocá <strong>Guardar y enviar final</strong>. Si un
       producto tiene más de un vencimiento, usá el botón <strong>+</strong> de esa fila.
     </p>
@@ -700,7 +700,7 @@ async function renderLocal(bloque){
     tr.dataset.item = nombre;
     tr.innerHTML = `
       <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : nombre}</td>
-      <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0" value="${g.cantidad || ''}"></td>
+      <td><input type="number" min="0" step="1" class="inp-cant" placeholder="—" value="${g.cantidad != null && g.cantidad !== '' ? g.cantidad : ''}"></td>
       <td><input type="date" class="inp-venc" value="${g.vencimiento || ''}"></td>
       <td class="col-add">${esExtra ? '' : '<button type="button" class="add-lote-btn" title="Agregar otro vencimiento para este producto">+</button>'}</td>
       <td class="col-del">${esExtra ? '<button type="button" class="del-btn" title="Quitar">✕</button>' : ''}</td>
@@ -847,12 +847,16 @@ async function renderLocal(bloque){
       return;
     }
     const filas = [...cont.querySelectorAll('tr[data-item]')];
+    // completas: cantidad > 0 con vencimiento, o un 0 explícito ("no hay",
+    // no pide vencimiento). Pedido por Carolina (30/09/2026).
     const completas = [], incompletas = [], vaciadas = [];
     filas.forEach(tr => {
-      const cantidad = tr.querySelector('.inp-cant').value;
+      const cantidad = tr.querySelector('.inp-cant').value.trim();
       const vencimiento = tr.querySelector('.inp-venc').value;
-      const tieneCant = cantidad && Number(cantidad) > 0;
-      if(tieneCant && vencimiento) completas.push(tr);
+      const esCero = cantidad !== '' && Number(cantidad) === 0;
+      const tieneCant = cantidad !== '' && Number(cantidad) > 0;
+      if(esCero) completas.push(tr);
+      else if(tieneCant && vencimiento) completas.push(tr);
       else if(tieneCant || vencimiento) incompletas.push(tr.dataset.item + (tieneCant ? ' (falta vencimiento)' : ' (falta cantidad)'));
       else if(tr.dataset.guardado) vaciadas.push(tr);
     });
@@ -863,12 +867,15 @@ async function renderLocal(bloque){
       return;
     }
     const items = completas.map(tr => {
-      const it = { sabor: tr.dataset.item, cantidad: tr.querySelector('.inp-cant').value, vencimiento: tr.querySelector('.inp-venc').value };
-      if(tr.dataset.vencGuardado && tr.dataset.vencGuardado !== it.vencimiento) it.vencimientoAnterior = tr.dataset.vencGuardado;
+      const cantidad = tr.querySelector('.inp-cant').value.trim();
+      const esCero = Number(cantidad) === 0;
+      if(esCero) tr.querySelector('.inp-venc').value = ''; // un 0 no lleva vencimiento
+      const it = { sabor: tr.dataset.item, cantidad: esCero ? 0 : cantidad, vencimiento: esCero ? '' : tr.querySelector('.inp-venc').value };
+      if(tr.dataset.guardado && (tr.dataset.vencGuardado || '') !== it.vencimiento) it.vencimientoAnterior = tr.dataset.vencGuardado || '';
       return it;
     });
-    // el aviso de vencimientos raros, solo para lo que se tocó
-    const tocados = completas.filter(tr => !tr.dataset.guardado || tr.classList.contains('fila-pendiente'))
+    // el aviso de vencimientos raros, solo para lo que se tocó (y no para los 0)
+    const tocados = completas.filter(tr => (!tr.dataset.guardado || tr.classList.contains('fila-pendiente')) && Number(tr.querySelector('.inp-cant').value) > 0)
       .map(tr => ({ sabor: tr.dataset.item, vencimiento: tr.querySelector('.inp-venc').value }));
     if(!confirmarVencimientos(tocados, fecha)) return;
     if(enviar){
