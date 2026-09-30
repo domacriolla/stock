@@ -131,6 +131,12 @@
   @media print{.tabla-fija{max-height:none;overflow:visible;}}
   .fila-agregar{display:flex;gap:8px;align-items:center;margin:10px 0 4px;flex-wrap:wrap;}
   .fila-agregar select{max-width:340px;}
+  .tabla-resumen-envios tr.fila-subtotal-resumen td{font-weight:700;border-top:2px solid var(--line);border-bottom:2px solid var(--line);background:#faf5ea;}
+  table.lotes tfoot tr.fila-subtotal-cat td{font-weight:700;border-top:2px solid var(--line);background:#faf5ea;}
+  .print-tabla tr.fila-subtotal-print td{font-weight:700;border-top:2px solid #000;}
+  .tabla-resumen-envios tr.fila-grupo-resumen td{background:#efe6d3;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--crust-dark);}
+  .tabla-resumen-envios tfoot td{border-top:2px solid var(--ink-soft);background:var(--panel);}
+  .tabla-resumen-envios td.num, .tabla-resumen-envios th.num{min-width:90px;text-align:right;}
   .origen-traspaso{color:#7a3fa0;font-size:12.5px;}
   .bloque-salidas{margin-top:28px;padding:14px;border:1px dashed #b98bd3;border-radius:4px;background:#faf5fd;}
   .cartel-enviado{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
@@ -2593,11 +2599,12 @@ async function cargarEnvios(){
     const tabs = document.getElementById('tabsEnvios');
     tabs.style.display = 'flex';
     const pestañas = LOCALES_VENTA.map(l => ({ id: l, texto: l + (guardadoPorLocal[l] && guardadoPorLocal[l].cierre ? ' ✓' : '') }))
-      .concat([{ id: 'traspaso', texto: 'Traspaso entre locales' }]);
+      .concat([{ id: 'resumen', texto: 'Total a enviar' }, { id: 'traspaso', texto: 'Traspaso entre locales' }]);
     tabs.innerHTML = pestañas.map(p => `<button class="tab-btn ${p.id===TAB_ENVIO_ACTIVO?'active':''}" data-tab="${p.id}">${p.texto}</button>`).join('');
     const mostrar = () => {
       [...tabs.querySelectorAll('.tab-btn')].forEach(x => x.classList.toggle('active', x.dataset.tab === TAB_ENVIO_ACTIVO));
       [...cont.querySelectorAll(':scope > .panel-tab')].forEach(p => p.style.display = (p.dataset.tab === TAB_ENVIO_ACTIVO ? '' : 'none'));
+      if(TAB_ENVIO_ACTIVO === 'resumen') pintarResumenEnvios(cont.querySelector(':scope > .panel-tab[data-tab="resumen"]'));
     };
     [...tabs.querySelectorAll('.tab-btn')].forEach(b => { b.onclick = () => { TAB_ENVIO_ACTIVO = b.dataset.tab; mostrar(); }; });
 
@@ -2609,6 +2616,9 @@ async function cargarEnvios(){
       wrap.appendChild(pintarPanelEnvio({ origen: '', destino: local, itemsCalculados: data.envios[local] || [], data, categorias, guardado: guardadoPorLocal[local] || {} }));
       cont.appendChild(wrap);
     });
+    const wrapR = document.createElement('div');
+    wrapR.className = 'panel-tab'; wrapR.dataset.tab = 'resumen';
+    cont.appendChild(wrapR);
     const wrapT = document.createElement('div');
     wrapT.className = 'panel-tab'; wrapT.dataset.tab = 'traspaso';
     cont.appendChild(wrapT);
@@ -2617,6 +2627,66 @@ async function cargarEnvios(){
   }catch(err){
     cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo calcular: ${err.message} <button class="btn secondary" style="font-size:12px;padding:5px 9px;margin-left:8px;" onclick="cargarEnvios()">Reintentar</button></div>`;
   }
+}
+
+// solapa "Total a enviar": vista general de los 3 locales juntos (no se
+// carga nada acá — cada local se despacha desde su propia solapa). Muestra
+// la orden calculada, o lo que ya se cargó como "Enviado (real)" en cada
+// local. Pedido por Carolina (30/09/2026).
+let VISTA_RESUMEN_ENVIOS = 'calculada';
+let RESUMEN_SOLO_CON_ENVIO = true;
+function pintarResumenEnvios(wrap){
+  if(!wrap || !DATOS_ENVIOS) return;
+  const { data, categorias } = DATOS_ENVIOS;
+  const valor = {}; // valor[local][producto]
+  LOCALES_VENTA.forEach(local => {
+    valor[local] = {};
+    if(VISTA_RESUMEN_ENVIOS === 'calculada'){
+      (data.envios[local] || []).forEach(it => { valor[local][it.sabor] = Number(it.aHacerUnidades) || 0; });
+    } else {
+      const panel = document.querySelector(`.panel-envio-local[data-clave="${local}"]`);
+      if(panel) [...panel.querySelectorAll('tr[data-item]')].forEach(tr => {
+        valor[local][tr.dataset.item] = (valor[local][tr.dataset.item] || 0) + (Number(tr.querySelector('.inp-cant').value) || 0);
+      });
+    }
+  });
+  const totLocal = {}; LOCALES_VENTA.forEach(l => totLocal[l] = 0);
+  let totGeneral = 0;
+  const bloques = Object.keys(categorias).map(cat => {
+    const subLocal = LOCALES_VENTA.map(() => 0);
+    let subTotal = 0;
+    const filas = categorias[cat].map(n => {
+      const v = LOCALES_VENTA.map(l => valor[l][n] || 0);
+      const tot = v.reduce((a, b) => a + b, 0);
+      if(RESUMEN_SOLO_CON_ENVIO && tot <= 0) return '';
+      LOCALES_VENTA.forEach((l, i) => { totLocal[l] += v[i]; subLocal[i] += v[i]; });
+      totGeneral += tot;
+      subTotal += tot;
+      return `<tr><td>${n}</td>${v.map(x => `<td class="num" style="${x ? '' : 'color:var(--ink-soft);'}">${x ? ent(x) : '—'}</td>`).join('')}<td class="num"><strong>${ent(tot)}</strong></td></tr>`;
+    }).join('');
+    if(!filas) return '';
+    // subtotal de la clasificación (pedido por Carolina 30/09/2026)
+    const subtotal = `<tr class="fila-subtotal-resumen"><td>Total ${cat}</td>${subLocal.map(x => `<td class="num">${ent(x)}</td>`).join('')}<td class="num">${ent(subTotal)}</td></tr>`;
+    return `<tr class="fila-grupo-resumen"><td colspan="${LOCALES_VENTA.length + 2}">${cat}</td></tr>${filas}${subtotal}`;
+  }).join('');
+  wrap.innerHTML = `
+    <div class="fab-toolbar no-print" style="justify-content:flex-start;align-items:flex-end;">
+      <div class="field-row"><label>Ver</label>
+        <select id="selVistaResumen">
+          <option value="calculada" ${VISTA_RESUMEN_ENVIOS === 'calculada' ? 'selected' : ''}>Orden calculada</option>
+          <option value="real" ${VISTA_RESUMEN_ENVIOS === 'real' ? 'selected' : ''}>Enviado (real) cargado</option>
+        </select></div>
+      <label style="display:flex;align-items:center;gap:6px;font-size:13px;margin:0 0 10px;"><input type="checkbox" id="chkSoloConEnvio" ${RESUMEN_SOLO_CON_ENVIO ? 'checked' : ''}> Solo productos con envío</label>
+      <button class="btn secondary" style="margin-left:auto;" onclick="window.print()">🖶 Imprimir</button>
+    </div>
+    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)} — ${VISTA_RESUMEN_ENVIOS === 'calculada' ? 'orden calculada' : 'lo cargado como "Enviado (real)"'} de los 3 locales. Es solo para ver el total: cada local se despacha desde su propia solapa.</p>
+    ${bloques ? `<div style="overflow-x:auto;"><table class="prod tabla-resumen-envios">
+      <thead><tr><th>Producto</th>${LOCALES_VENTA.map(l => `<th class="num">${l}</th>`).join('')}<th class="num">Total a enviar</th></tr></thead>
+      <tbody>${bloques}</tbody>
+      <tfoot><tr><td><strong>TOTAL</strong></td>${LOCALES_VENTA.map(l => `<td class="num"><strong>${ent(totLocal[l])}</strong></td>`).join('')}<td class="num"><strong>${ent(totGeneral)}</strong></td></tr></tfoot>
+    </table></div>` : `<div class="empty">No hay nada para enviar${VISTA_RESUMEN_ENVIOS === 'real' ? ' cargado todavía' : ''}.</div>`}`;
+  wrap.querySelector('#selVistaResumen').onchange = (e) => { VISTA_RESUMEN_ENVIOS = e.target.value; pintarResumenEnvios(wrap); };
+  wrap.querySelector('#chkSoloConEnvio').onchange = (e) => { RESUMEN_SOLO_CON_ENVIO = e.target.checked; pintarResumenEnvios(wrap); };
 }
 
 // solapa "Traspaso entre locales": elegir de dónde sale y a dónde va
@@ -2721,7 +2791,13 @@ function pintarPanelEnvio({ origen, destino, itemsCalculados, data, categorias, 
         <th class="col-cant">${origen ? 'Cantidad' : 'Enviado (real)'}</th>
         <th class="col-venc">Vencimiento</th>
         <th class="col-add"></th><th class="col-del"></th><th></th>
-      </tr></thead><tbody></tbody>`;
+      </tr></thead><tbody></tbody>
+      <tfoot><tr class="fila-subtotal-cat">
+        <td>Total ${cat}</td>
+        ${conOrden ? '<td class="num sub-orden"></td>' : ''}
+        <td class="num sub-enviado" style="padding-left:14px;"></td>
+        <td colspan="4"></td>
+      </tr></tfoot>`;
     const tbody = table.querySelector('tbody');
     categorias[cat].forEach(nombre => {
       const orden = (porSabor[nombre] && porSabor[nombre].aHacerUnidades) || 0;
@@ -2729,6 +2805,18 @@ function pintarPanelEnvio({ origen, destino, itemsCalculados, data, categorias, 
       if(gs.length === 0) tbody.appendChild(filaEnvio(nombre, orden, false, null, conOrden, panelEstado));
       else gs.forEach((g, k) => tbody.appendChild(filaEnvio(nombre, orden, k > 0, g, conOrden, panelEstado)));
     });
+    // subtotal de la clasificación: orden calculada y enviado (real), se
+    // actualiza mientras cargan (pedido por Carolina 30/09/2026)
+    const actualizarSubtotal = () => {
+      const filas = [...tbody.querySelectorAll('tr[data-item]')];
+      const sumOrden = filas.reduce((a, tr) => a + (Number(tr.dataset.orden) || 0), 0);
+      const sumEnv = filas.reduce((a, tr) => a + (Number(tr.querySelector('.inp-cant').value) || 0), 0);
+      const so = table.querySelector('.sub-orden'); if(so) so.textContent = ent(sumOrden);
+      table.querySelector('.sub-enviado').textContent = ent(sumEnv);
+    };
+    tbody.addEventListener('input', actualizarSubtotal);
+    tbody.addEventListener('click', () => setTimeout(actualizarSubtotal, 0)); // al quitar un lote
+    actualizarSubtotal();
     tablas.appendChild(table);
     const a = document.createElement('a');
     a.href = `#${catId}`; a.textContent = cat;
@@ -2879,16 +2967,14 @@ function imprimirOrdenEnvio(panel, local, fecha){
     it.cantidadImprimir = it.cantidadReal > 0 ? it.cantidadReal : it.ordenCalculada;
   });
 
-  const hayAlgo = Object.keys(porSabor).some(n => porSabor[n].cantidadImprimir > 0);
-  if(!hayAlgo){
-    alert(`No hay nada para enviar a ${local} hoy (ni cargado ni calculado).`);
-    return;
-  }
-
+  // Las EMPANADAS (Horno y Frito) se imprimen SIEMPRE completas, aunque
+  // haya que mandar 0; del resto de las categorías, solo lo que se envía.
+  // Pedido por Carolina (30/09/2026).
+  const esEmpanadas = cat => cat === 'Empanadas Horno' || cat === 'Empanadas Frito';
   const categorias = SABORES_CACHE || {};
   let filasHtml = '';
   Object.keys(categorias).forEach(cat => {
-    const nombres = categorias[cat].filter(n => porSabor[n] && porSabor[n].cantidadImprimir > 0);
+    const nombres = categorias[cat].filter(n => esEmpanadas(cat) || (porSabor[n] && porSabor[n].cantidadImprimir > 0));
     if(nombres.length === 0) return;
     filasHtml += `
       <h3>${cat}</h3>
@@ -2898,9 +2984,14 @@ function imprimirOrdenEnvio(panel, local, fecha){
           ${nombres.map(n => `
             <tr>
               <td>${n}</td>
-              <td class="num">${ent(porSabor[n].cantidadImprimir)}</td>
-              <td>${porSabor[n].vencimiento ? fmtFecha(porSabor[n].vencimiento) : ''}</td>
+              <td class="num">${ent(porSabor[n] ? porSabor[n].cantidadImprimir : 0)}</td>
+              <td>${porSabor[n] && porSabor[n].vencimiento ? fmtFecha(porSabor[n].vencimiento) : ''}</td>
             </tr>`).join('')}
+          <tr class="fila-subtotal-print">
+            <td>Total ${cat}</td>
+            <td class="num">${ent(nombres.reduce((a, n) => a + (porSabor[n] ? porSabor[n].cantidadImprimir : 0), 0))}</td>
+            <td></td>
+          </tr>
         </tbody>
       </table>`;
   });
