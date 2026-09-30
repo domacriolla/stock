@@ -242,6 +242,35 @@
    ====================================================================== */
 const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx0MpQPLqVL_5QpuRAOmz_3uvA6Oz-72bzwABz3bN6ltR3kmH0-nnMwRnoDrfhanm0DWQ/exec';
 
+/* ---------------------------------------------------------------------
+   REGISTRO DE TIEMPOS (30/09/2026): cada pedido al servidor anota cuánto
+   tardó en total y cuánto de eso fue trabajo del servidor (_ms), para ver en
+   "Actualizar datos → Tiempos de carga" qué pantallas son lentas. Se guarda
+   solo en esta tablet (últimos 300 pedidos).
+   --------------------------------------------------------------------- */
+const _fetchOriginal = window.fetch.bind(window);
+function pantallaActual(){ const h = document.querySelector('#app header.top h1'); return h ? h.textContent.trim() : ''; }
+function registrarTiempo(accion, totalMs, servidorMs, desdeCache){
+  try{
+    const k = 'doma:tiempos';
+    const lista = JSON.parse(localStorage.getItem(k) || '[]');
+    lista.push({ a: accion || '?', t: Math.round(totalMs), s: servidorMs != null ? Math.round(servidorMs) : null, c: !!desdeCache, p: pantallaActual(), f: Date.now() });
+    localStorage.setItem(k, JSON.stringify(lista.slice(-300)));
+  }catch(e){}
+}
+window.fetch = async function(url, opts){
+  if(!String(url).startsWith(APPS_SCRIPT_URL)) return _fetchOriginal(url, opts);
+  let accion = '';
+  try{ accion = opts && opts.body ? JSON.parse(opts.body).action : new URL(url).searchParams.get('action'); }catch(e){}
+  const t0 = performance.now();
+  const resp = await _fetchOriginal(url, opts);
+  try{
+    resp.clone().json().then(d => registrarTiempo(accion, performance.now() - t0, d && d._ms, d && d._cache))
+      .catch(() => registrarTiempo(accion, performance.now() - t0));
+  }catch(e){}
+  return resp;
+};
+
 const LOCALES = ['Centro', 'Patagonia', 'Zelarrayan', 'Fábrica - Producción', 'Fábrica - Cocina', 'Fábrica - Discos'];
 const TIPOS_DISCO = ['Horno', 'Frito', 'Recorte'];
 let SABORES_CACHE = null;
@@ -284,7 +313,7 @@ function guardarMemoria(clave, datos){
   try{ localStorage.setItem('doma:' + MEMORIA_VERSION + ':' + clave, JSON.stringify({ t: Date.now(), d: datos })); }catch(e){}
 }
 function borrarMemoria(){
-  try{ Object.keys(localStorage).filter(k => k.startsWith('doma:')).forEach(k => localStorage.removeItem(k)); }catch(e){}
+  try{ Object.keys(localStorage).filter(k => k.startsWith('doma:') && k !== 'doma:tiempos').forEach(k => localStorage.removeItem(k)); }catch(e){}
 }
 const PEDIDOS_EN_CURSO = {};
 async function pedirReferencia(action){
@@ -328,6 +357,7 @@ function irA(pantalla){
   if(pantalla === 'local') renderLocal('locales');
   if(pantalla === 'fabrica') renderFabrica();
   if(pantalla === 'planificacion') renderPlanificacion();
+  if(pantalla === 'tiempos') renderTiempos();
   if(pantalla === 'envios') renderEnvios();
   if(pantalla === 'recepcion') renderRecepcion();
   if(pantalla === 'historial') renderHistorialEnvios();
@@ -523,7 +553,46 @@ async function refrescarDatosPlanilla(){
   }
 }
 
+// al abrir el inicio: "despierta" al servidor (el primer pedido del día es el
+// más lento) y deja en la tablet las listas de productos y empleados.
+let SERVIDOR_DESPIERTO = false;
+function precalentar(){
+  if(SERVIDOR_DESPIERTO) return;
+  SERVIDOR_DESPIERTO = true;
+  _fetchOriginal(`${APPS_SCRIPT_URL}?action=ping`).catch(() => {});
+  obtenerCategorias().catch(() => {});
+  obtenerRellenos().catch(() => {});
+  obtenerEmpleados().catch(() => {});
+}
+
+function renderTiempos(){
+  let lista = [];
+  try{ lista = JSON.parse(localStorage.getItem('doma:tiempos') || '[]'); }catch(e){}
+  const porAccion = {};
+  lista.forEach(r => {
+    const k = r.a;
+    const g = porAccion[k] = porAccion[k] || { n: 0, total: 0, max: 0, srv: 0, nsrv: 0, cache: 0, pantallas: new Set() };
+    g.n++; g.total += r.t; g.max = Math.max(g.max, r.t);
+    if(r.s != null){ g.srv += r.s; g.nsrv++; }
+    if(r.c) g.cache++;
+    if(r.p) g.pantallas.add(r.p);
+  });
+  const filas = Object.keys(porAccion).map(k => ({ k, ...porAccion[k] })).sort((a, b) => (b.total / b.n) - (a.total / a.n));
+  const seg = ms => (ms / 1000).toFixed(1) + ' s';
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <header class="top"><h1>Tiempos de carga</h1></header>
+    <p style="color:var(--ink-soft);font-size:13px;max-width:640px;">Últimos ${lista.length} pedidos al servidor desde esta tablet. <strong>Total</strong> es lo que esperó la persona; <strong>Servidor</strong> es lo que tardó Google en procesar; la diferencia es el arranque del script y la conexión.</p>
+    ${filas.length ? `<table class="prod">
+      <thead><tr><th>Pedido</th><th>Pantalla</th><th class="num">Veces</th><th class="num">Total prom.</th><th class="num">Máx.</th><th class="num">Servidor prom.</th><th class="num">Desde caché</th></tr></thead>
+      <tbody>${filas.map(f => `<tr><td>${f.k}</td><td style="color:var(--ink-soft);font-size:12px;">${[...f.pantallas].join(', ')}</td><td class="num">${f.n}</td><td class="num"><strong>${seg(f.total / f.n)}</strong></td><td class="num">${seg(f.max)}</td><td class="num">${f.nsrv ? seg(f.srv / f.nsrv) : '—'}</td><td class="num">${f.cache ? Math.round(100 * f.cache / f.n) + '%' : '—'}</td></tr>`).join('')}</tbody>
+    </table>` : '<div class="empty">Todavía no hay pedidos registrados en esta tablet.</div>'}
+    <div class="actions"><button class="btn secondary" id="btnBorrarTiempos">Borrar registro</button></div>`;
+  document.getElementById('btnBorrarTiempos').onclick = () => { try{ localStorage.removeItem('doma:tiempos'); }catch(e){} renderTiempos(); };
+}
+
 function renderHome(){
+  precalentar();
   app.innerHTML = `
     <header class="top">
       <h1>Doma Criolla</h1>
@@ -553,6 +622,7 @@ function renderHome(){
     <div class="home-grid">
       ${tarjetaHome('fichas', 'Fichas técnicas', 'Importar y actualizar las recetas (Rellenos, Preparados, Postres, Dips, Edición Limitada).')}
       ${tarjetaHome('planificacion', 'Editar venta proyectada', 'Actualizar, por local, cuánto se espera vender de cada sabor cada día de la semana.')}
+      ${tarjetaHome('tiempos', 'Tiempos de carga', 'Cuánto tarda cada pantalla en esta tablet (para detectar lentitud).')}
       <button class="home-card" id="btnRefrescarDatos" onclick="refrescarDatosPlanilla()">
         <h2>Refrescar datos de la planilla</h2>
         <p>Usalo si cambiaste algo a mano en la planilla (sabores, calendario, empleados) y la app todavía no lo muestra.</p>
