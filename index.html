@@ -1132,7 +1132,8 @@ function pintarProduccion(data){
             ${esEmpanada ? '<th>Se cocinó</th>' : ''}
             <th class="num">Objetivo</th>
             ${esEmpanada ? '<th>Días que cubre</th>' : ''}
-            <th class="num">Stock disponible</th>
+            <th class="num">Stock en fábrica</th>
+            <th class="num">Stock en locales</th>
             <th class="num">${esEmpanada ? 'Stock necesario' : 'A reponer'} (u.)</th>
             ${esEmpanada ? '<th class="num">Docenas</th>' : ''}
           </tr>
@@ -1144,7 +1145,7 @@ function pintarProduccion(data){
               ${esEmpanada ? `<td>${f.diaCocina}${f.diaCocina !== f.diaArmado ? ` <span class="badge reposo">reposo</span>` : ''}</td>` : ''}
               <td class="num">${ent(f.objetivoUnidades)}</td>
               ${esEmpanada ? `<td style="color:var(--ink-soft);font-size:12.5px;">${f.diasQueCubre}</td>` : ''}
-              <td class="num">${ent(f.stockValidoUnidades)}</td>
+              ${celdasStock(f)}
               <td class="num"><strong>${ent(f.aHacerUnidades)}</strong></td>
               ${esEmpanada ? `<td class="num">${ent(f.aHacerDocenas)}</td>` : ''}
             </tr>`).join('')}
@@ -1161,6 +1162,13 @@ function pintarProduccion(data){
 
 /* ---- Pestaña COCINA: todo lo que elabora Cocina hoy — Preparados, Rellenos,
    Dips y Postres (Dips/Postres los arma Cocina, no Producción) ---- */
+// stock disponible separado: lo que hay en fábrica y lo que hay en los
+// locales (pedido por Carolina 02/10/2026). Si el Apps Script todavía es el
+// viejo (no manda el detalle), muestra el total en la primera columna.
+function celdasStock(f){
+  if(f.stockFabricaUnidades === undefined) return `<td class="num">${ent(f.stockValidoUnidades)}</td><td class="num" style="color:var(--ink-soft);">—</td>`;
+  return `<td class="num">${ent(f.stockFabricaUnidades)}</td><td class="num">${ent(f.stockLocalesUnidades)}</td>`;
+}
 function pintarCocina(data){
   const cont = document.getElementById('contenidoFabrica');
   const filasRelleno = data.cocina.filter(f => f.kilosDeRelleno > 0);
@@ -1172,13 +1180,13 @@ function pintarCocina(data){
     return `
       <h3 style="font-size:15px;margin:20px 0 8px;">${titulo}</h3>
       <table class="prod">
-        <thead><tr><th>Sabor / ítem</th><th class="num">Objetivo</th><th class="num">Stock disponible</th><th class="num">A reponer (u.)</th></tr></thead>
+        <thead><tr><th>Sabor / ítem</th><th class="num">Objetivo</th><th class="num">Stock en fábrica</th><th class="num">Stock en locales</th><th class="num">A reponer (u.)</th></tr></thead>
         <tbody>
           ${items.map(f => `
             <tr>
               <td>${f.sabor}</td>
               <td class="num">${ent(f.objetivoUnidades)}</td>
-              <td class="num">${ent(f.stockValidoUnidades)}</td>
+              ${celdasStock(f)}
               <td class="num"><strong>${ent(f.aHacerUnidades)}</strong></td>
             </tr>`).join('')}
         </tbody>
