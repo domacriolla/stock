@@ -782,8 +782,8 @@ async function renderLocal(bloque){
     const tr = document.createElement('tr');
     tr.dataset.item = nombre;
     tr.innerHTML = `
-      <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : nombre + etiquetaUnidad(nombre, bloque === 'locales' ? 'porciones' : '')}</td>
-      <td><input type="number" min="0" step="${pasoProd(nombre)}" class="inp-cant" placeholder="—" value="${g.cantidad != null && g.cantidad !== '' ? g.cantidad : ''}"></td>
+      <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : nombre + etiquetaUnidad(nombre, bloque === 'locales' ? 'porciones' : 'kg')}</td>
+      <td><input type="number" min="0" step="${bloque !== 'locales' && ENVIO_EN_KILOS[nombre] ? '0.01' : pasoProd(nombre)}" class="inp-cant" placeholder="—" value="${g.cantidad != null && g.cantidad !== '' ? g.cantidad : ''}"></td>
       <td><input type="date" class="inp-venc" value="${g.vencimiento || ''}"></td>
       <td class="col-add">${esExtra ? '' : '<button type="button" class="add-lote-btn" title="Agregar otro vencimiento para este producto">+</button>'}</td>
       <td class="col-del">${esExtra ? '<button type="button" class="del-btn" title="Quitar">✕</button>' : ''}</td>
@@ -873,14 +873,19 @@ async function renderLocal(bloque){
     if(responsableGuardado) pintarResponsable(responsableGuardado);
 
     if(modo === 'sabor'){
-      nombresCategorias.forEach((cat, i) => {
+      // Fábrica - Producción también cuenta lo que queda armado para mañana:
+      // rollos de jamón y queso y moldes de canasta (pedido por Carolina 06/10/2026)
+      const cats = local === 'Fábrica - Producción'
+        ? Object.assign({}, categorias, { [CATEGORIA_EXTRAS_PRODUCCION]: [NOMBRE_ROLLOS_JYQ, NOMBRE_MOLDE_CANASTA] })
+        : categorias;
+      Object.keys(cats).forEach((cat, i) => {
         const id = `cat-${i}`;
         const h = document.createElement('h4');
         h.className = 'cat-heading';
         h.id = id;
         h.textContent = cat;
         cont.appendChild(h);
-        cont.appendChild(tablaDe(labelCantidad, 'Sabor / ítem', categorias[cat], guardadosPorItem));
+        cont.appendChild(tablaDe(labelCantidad, 'Sabor / ítem', cats[cat], guardadosPorItem));
         const a = document.createElement('a');
         a.href = `#${id}`;
         a.textContent = cat;
@@ -1104,6 +1109,9 @@ function etiquetaUnidad(nombre, dondeMuzza){
   if(ENVIO_EN_KILOS[nombre] && dondeMuzza === 'porciones') return ` <span class="unidad-prod">(porciones de ${ENVIO_EN_KILOS[nombre] * 1000} g)</span>`;
   return '';
 }
+// nombre con el que FÁBRICA ve el producto (despacho y qué producir)
+const NOMBRE_FABRICA = { 'TOPPING MUZZARELLA': 'MUZZARELLA' };
+function nombreFabrica(nombre){ return NOMBRE_FABRICA[nombre] || nombre; }
 // orden de envío tal como la ve fábrica: kilos enteros para arriba si el producto va por kilo
 function ordenEnvioFabrica(nombre, unidades){
   const kg = ENVIO_EN_KILOS[nombre];
@@ -1157,6 +1165,25 @@ async function pintarBarraPlan(idCont, fecha, plan, alCambiar){
   };
 }
 
+function conectarPctProduccion(fecha){
+  const bR = document.getElementById('btnReabrirPctProd');
+  if(bR) bR.onclick = () => { PREP_ACTUAL.porcentajeProduccionAbierto = true; pintarTabActiva(); };
+  const bG = document.getElementById('btnGuardarPctProd');
+  if(bG) bG.onclick = async () => {
+    const pct = Number(document.getElementById('inpPctProd').value);
+    if(!pct || pct <= 0){ avisar('✗ Ingresá un % válido.', 'err'); return; }
+    bG.disabled = true; bG.textContent = 'Guardando...';
+    try{
+      await postJSON({ action: 'guardarPorcentajeProduccion', fecha, pct });
+      avisar(`✓ Guardado · ${horaCorta()} — ${pct}% para rollos y canastas.`);
+      cargarCalculo();
+    }catch(err){
+      bG.disabled = false; bG.textContent = 'Guardar %';
+      avisar('✗ NO se guardó — ' + err.message, 'err');
+    }
+  };
+}
+
 // bloque "para mañana": Rollos de Jamón y Queso + Canastas que hay que
 // dejar armados HOY (se ve en la pestaña Producción, arriba de lo del día).
 function bloquePrepDiaAnterior(){
@@ -1171,9 +1198,17 @@ function bloquePrepDiaAnterior(){
   const filasCanastas = canastas.length
     ? `<tr><td>Molde de canasta <span style="color:var(--ink-soft);font-size:11px;">(${canastas.map(c => `${c.sabor}: ${ent(c.aHacerUnidades)}`).join(' · ')})</span></td><td class="num"><strong>${ent(totalMoldes)}</strong></td></tr>`
     : '';
-  const notaPct = (prep.porcentajeCocina != null && Number(prep.porcentajeCocina) !== 100)
-    ? `<p style="color:var(--ink-soft);font-size:12px;margin-top:6px;">Ya aplicado el ${ent(prep.porcentajeCocina)}% de venta a cubrir guardado hoy para Cocina.</p>`
-    : '';
+  // el % lo registra Producción (aparte del de Cocina) — pedido por Carolina 06/10/2026
+  const pct = prep.porcentajeProduccionAbierto ? null : prep.porcentajeProduccion;
+  const notaPct = `
+    <div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:13px;">
+      <label style="margin:0;">% a dejar armado para mañana (rollos y canastas)</label>
+      ${pct != null
+        ? `<input type="number" value="${pct}" disabled style="width:80px;"><button type="button" class="btn secondary" id="btnReabrirPctProd">Reabrir</button><span style="color:var(--ink-soft);font-size:12px;">guardado para hoy por Producción</span>`
+        : `<input type="number" id="inpPctProd" min="1" max="200" step="5" value="100" style="width:80px;"><button type="button" class="btn" id="btnGuardarPctProd">Guardar %</button><span style="color:var(--ink-soft);font-size:12px;">sin guardar: se calcula al 100%</span>`}
+    </div>`
+    + (pct != null && Number(pct) !== 100 ? `<p style="color:var(--ink-soft);font-size:12px;margin-top:6px;">Ya aplicado el ${ent(pct)}% guardado hoy por Producción.</p>` : '');
+  setTimeout(() => conectarPctProduccion(prep.fecha), 0);
   return `
     <h3 style="font-size:15px;margin:20px 0 8px;">Para mañana (${prep.diaManana}, ${fmtFecha(prep.fechaManana)}) — armar/moldear HOY</h3>
     <table class="prod">
@@ -1221,7 +1256,14 @@ function pintarProduccion(data){
           </tr>
         </thead>
         <tbody>
-          ${items.map(f => `
+          ${items.map(f => ENVIO_EN_KILOS[f.sabor] ? `
+            <tr>
+              <td>${nombreFabrica(f.sabor)}${etiquetaUnidad(f.sabor, 'kg')}</td>
+              <td class="num">${dec(f.objetivoUnidades * ENVIO_EN_KILOS[f.sabor])}</td>
+              ${f.stockFabricaUnidades === undefined ? `<td class="num">${dec(f.stockValidoUnidades * ENVIO_EN_KILOS[f.sabor])}</td><td class="num">—</td>`
+                : `<td class="num">${dec(f.stockFabricaUnidades * ENVIO_EN_KILOS[f.sabor])}</td><td class="num">${dec(f.stockLocalesUnidades * ENVIO_EN_KILOS[f.sabor])}</td>`}
+              <td class="num"><strong>${dec(f.aHacerUnidades * ENVIO_EN_KILOS[f.sabor])}</strong></td>
+            </tr>` : `
             <tr>
               <td>${f.sabor}</td>
               ${esEmpanada ? `<td>${f.diaCocina}${f.diaCocina !== f.diaArmado ? ` <span class="badge reposo">reposo</span>` : ''}</td>` : ''}
@@ -1528,6 +1570,7 @@ let EMPLEADOS_REGISTRO = null;
 let PREP_REGISTRO = null;
 let SECTOR_REGISTRO_ACTIVO = 'produccion';
 let PREPEDIDO_REGISTRO = null;
+const CATEGORIA_EXTRAS_PRODUCCION = 'Extras de producción';
 const NOMBRE_ROLLOS_JYQ = 'Rollos de Jamón y Queso';
 const NOMBRE_MOLDE_CANASTA = 'Molde de canasta'; // uno solo para todas las canastas
 
@@ -2108,8 +2151,8 @@ async function cargarInformeStockLocal(){
         }
         return it.lotes.map((l, i) => `
           <tr class="${claseFila[l.estado] || ''}">
-            <td>${i === 0 ? it.sabor : `<span class="item-extra">↳ otro lote</span>`}</td>
-            <td class="num">${cantProd(it.sabor, l.cantidad)}</td>
+            <td>${i === 0 ? it.sabor + etiquetaUnidad(it.sabor, String(local).startsWith('Fábrica') ? 'kg' : 'porciones') : `<span class="item-extra">↳ otro lote</span>`}</td>
+            <td class="num">${ENVIO_EN_KILOS[it.sabor] && String(local).startsWith('Fábrica') ? dec(l.cantidad) : cantProd(it.sabor, l.cantidad)}</td>
             <td>${fmtFecha(l.vencimiento)}</td>
           </tr>`).join('');
       }).join('');
@@ -2347,8 +2390,8 @@ async function pintarRegistroProduccionSector(){
 
   // Extras para mañana: Rollos de Jamón y Queso y UN solo "Molde de canasta"
   // (es el mismo molde para todas las canastas — se suma lo de todas).
-  const notaPct = (prep.porcentajeCocina != null && Number(prep.porcentajeCocina) !== 100)
-    ? `<span style="color:var(--ink-soft);font-size:11.5px;font-weight:400;">Ya aplicado el ${ent(prep.porcentajeCocina)}% de venta a cubrir de Cocina.</span>` : '';
+  const notaPct = (prep.porcentajeProduccion != null && Number(prep.porcentajeProduccion) !== 100)
+    ? `<span style="color:var(--ink-soft);font-size:11.5px;font-weight:400;">Ya aplicado el ${ent(prep.porcentajeProduccion)}% guardado hoy por Producción.</span>` : '';
   filaGrupo('Extras de producción (para mañana)', notaPct);
   const etiquetaManana = ' <span style="color:var(--ink-soft);font-size:11px;">(armar hoy para mañana)</span>';
   tbody.appendChild(filaRegistroProduccion(NOMBRE_ROLLOS_JYQ, NOMBRE_ROLLOS_JYQ, prep.rollosJyQ, etiquetaManana, true, EMPLEADOS_REGISTRO, guardadoPorSabor[NOMBRE_ROLLOS_JYQ], bloqueadoGlobal));
@@ -2769,7 +2812,7 @@ function pintarResumenEnvios(wrap){
       LOCALES_VENTA.forEach((l, i) => { totLocal[l] += v[i]; subLocal[i] += v[i]; });
       totGeneral += tot;
       subTotal += tot;
-      return `<tr><td>${n}${etiquetaUnidad(n, 'kg')}</td>${v.map(x => `<td class="num" style="${x ? '' : 'color:var(--ink-soft);'}">${x ? cantProd(n, x) : '—'}</td>`).join('')}<td class="num"><strong>${cantProd(n, tot)}</strong></td></tr>`;
+      return `<tr><td>${nombreFabrica(n)}${etiquetaUnidad(n, 'kg')}</td>${v.map(x => `<td class="num" style="${x ? '' : 'color:var(--ink-soft);'}">${x ? cantProd(n, x) : '—'}</td>`).join('')}<td class="num"><strong>${cantProd(n, tot)}</strong></td></tr>`;
     }).join('');
     if(!filas) return '';
     // subtotal de la clasificación (pedido por Carolina 30/09/2026)
@@ -2832,7 +2875,7 @@ function filaEnvio(nombre, ordenCalculada, esExtra, guardado, conOrden, panelEst
   tr.dataset.orden = esExtra ? 0 : (ordenVista || 0);
   const cantVista = g.cantidad ? (kgPorcion ? Math.round(Number(g.cantidad) * kgPorcion * 100) / 100 : g.cantidad) : '';
   tr.innerHTML = `
-    <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : nombre + etiquetaUnidad(nombre, conOrden ? 'kg' : 'porciones')}</td>
+    <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : (conOrden ? nombreFabrica(nombre) : nombre) + etiquetaUnidad(nombre, conOrden ? 'kg' : 'porciones')}</td>
     ${conOrden ? `<td class="num" style="color:var(--ink-soft);">${esExtra ? '' : cantProd(nombre, ordenVista)}</td>` : ''}
     <td><input type="number" min="0" step="${kgPorcion ? '0.25' : pasoProd(nombre)}" class="inp-cant" placeholder="0" value="${cantVista}"></td>
     <td><input type="date" class="inp-venc" value="${g.vencimiento || ''}"></td>
@@ -3101,7 +3144,7 @@ function imprimirOrdenEnvio(panel, local, fecha){
         <tbody>
           ${nombres.map(n => `
             <tr>
-              <td>${n}${etiquetaUnidad(n, 'kg')}</td>
+              <td>${nombreFabrica(n)}${etiquetaUnidad(n, 'kg')}</td>
               <td class="num">${cantProd(n, porSabor[n] ? porSabor[n].cantidadImprimir : 0)}</td>
               <td>${porSabor[n] && porSabor[n].vencimiento ? fmtFecha(porSabor[n].vencimiento) : ''}</td>
             </tr>`).join('')}
@@ -3194,7 +3237,22 @@ async function cargarPendientesRecepcion(){
           <table class="lotes">
             <thead><tr><th>Sabor / ítem</th><th>Viene de</th><th>Enviado el</th><th class="col-cant">Cant. enviada</th><th>Vencimiento</th><th class="col-cant">Cant. recibida</th><th></th></tr></thead>
             <tbody>
-              ${g.items.map(p => `
+              ${g.items.map(p => {
+                // lo que manda FÁBRICA por kilo (muzzarella) el local lo recibe
+                // y lo confirma en KILOS; en la planilla queda en porciones.
+                const kg = !p.Origen ? ENVIO_EN_KILOS[p.Sabor] : null;
+                const aKg = v => Math.round(Number(v) * kg * 100) / 100;
+                if(kg) return `
+                <tr data-id="${p.ID}" data-kg-porcion="${kg}">
+                  <td>${nombreFabrica(p.Sabor)}${etiquetaUnidad(p.Sabor, 'kg')}</td>
+                  <td><span style="color:var(--ink-soft);">Fábrica</span></td>
+                  <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Fecha_envio)}</td>
+                  <td class="num" style="color:var(--ink-soft);">${dec(aKg(p.Cantidad_Enviada))}</td>
+                  <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Vencimiento)}</td>
+                  <td><input type="number" min="0" step="0.25" class="inp-recibido" style="max-width:90px;" value="${aKg(p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? p.Cantidad_Recibida : p.Cantidad_Enviada)}"></td>
+                  <td class="celda-estado" style="white-space:nowrap;">${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? '<span class="sello-guardado">✓ Guardado</span>' : ''}</td>
+                </tr>`;
+                return `
                 <tr data-id="${p.ID}">
                   <td>${p.Sabor}${etiquetaUnidad(p.Sabor, 'porciones')}</td>
                   <td>${p.Origen ? `<strong class="origen-traspaso">Ingresa desde ${p.Origen}</strong>` : '<span style="color:var(--ink-soft);">Fábrica</span>'}</td>
@@ -3203,7 +3261,7 @@ async function cargarPendientesRecepcion(){
                   <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Vencimiento)}</td>
                   <td><input type="number" min="0" step="${pasoProd(p.Sabor)}" class="inp-recibido" style="max-width:90px;" value="${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? p.Cantidad_Recibida : p.Cantidad_Enviada}"></td>
                   <td class="celda-estado" style="white-space:nowrap;">${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? '<span class="sello-guardado">✓ Guardado</span>' : ''}</td>
-                </tr>`).join('')}
+                </tr>`; }).join('')}
             </tbody>
           </table>`;
       });
@@ -3284,10 +3342,12 @@ async function guardarRecepcion(confirmar){
     return;
   }
   const filas = [...document.querySelectorAll('#contenidoRecepcion tr[data-id]')];
-  const confirmaciones = filas.map(tr => ({
-    id: tr.dataset.id,
-    cantidadRecibida: tr.querySelector('.inp-recibido').value
-  })).filter(c => c.cantidadRecibida !== '');
+  const confirmaciones = filas.map(tr => {
+    let v = tr.querySelector('.inp-recibido').value;
+    // recibido en kilos -> se guarda en porciones del local
+    if(v !== '' && tr.dataset.kgPorcion) v = String(Math.round(Number(v) / Number(tr.dataset.kgPorcion) * 100) / 100);
+    return { id: tr.dataset.id, cantidadRecibida: v };
+  }).filter(c => c.cantidadRecibida !== '');
 
   if(confirmaciones.length === 0){
     msg.className = 'msg err'; msg.textContent = 'Cargá la cantidad recibida de al menos un producto.'; return;
