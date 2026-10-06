@@ -131,6 +131,13 @@
   @media print{.tabla-fija{max-height:none;overflow:visible;}}
   .fila-agregar{display:flex;gap:8px;align-items:center;margin:10px 0 4px;flex-wrap:wrap;}
   .fila-agregar select{max-width:340px;}
+  .unidad-prod{color:var(--ink-soft);font-size:11.5px;font-weight:400;white-space:nowrap;}
+  .plan-dia{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:10px 0 14px;font-size:13px;}
+  .plan-dia.provisorio{background:#fdf6e3;border-color:#e6cf8f;}
+  .plan-dia.confirmado{background:var(--herb-bg);}
+  .plan-dia > div:first-child{flex:1 1 320px;}
+  .plan-dia .plan-form{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;}
+  .plan-dia select{min-width:170px;}
   .tabla-resumen-envios tr.fila-subtotal-resumen td{font-weight:700;border-top:2px solid var(--line);border-bottom:2px solid var(--line);background:#faf5ea;}
   table.lotes tfoot tr.fila-subtotal-cat td{font-weight:700;border-top:2px solid var(--line);background:#faf5ea;}
   .print-tabla tr.fila-subtotal-print td{font-weight:700;border-top:2px solid #000;}
@@ -775,8 +782,8 @@ async function renderLocal(bloque){
     const tr = document.createElement('tr');
     tr.dataset.item = nombre;
     tr.innerHTML = `
-      <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : nombre}</td>
-      <td><input type="number" min="0" step="1" class="inp-cant" placeholder="—" value="${g.cantidad != null && g.cantidad !== '' ? g.cantidad : ''}"></td>
+      <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : nombre + etiquetaUnidad(nombre, bloque === 'locales' ? 'porciones' : '')}</td>
+      <td><input type="number" min="0" step="${pasoProd(nombre)}" class="inp-cant" placeholder="—" value="${g.cantidad != null && g.cantidad !== '' ? g.cantidad : ''}"></td>
       <td><input type="date" class="inp-venc" value="${g.vencimiento || ''}"></td>
       <td class="col-add">${esExtra ? '' : '<button type="button" class="add-lote-btn" title="Agregar otro vencimiento para este producto">+</button>'}</td>
       <td class="col-del">${esExtra ? '<button type="button" class="del-btn" title="Quitar">✕</button>' : ''}</td>
@@ -1017,6 +1024,7 @@ async function renderFabrica(){
       <button class="tab-btn" data-tab="discos">Discos</button>
       <button class="btn secondary" id="btnImprimir" style="margin-left:auto;" onclick="window.print()">🖶 Imprimir</button>
     </div>
+    <div id="barraPlanFabrica"></div>
     <div id="contenidoFabrica" class="loading">Calculando…</div>
   `;
   document.getElementById('fechaCalculo').onchange = cargarCalculo;
@@ -1043,6 +1051,7 @@ async function cargarCalculo(){
     ULTIMO_CALCULO = data;
     PREP_ACTUAL = prep.error ? null : prep;
     document.getElementById('tabsFabrica').style.display = 'flex';
+    pintarBarraPlan('barraPlanFabrica', fecha, data.plan, cargarCalculo);
     [...document.querySelectorAll('.tab-btn')].forEach(b => {
       b.onclick = () => { TAB_ACTIVA = b.dataset.tab; marcarTabActiva(); pintarTabActiva(); };
     });
@@ -1076,6 +1085,78 @@ function fmtFecha(iso){
 // redondeo a entero para mostrar en pantalla (el cálculo interno sigue con decimales)
 function ent(n){ return Math.round(Number(n) || 0).toLocaleString('es-AR'); }
 
+// ---- UNIDADES ESPECIALES (pedido por Carolina, 05/10/2026) ----
+// Productos que se manejan con DECIMALES y en otra unidad (no "unidades").
+const UNIDAD_PRODUCTO = { 'SALSA FILETTO': 'litros' };
+// Productos que el LOCAL cuenta en porciones pero FÁBRICA despacha en KILOS:
+// valor = kilos por porción. La orden de envío se redondea para arriba al
+// kilo entero; en la planilla se guarda siempre en porciones del local.
+const ENVIO_EN_KILOS = { 'TOPPING MUZZARELLA': 0.25 };
+function esDecimal(nombre){ return !!UNIDAD_PRODUCTO[nombre]; }
+function dec(n){ return (Number(n) || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 }); }
+// cantidad de un producto: con decimales solo si el producto los usa
+function cantProd(nombre, n){ return esDecimal(nombre) ? dec(n) : ent(n); }
+function pasoProd(nombre){ return esDecimal(nombre) ? '0.01' : '1'; }
+// etiqueta chica al lado del nombre. dondeMuzza: 'kg' (despacho de fábrica) o 'porciones' (local)
+function etiquetaUnidad(nombre, dondeMuzza){
+  if(UNIDAD_PRODUCTO[nombre]) return ` <span class="unidad-prod">(${UNIDAD_PRODUCTO[nombre]})</span>`;
+  if(ENVIO_EN_KILOS[nombre] && dondeMuzza === 'kg') return ' <span class="unidad-prod">(kg)</span>';
+  if(ENVIO_EN_KILOS[nombre] && dondeMuzza === 'porciones') return ` <span class="unidad-prod">(porciones de ${ENVIO_EN_KILOS[nombre] * 1000} g)</span>`;
+  return '';
+}
+// orden de envío tal como la ve fábrica: kilos enteros para arriba si el producto va por kilo
+function ordenEnvioFabrica(nombre, unidades){
+  const kg = ENVIO_EN_KILOS[nombre];
+  return kg ? Math.ceil((Number(unidades) || 0) * kg - 1e-9) : (Number(unidades) || 0);
+}
+
+// ---- PLAN DEL DÍA: provisorio / confirmado (congelado) ----
+// plan = lo que manda el servidor en calcularTodo / calcularEnvios (.plan):
+// null = provisorio (se calcula en vivo); { confirmado, responsable, hora }.
+// alCambiar = función que vuelve a cargar la pantalla.
+async function pintarBarraPlan(idCont, fecha, plan, alCambiar){
+  const cont = document.getElementById(idCont);
+  if(!cont) return;
+  if(plan === undefined){ cont.innerHTML = ''; return; } // Apps Script viejo: todavía no sabe de planes
+  const empleados = await obtenerEmpleados();
+  const form = (texto, recalcular) => `
+    <span class="plan-form no-print">
+      <select class="sel-plan">${opcionesEmpleadosSeleccion(empleados, '')}</select>
+      <button class="btn ${recalcular ? 'secondary' : ''} btn-plan">${texto}</button>
+    </span>`;
+  if(plan && plan.confirmado){
+    cont.className = 'plan-dia confirmado';
+    cont.innerHTML = `<div><strong>✓ Plan confirmado</strong> a las ${plan.hora} por ${plan.responsable}. Las cantidades de hoy quedan fijas: el stock que se cargue o corrija después cuenta para mañana.</div>
+      <div class="no-print"><button class="btn secondary btn-abrir-recalc" style="font-size:12px;padding:5px 9px;">Recalcular…</button>
+      <span class="zona-recalc" style="display:none;">${form('Recalcular con los datos de ahora', true)}</span></div>`;
+    cont.querySelector('.btn-abrir-recalc').onclick = (e) => { e.target.style.display = 'none'; cont.querySelector('.zona-recalc').style.display = ''; };
+  } else {
+    cont.className = 'plan-dia provisorio';
+    cont.innerHTML = `<div><strong>Plan provisorio</strong>: las cantidades pueden cambiar si se carga o corrige stock, o si se importa otra proyección. Cuando el stock esté cargado, confirmalo para dejarlo fijo todo el día (producción y órdenes de envío).</div>
+      <div>${form('Confirmar plan del día', false)}</div>`;
+  }
+  const btn = cont.querySelector('.btn-plan');
+  btn.onclick = async () => {
+    const responsable = cont.querySelector('.sel-plan').value;
+    const recalcular = !!(plan && plan.confirmado);
+    if(!responsable){ avisar('✗ Elegí quién confirma el plan.', 'err'); return; }
+    if(!confirm(recalcular
+      ? `¿Recalcular el plan del ${fmtFecha(fecha)} con el stock y la proyección cargados AHORA? Las cantidades a producir y a enviar pueden cambiar.`
+      : `¿Confirmar el plan del ${fmtFecha(fecha)}? Las cantidades a producir y las órdenes de envío quedan fijas para todo el día.`)) return;
+    const original = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    try{
+      const resp = await postJSON({ action: 'confirmarPlanDia', fecha, responsable, recalcular });
+      avisar(resp.yaEstaba ? `El plan ya estaba confirmado por ${resp.plan.responsable} a las ${resp.plan.hora}.`
+        : `✓ Plan ${recalcular ? 'recalculado' : 'confirmado'} · ${resp.plan.hora} — ${responsable}`);
+      alCambiar();
+    }catch(err){
+      avisar('✗ NO se guardó — ' + err.message, 'err');
+      btn.disabled = false; btn.textContent = original;
+    }
+  };
+}
+
 // bloque "para mañana": Rollos de Jamón y Queso + Canastas que hay que
 // dejar armados HOY (se ve en la pestaña Producción, arriba de lo del día).
 function bloquePrepDiaAnterior(){
@@ -1106,7 +1187,8 @@ function pintarProduccion(data){
   const cont = document.getElementById('contenidoFabrica');
   // Dips y Postres los elabora Cocina (no Producción) — se muestran en la
   // pestaña Cocina, junto con Preparados y Rellenos.
-  const filas = data.produccion.filter(f => f.aHacerUnidades > 0 && f.rubro !== 'Dips' && f.rubro !== 'Postres');
+  // La salsa (litros) también la elabora Cocina.
+  const filas = data.produccion.filter(f => f.aHacerUnidades > 0 && f.rubro !== 'Dips' && f.rubro !== 'Postres' && !esDecimal(f.sabor));
   const prepHtml = bloquePrepDiaAnterior();
 
   const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Producción</h2>`;
@@ -1175,8 +1257,23 @@ function pintarCocina(data){
   const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Cocina</h2>`;
 
   const tablaSimple = (rubro, titulo) => {
-    const items = (data.produccion || []).filter(f => f.rubro === rubro && f.aHacerUnidades > 0);
+    // 'Salsas' = productos en litros (SALSA FILETTO), que en la planilla son Toppings
+    const items = (data.produccion || []).filter(f => f.aHacerUnidades > 0 && (rubro === 'Salsas' ? esDecimal(f.sabor) : (f.rubro === rubro && !esDecimal(f.sabor))));
     if(items.length === 0) return '';
+    if(rubro === 'Salsas') return `
+      <h3 style="font-size:15px;margin:20px 0 8px;">${titulo}</h3>
+      <table class="prod">
+        <thead><tr><th>Ítem</th><th class="num">Objetivo</th><th class="num">Stock en fábrica</th><th class="num">Stock en locales</th><th class="num">A elaborar</th></tr></thead>
+        <tbody>
+          ${items.map(f => `
+            <tr>
+              <td>${f.sabor}${etiquetaUnidad(f.sabor)}</td>
+              <td class="num">${dec(f.objetivoUnidades)}</td>
+              <td class="num">${dec(f.stockFabricaUnidades)}</td><td class="num">${dec(f.stockLocalesUnidades)}</td>
+              <td class="num"><strong>${dec(f.aHacerUnidades)}</strong></td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
     return `
       <h3 style="font-size:15px;margin:20px 0 8px;">${titulo}</h3>
       <table class="prod">
@@ -1193,7 +1290,7 @@ function pintarCocina(data){
       </table>`;
   };
   const bloqueDips = tablaSimple('Dips', 'Dips');
-  const bloquePostres = tablaSimple('Postres', 'Postres');
+  const bloquePostres = tablaSimple('Postres', 'Postres') + tablaSimple('Salsas', 'Salsas');
 
   if(filasRelleno.length === 0 && !bloqueDips && !bloquePostres){
     cont.className = '';
@@ -2012,7 +2109,7 @@ async function cargarInformeStockLocal(){
         return it.lotes.map((l, i) => `
           <tr class="${claseFila[l.estado] || ''}">
             <td>${i === 0 ? it.sabor : `<span class="item-extra">↳ otro lote</span>`}</td>
-            <td class="num">${ent(l.cantidad)}</td>
+            <td class="num">${cantProd(it.sabor, l.cantidad)}</td>
             <td>${fmtFecha(l.vencimiento)}</td>
           </tr>`).join('');
       }).join('');
@@ -2568,6 +2665,7 @@ async function renderEnvios(){
       usá el botón <strong>+</strong>. En <strong>Traspaso entre locales</strong> se carga la mercadería que
       fábrica retira de un local para llevarla a otro.
     </p>
+    <div id="barraPlanEnvios"></div>
     <div class="tabs" id="tabsEnvios" style="display:none;"></div>
     <div id="contenidoEnvios" class="loading">Calculando…</div>
     <div class="msg" id="msgEnvios"></div>
@@ -2598,6 +2696,7 @@ async function cargarEnvios(){
     const guardadoPorLocal = rGuardado.porLocal || {};
     const traspasos = rGuardado.traspasos || {};
     DATOS_ENVIOS = { fecha, data, categorias, traspasos };
+    pintarBarraPlan('barraPlanEnvios', fecha, data.plan, cargarEnvios);
     const conDatos = LOCALES_VENTA.map(l => guardadoPorLocal[l]).concat(Object.values(traspasos)).find(g => g && g.responsable) || {};
 
     document.getElementById('inpResponsableEnvio').innerHTML = opcionesEmpleadosSeleccion(empleados, conDatos.responsable);
@@ -2650,7 +2749,7 @@ function pintarResumenEnvios(wrap){
   LOCALES_VENTA.forEach(local => {
     valor[local] = {};
     if(VISTA_RESUMEN_ENVIOS === 'calculada'){
-      (data.envios[local] || []).forEach(it => { valor[local][it.sabor] = Number(it.aHacerUnidades) || 0; });
+      (data.envios[local] || []).forEach(it => { valor[local][it.sabor] = ordenEnvioFabrica(it.sabor, it.aHacerUnidades); });
     } else {
       const panel = document.querySelector(`.panel-envio-local[data-clave="${local}"]`);
       if(panel) [...panel.querySelectorAll('tr[data-item]')].forEach(tr => {
@@ -2670,11 +2769,12 @@ function pintarResumenEnvios(wrap){
       LOCALES_VENTA.forEach((l, i) => { totLocal[l] += v[i]; subLocal[i] += v[i]; });
       totGeneral += tot;
       subTotal += tot;
-      return `<tr><td>${n}</td>${v.map(x => `<td class="num" style="${x ? '' : 'color:var(--ink-soft);'}">${x ? ent(x) : '—'}</td>`).join('')}<td class="num"><strong>${ent(tot)}</strong></td></tr>`;
+      return `<tr><td>${n}${etiquetaUnidad(n, 'kg')}</td>${v.map(x => `<td class="num" style="${x ? '' : 'color:var(--ink-soft);'}">${x ? cantProd(n, x) : '—'}</td>`).join('')}<td class="num"><strong>${cantProd(n, tot)}</strong></td></tr>`;
     }).join('');
     if(!filas) return '';
     // subtotal de la clasificación (pedido por Carolina 30/09/2026)
-    const subtotal = `<tr class="fila-subtotal-resumen"><td>Total ${cat}</td>${subLocal.map(x => `<td class="num">${ent(x)}</td>`).join('')}<td class="num">${ent(subTotal)}</td></tr>`;
+    const f = categorias[cat].some(esDecimal) ? dec : ent;
+    const subtotal = `<tr class="fila-subtotal-resumen"><td>Total ${cat}</td>${subLocal.map(x => `<td class="num">${f(x)}</td>`).join('')}<td class="num">${f(subTotal)}</td></tr>`;
     return `<tr class="fila-grupo-resumen"><td colspan="${LOCALES_VENTA.length + 2}">${cat}</td></tr>${filas}${subtotal}`;
   }).join('');
   wrap.innerHTML = `
@@ -2723,11 +2823,18 @@ function filaEnvio(nombre, ordenCalculada, esExtra, guardado, conOrden, panelEst
   const g = guardado || {};
   const tr = document.createElement('tr');
   tr.dataset.item = nombre;
-  tr.dataset.orden = esExtra ? 0 : (ordenCalculada || 0);
+  // productos que fábrica despacha por KILO (muzzarella): la orden y lo
+  // enviado se ven en kilos; al guardar se pasa a porciones del local.
+  // En los traspasos entre locales se sigue en porciones.
+  const kgPorcion = conOrden ? ENVIO_EN_KILOS[nombre] : null;
+  const ordenVista = conOrden ? ordenEnvioFabrica(nombre, ordenCalculada) : (ordenCalculada || 0);
+  if(kgPorcion) tr.dataset.kgPorcion = kgPorcion;
+  tr.dataset.orden = esExtra ? 0 : (ordenVista || 0);
+  const cantVista = g.cantidad ? (kgPorcion ? Math.round(Number(g.cantidad) * kgPorcion * 100) / 100 : g.cantidad) : '';
   tr.innerHTML = `
-    <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : nombre}</td>
-    ${conOrden ? `<td class="num" style="color:var(--ink-soft);">${esExtra ? '' : ent(ordenCalculada)}</td>` : ''}
-    <td><input type="number" min="0" step="1" class="inp-cant" placeholder="0" value="${g.cantidad || ''}"></td>
+    <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : nombre + etiquetaUnidad(nombre, conOrden ? 'kg' : 'porciones')}</td>
+    ${conOrden ? `<td class="num" style="color:var(--ink-soft);">${esExtra ? '' : cantProd(nombre, ordenVista)}</td>` : ''}
+    <td><input type="number" min="0" step="${kgPorcion ? '0.25' : pasoProd(nombre)}" class="inp-cant" placeholder="0" value="${cantVista}"></td>
     <td><input type="date" class="inp-venc" value="${g.vencimiento || ''}"></td>
     <td class="col-add">${esExtra ? '' : '<button type="button" class="add-lote-btn" title="Agregar otro vencimiento para este producto">+</button>'}</td>
     <td class="col-del">${esExtra ? '<button type="button" class="del-btn" title="Quitar">✕</button>' : ''}</td>
@@ -2819,8 +2926,9 @@ function pintarPanelEnvio({ origen, destino, itemsCalculados, data, categorias, 
       const filas = [...tbody.querySelectorAll('tr[data-item]')];
       const sumOrden = filas.reduce((a, tr) => a + (Number(tr.dataset.orden) || 0), 0);
       const sumEnv = filas.reduce((a, tr) => a + (Number(tr.querySelector('.inp-cant').value) || 0), 0);
-      const so = table.querySelector('.sub-orden'); if(so) so.textContent = ent(sumOrden);
-      table.querySelector('.sub-enviado').textContent = ent(sumEnv);
+      const conDec = categorias[cat].some(esDecimal); // la categoría tiene algo en litros
+      const so = table.querySelector('.sub-orden'); if(so) so.textContent = conDec ? dec(sumOrden) : ent(sumOrden);
+      table.querySelector('.sub-enviado').textContent = conDec ? dec(sumEnv) : ent(sumEnv);
     };
     tbody.addEventListener('input', actualizarSubtotal);
     tbody.addEventListener('click', () => setTimeout(actualizarSubtotal, 0)); // al quitar un lote
@@ -2914,6 +3022,8 @@ async function guardarEnvio(panel, origen, destino, fecha, enviar){
   }
   const items = completas.map(tr => {
     const it = { sabor: tr.dataset.item, cantidad: tr.querySelector('.inp-cant').value, vencimiento: tr.querySelector('.inp-venc').value };
+    // lo cargado en kilos se guarda en porciones del local (2 kg de muzzarella = 8 toppings)
+    if(tr.dataset.kgPorcion) it.cantidad = String(Math.round(Number(it.cantidad) / Number(tr.dataset.kgPorcion) * 100) / 100);
     if(tr.dataset.vencGuardado && tr.dataset.vencGuardado !== it.vencimiento) it.vencimientoAnterior = tr.dataset.vencGuardado;
     return it;
   });
@@ -2991,13 +3101,13 @@ function imprimirOrdenEnvio(panel, local, fecha){
         <tbody>
           ${nombres.map(n => `
             <tr>
-              <td>${n}</td>
-              <td class="num">${ent(porSabor[n] ? porSabor[n].cantidadImprimir : 0)}</td>
+              <td>${n}${etiquetaUnidad(n, 'kg')}</td>
+              <td class="num">${cantProd(n, porSabor[n] ? porSabor[n].cantidadImprimir : 0)}</td>
               <td>${porSabor[n] && porSabor[n].vencimiento ? fmtFecha(porSabor[n].vencimiento) : ''}</td>
             </tr>`).join('')}
           <tr class="fila-subtotal-print">
             <td>Total ${cat}</td>
-            <td class="num">${ent(nombres.reduce((a, n) => a + (porSabor[n] ? porSabor[n].cantidadImprimir : 0), 0))}</td>
+            <td class="num">${(nombres.some(esDecimal) ? dec : ent)(nombres.reduce((a, n) => a + (porSabor[n] ? porSabor[n].cantidadImprimir : 0), 0))}</td>
             <td></td>
           </tr>
         </tbody>
@@ -3086,12 +3196,12 @@ async function cargarPendientesRecepcion(){
             <tbody>
               ${g.items.map(p => `
                 <tr data-id="${p.ID}">
-                  <td>${p.Sabor}</td>
+                  <td>${p.Sabor}${etiquetaUnidad(p.Sabor, 'porciones')}</td>
                   <td>${p.Origen ? `<strong class="origen-traspaso">Ingresa desde ${p.Origen}</strong>` : '<span style="color:var(--ink-soft);">Fábrica</span>'}</td>
                   <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Fecha_envio)}</td>
-                  <td class="num" style="color:var(--ink-soft);">${ent(p.Cantidad_Enviada)}</td>
+                  <td class="num" style="color:var(--ink-soft);">${cantProd(p.Sabor, p.Cantidad_Enviada)}</td>
                   <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Vencimiento)}</td>
-                  <td><input type="number" min="0" step="1" class="inp-recibido" style="max-width:90px;" value="${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? p.Cantidad_Recibida : p.Cantidad_Enviada}"></td>
+                  <td><input type="number" min="0" step="${pasoProd(p.Sabor)}" class="inp-recibido" style="max-width:90px;" value="${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? p.Cantidad_Recibida : p.Cantidad_Enviada}"></td>
                   <td class="celda-estado" style="white-space:nowrap;">${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? '<span class="sello-guardado">✓ Guardado</span>' : ''}</td>
                 </tr>`).join('')}
             </tbody>
@@ -3116,7 +3226,7 @@ async function cargarPendientesRecepcion(){
                   <td>${p.Sabor}</td>
                   <td><strong class="origen-traspaso">Sale hacia ${p.Local}</strong></td>
                   <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Fecha_envio)}</td>
-                  <td class="num">${ent(p.Cantidad_Enviada)}</td>
+                  <td class="num">${cantProd(p.Sabor, p.Cantidad_Enviada)}</td>
                   <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Vencimiento)}</td>
                 </tr>`).join('')}
             </tbody>
@@ -3263,11 +3373,11 @@ async function cargarHistorialEnvios(){
               <td>${f.Origen ? `<span class="origen-traspaso">${f.Origen}</span>` : 'Fábrica'}</td>
               <td>${f.Local}</td>
               <td>${f.Sabor}</td>
-              <td class="num">${ent(f.Cantidad_Enviada)}</td>
+              <td class="num">${cantProd(f.Sabor, f.Cantidad_Enviada)}</td>
               <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(f.Vencimiento)}</td>
               <td style="color:var(--ink-soft);font-size:12.5px;">${f.Fecha_recepcion ? fmtFecha(f.Fecha_recepcion) : (f.Estado === 'Preparando' ? '— en preparación (sin enviar) —' : '— sin confirmar —')}</td>
-              <td class="num">${f.Fecha_recepcion ? ent(f.Cantidad_Recibida) : '—'}</td>
-              <td class="num" style="${f.Diferencia ? 'color:var(--alert);font-weight:600;' : ''}">${f.Diferencia === null ? '—' : (f.Diferencia > 0 ? '+' : '') + ent(f.Diferencia)}</td>
+              <td class="num">${f.Fecha_recepcion ? cantProd(f.Sabor, f.Cantidad_Recibida) : '—'}</td>
+              <td class="num" style="${f.Diferencia ? 'color:var(--alert);font-weight:600;' : ''}">${f.Diferencia === null ? '—' : (f.Diferencia > 0 ? '+' : '') + cantProd(f.Sabor, f.Diferencia)}</td>
             </tr>`).join('')}
         </tbody>
       </table>
