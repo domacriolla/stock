@@ -1104,6 +1104,12 @@ const UNIDAD_PRODUCTO = { 'SALSA FILETTO': 'litros' };
 // valor = kilos por porción. La orden de envío se redondea para arriba al
 // kilo entero; en la planilla se guarda siempre en porciones del local.
 const ENVIO_EN_KILOS = { 'TOPPING MUZZARELLA': 0.25 };
+// cantidades de insumos (kg, litros): con decimales cuando son chicas, para
+// que 0,3 kg de sal no se muestre como "0". Corregido 07/10/2026.
+function cantIng(n){
+  const x = Number(n) || 0, a = Math.abs(x);
+  return x.toLocaleString('es-AR', { maximumFractionDigits: a < 10 ? 2 : a < 100 ? 1 : 0 });
+}
 function esDecimal(nombre){ return !!UNIDAD_PRODUCTO[nombre]; }
 function dec(n){ return (Number(n) || 0).toLocaleString('es-AR', { maximumFractionDigits: 2 }); }
 // cantidad de un producto: con decimales solo si el producto los usa
@@ -1464,7 +1470,7 @@ function bloqueGramajeOllas(items){
     <details style="margin-top:8px;font-size:12.5px;">
       <summary style="cursor:pointer;color:var(--ink-soft);">Gramaje por olla — ${o.nombre}</summary>
       <ul style="margin:8px 0 0 18px;">
-        ${(o.gramajePorOlla || []).map(g => `<li>${g.ingrediente}: ${ent(g.cantidad)} ${g.medida || ''}</li>`).join('')}
+        ${(o.gramajePorOlla || []).map(g => `<li>${g.ingrediente}: ${cantIng(g.cantidad)} ${g.medida || ''}</li>`).join('')}
       </ul>
     </details>`).join('');
 }
@@ -1522,7 +1528,7 @@ async function cargarPreparadosCocina(fecha){
         <tbody>
           ${demanda.map(d => {
             const o = ollasPorNombre[normalizarFicha(d.preparado)];
-            return `<tr><td><strong>${d.preparado}</strong></td><td class="num">${ent(d.cantidad)} ${d.unidad}</td><td class="num">${o ? `<strong>${o.ollas}</strong>` : '—'}</td></tr>`;
+            return `<tr><td><strong>${d.preparado}</strong></td><td class="num">${cantIng(d.cantidad)} ${d.unidad}</td><td class="num">${o ? `<strong>${o.ollas}</strong>` : '—'}</td></tr>`;
           }).join('')}
         </tbody>
       </table>
@@ -1792,7 +1798,7 @@ async function pintarRegistroCocinaSector(){
     h.className = 'cat-heading receta-heading';
     h.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;';
     h.innerHTML = `
-      <span>${nombreReceta} — ${ent(cantidadHoy)} ${unidadTxt} ${subtitulo === ' — adicional' ? '(1 receta de ficha)' : 'calculados hoy'}${subtitulo || ''}</span>
+      <span>${nombreReceta} — ${cantIng(cantidadHoy)} ${unidadTxt} ${subtitulo === ' — adicional' ? '(1 receta de ficha)' : 'calculados hoy'}${subtitulo || ''}</span>
       <span class="no-print">${finalizada
         ? `<span style="color:#2a7a4a;font-size:12.5px;font-weight:600;margin-right:6px;">✓ Enviada</span><button type="button" class="btn secondary btn-reabrir-receta" style="font-size:12px;padding:5px 9px;">Reabrir</button>`
         : ''}</span>
@@ -1836,10 +1842,10 @@ async function pintarRegistroCocinaSector(){
       tr.dataset.ingrediente = ing.Ingrediente;
       tr.innerHTML = `
         <td>${ing.Ingrediente}</td>
-        <td class="num" style="color:var(--ink-soft);">${ent(cantidadHoyIng)} ${ing.Medida || ''}</td>
-        <td><input type="number" min="0" step="0.01" class="inp-bruto-real" style="width:90px;" placeholder="${ent(cantidadHoyIng)}" value="${valorBruto}" ${dis}></td>
-        <td class="num" style="color:var(--ink-soft);">${tieneRinde ? `${ent(rindeHoyIng)} ${ing.Medida || ''}` : `<span style="font-size:11px;">sin control de rinde</span>`}</td>
-        <td>${tieneRinde ? `<input type="number" min="0" step="0.01" class="inp-rinde-real" style="width:90px;" placeholder="${ent(rindeHoyIng)}" value="${valorRinde}" ${dis}>` : ''}</td>
+        <td class="num" style="color:var(--ink-soft);">${cantIng(cantidadHoyIng)} ${ing.Medida || ''}</td>
+        <td><input type="number" min="0" step="0.01" class="inp-bruto-real" style="width:90px;" placeholder="${cantIng(cantidadHoyIng)}" value="${valorBruto}" ${dis}></td>
+        <td class="num" style="color:var(--ink-soft);">${tieneRinde ? `${cantIng(rindeHoyIng)} ${ing.Medida || ''}` : `<span style="font-size:11px;">sin control de rinde</span>`}</td>
+        <td>${tieneRinde ? `<input type="number" min="0" step="0.01" class="inp-rinde-real" style="width:90px;" placeholder="${cantIng(rindeHoyIng)}" value="${valorRinde}" ${dis}>` : ''}</td>
         <td class="no-print celda-estado" style="white-space:nowrap;"></td>
       `;
       if(guardado){ tr.dataset.guardado = '1'; tr.classList.add('fila-guardada'); ponerSello(tr, null); }
@@ -2120,7 +2126,7 @@ async function cargarInformeInsumos(){
       <table class="prod">
         <thead><tr><th>Insumo</th><th class="num">Total usado</th></tr></thead>
         <tbody>
-          ${totales.map(t => `<tr><td>${t.ingrediente}</td><td class="num"><strong>${ent(t.cantidad)}</strong> ${t.unidad}</td></tr>`).join('')}
+          ${totales.map(t => `<tr><td>${t.ingrediente}</td><td class="num"><strong>${cantIng(t.cantidad)}</strong> ${t.unidad}</td></tr>`).join('')}
         </tbody>
       </table>
     `;
