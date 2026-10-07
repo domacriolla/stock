@@ -715,7 +715,8 @@ async function renderLocal(bloque){
     </div>
     <div class="field-row">
       <label>Fecha (por si cargás con atraso)</label>
-      <input type="date" id="fechaCarga" value="${hoyISO()}">
+      <input type="date" id="fechaCarga" value="${esBloqueFabrica ? hoyISO() : fechaCierreISO()}">
+      ${!esBloqueFabrica && esMadrugada() ? `<p class="msg" style="display:block;background:#fdf6e3;border:1px solid #e6cf8f;margin-top:6px;font-size:12.5px;">Es de madrugada: la fecha quedó en <strong>${fmtFecha(fechaCierreISO())}</strong> porque este stock es el del cierre de ese día. No la cambies a la fecha de hoy.</p>` : ''}
     </div>
 
     <p style="color:var(--ink-soft);font-size:12.5px;max-width:560px;">
@@ -966,6 +967,12 @@ async function renderLocal(bloque){
     const tocados = completas.filter(tr => (!tr.dataset.guardado || tr.classList.contains('fila-pendiente')) && Number(tr.querySelector('.inp-cant').value) > 0)
       .map(tr => ({ sabor: tr.dataset.item, vencimiento: tr.querySelector('.inp-venc').value }));
     if(!confirmarVencimientos(tocados, fecha)) return;
+    // de madrugada y con la fecha de HOY: casi seguro es el cierre de ayer
+    if(!esBloqueFabrica && esMadrugada() && fecha === hoyISO()
+      && !confirm(`OJO: es de madrugada y estás cargando con fecha ${fmtFecha(fecha)} (el día que recién empieza).\n\nSi este es el stock del cierre de anoche, tocá "Cancelar" y cambiá la fecha a ${fmtFecha(fechaCierreISO())}.\n\n¿Guardar igual con fecha ${fmtFecha(fecha)}?`)) return;
+    // todo en 0: no se guarda sin confirmar (una carga en 0 deja al local sin stock para el cálculo)
+    if(completas.length >= 5 && completas.every(tr => Number(tr.querySelector('.inp-cant').value) === 0)
+      && !confirm(`OJO: los ${completas.length} productos cargados están en 0.\n\nCon esto el sistema va a calcular que ${local} NO tiene stock y va a pedir producir y enviar de más.\n\n¿De verdad no hay nada de stock?`)) return;
     if(enviar){
       const conDato = new Set(completas.map(tr => tr.dataset.item));
       const enBlanco = [...new Set(filas.map(tr => tr.dataset.item))].filter(n => !conDato.has(n));
@@ -1167,7 +1174,12 @@ async function pintarBarraPlan(idCont, fecha, plan, alCambiar){
 
 function conectarPctProduccion(fecha){
   const bR = document.getElementById('btnReabrirPctProd');
-  if(bR) bR.onclick = () => { PREP_ACTUAL.porcentajeProduccionAbierto = true; pintarTabActiva(); };
+  if(bR) bR.onclick = () => {
+    if(!confirm('¿Cambiar el % de rollos y canastas de Producción? Lo normal es dejarlo en 100%.')) return;
+    PREP_ACTUAL.porcentajeProduccionAbierto = true; pintarTabActiva();
+  };
+  const bC = document.getElementById('btnCancelarPctProd');
+  if(bC) bC.onclick = () => { PREP_ACTUAL.porcentajeProduccionAbierto = false; pintarTabActiva(); };
   const bG = document.getElementById('btnGuardarPctProd');
   if(bG) bG.onclick = async () => {
     const pct = Number(document.getElementById('inpPctProd').value);
@@ -1199,15 +1211,15 @@ function bloquePrepDiaAnterior(){
     ? `<tr><td>Molde de canasta <span style="color:var(--ink-soft);font-size:11px;">(${canastas.map(c => `${c.sabor}: ${ent(c.aHacerUnidades)}`).join(' · ')})</span></td><td class="num"><strong>${ent(totalMoldes)}</strong></td></tr>`
     : '';
   // el % lo registra Producción (aparte del de Cocina) — pedido por Carolina 06/10/2026
-  const pct = prep.porcentajeProduccionAbierto ? null : prep.porcentajeProduccion;
+  const pctGuardado = prep.porcentajeProduccion;
+  const pct = pctGuardado == null ? 100 : pctGuardado;
   const notaPct = `
-    <div class="no-print" style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:13px;">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:8px;font-size:13px;">
       <label style="margin:0;">% a dejar armado para mañana (rollos y canastas)</label>
-      ${pct != null
-        ? `<input type="number" value="${pct}" disabled style="width:80px;"><button type="button" class="btn secondary" id="btnReabrirPctProd">Reabrir</button><span style="color:var(--ink-soft);font-size:12px;">guardado para hoy por Producción</span>`
-        : `<input type="number" id="inpPctProd" min="1" max="200" step="5" value="100" style="width:80px;"><button type="button" class="btn" id="btnGuardarPctProd">Guardar %</button><span style="color:var(--ink-soft);font-size:12px;">sin guardar: se calcula al 100%</span>`}
-    </div>`
-    + (pct != null && Number(pct) !== 100 ? `<p style="color:var(--ink-soft);font-size:12px;margin-top:6px;">Ya aplicado el ${ent(pct)}% guardado hoy por Producción.</p>` : '');
+      ${prep.porcentajeProduccionAbierto
+        ? `<input type="number" id="inpPctProd" min="1" max="200" step="5" value="${pct}" style="width:80px;"><button type="button" class="btn" id="btnGuardarPctProd">Guardar %</button><button type="button" class="btn secondary" id="btnCancelarPctProd">Cancelar</button>`
+        : htmlPctCerrado(pct, pctGuardado != null, 'btnReabrirPctProd', 'Producción')}
+    </div>`;
   setTimeout(() => conectarPctProduccion(prep.fecha), 0);
   return `
     <h3 style="font-size:15px;margin:20px 0 8px;">Para mañana (${prep.diaManana}, ${fmtFecha(prep.fechaManana)}) — armar/moldear HOY</h3>
@@ -1389,25 +1401,38 @@ function pintarCocina(data){
 // Cocina) es el guardado en el servidor — tocar el número acá solo
 // previsualiza los kg de Rellenos de esta tabla, no cambia nada hasta
 // apretar "Guardar %".
-function pintarControlPctCocina(fecha, porcentajeGuardado){
+// El % queda SIEMPRE en 100 por defecto y cerrado: para cambiarlo hay que
+// tocar "Cambiar %" a propósito. Si queda distinto de 100 se muestra en rojo.
+// Pedido por Carolina (06/10/2026).
+function htmlPctCerrado(valor, guardado, idBoton, quien){
+  const distinto = Number(valor) !== 100;
+  return `
+    <input type="number" value="${valor}" disabled style="width:90px;${distinto ? 'color:var(--alert);border-color:var(--alert);background:var(--alert-bg);font-weight:700;' : ''}">
+    <button type="button" class="btn secondary no-print" id="${idBoton}">Cambiar %</button>
+    ${distinto
+      ? `<span style="color:var(--alert);font-size:12.5px;font-weight:700;">⚠ ${quien} está al ${valor}% — no al 100%</span>`
+      : `<span style="color:var(--ink-soft);font-size:12px;">${guardado ? 'guardado para hoy' : 'por defecto'}</span>`}`;
+}
+function pintarControlPctCocina(fecha, porcentajeGuardado, abierto){
   const cont = document.getElementById('pctCocinaControl');
   if(!cont) return;
-  if(porcentajeGuardado != null){
-    cont.innerHTML = `
-      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <input type="number" value="${porcentajeGuardado}" disabled style="width:90px;">
-        <button type="button" class="btn secondary" id="btnReabrirPct">Reabrir</button>
-        <span style="color:var(--ink-soft);font-size:12px;">guardado para hoy</span>
-      </div>`;
-    document.getElementById('btnReabrirPct').onclick = () => pintarControlPctCocina(fecha, null);
+  const valor = porcentajeGuardado == null ? 100 : porcentajeGuardado;
+  if(!abierto){
+    cont.innerHTML = `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${htmlPctCerrado(valor, porcentajeGuardado != null, 'btnReabrirPct', 'Cocina')}</div>`;
+    document.getElementById('btnReabrirPct').onclick = () => {
+      if(!confirm('¿Cambiar el % de venta a cubrir de Cocina? Lo normal es dejarlo en 100%.')) return;
+      pintarControlPctCocina(fecha, porcentajeGuardado, true);
+    };
   } else {
     cont.innerHTML = `
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-        <input type="number" id="inpPctRelleno" min="1" max="200" step="5" value="${porcentajeGuardado == null ? 100 : porcentajeGuardado}" style="width:90px;">
+        <input type="number" id="inpPctRelleno" min="1" max="200" step="5" value="${valor}" style="width:90px;">
         <button type="button" class="btn" id="btnGuardarPct">Guardar %</button>
+        <button type="button" class="btn secondary" id="btnCancelarPct">Cancelar</button>
       </div>`;
     document.getElementById('inpPctRelleno').oninput = recalcularCocinaPct;
     document.getElementById('btnGuardarPct').onclick = () => guardarPctCocina(fecha);
+    document.getElementById('btnCancelarPct').onclick = () => { pintarControlPctCocina(fecha, porcentajeGuardado, false); recalcularCocinaPct(); };
   }
 }
 
@@ -3833,6 +3858,23 @@ async function cargarRecetasCargadas(){
 // OJO: NO usar toISOString() acá — siempre da la fecha en UTC, así que entre
 // las 21:00 y las 23:59 (hora Argentina) ya devuelve el día SIGUIENTE. Se
 // calcula la fecha de hoy explícitamente en el huso horario de Argentina.
+// hora actual (0-23) en Argentina
+function horaArgentina(){
+  return Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', hour12: false }).format(new Date())) % 24;
+}
+// FECHA DEL CIERRE: los locales cierran después de medianoche. El stock que
+// se carga de madrugada (antes de las 6) es el del día que TERMINÓ, así que
+// la fecha por defecto es la de ayer. Si se guardaba con la fecha nueva, el
+// sistema lo tomaba como la carga del día siguiente y pisaba la real.
+// (Pasó el 07/10/2026 en Zelarrayán.)
+const HORA_CORTE_CIERRE = 6;
+function esMadrugada(){ return horaArgentina() < HORA_CORTE_CIERRE; }
+function fechaCierreISO(){
+  if(!esMadrugada()) return hoyISO();
+  const d = new Date(hoyISO() + 'T12:00:00');
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
 function hoyISO(){
   const fmt = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'America/Argentina/Buenos_Aires', year: 'numeric', month: '2-digit', day: '2-digit'
