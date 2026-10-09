@@ -138,6 +138,7 @@
   .plan-dia > div:first-child{flex:1 1 320px;}
   .plan-dia .plan-form{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;}
   .plan-dia select{min-width:170px;}
+  .plan-dia .aviso-proy{flex:1 1 100%;background:#fdecea;border:1px solid #e5a29b;border-radius:6px;padding:7px 10px;color:#8a2a1f;}
   .tabla-resumen-envios tr.fila-subtotal-resumen td{font-weight:700;border-top:2px solid var(--line);border-bottom:2px solid var(--line);background:#faf5ea;}
   table.lotes tfoot tr.fila-subtotal-cat td{font-weight:700;border-top:2px solid var(--line);background:#faf5ea;}
   .print-tabla tr.fila-subtotal-print td{font-weight:700;border-top:2px solid #000;}
@@ -1063,7 +1064,7 @@ async function cargarCalculo(){
     ULTIMO_CALCULO = data;
     PREP_ACTUAL = prep.error ? null : prep;
     document.getElementById('tabsFabrica').style.display = 'flex';
-    pintarBarraPlan('barraPlanFabrica', fecha, data.plan, cargarCalculo);
+    pintarBarraPlan('barraPlanFabrica', fecha, data.plan, cargarCalculo, data.proyeccion);
     [...document.querySelectorAll('.tab-btn')].forEach(b => {
       b.onclick = () => { TAB_ACTIVA = b.dataset.tab; marcarTabActiva(); pintarTabActiva(); };
     });
@@ -1135,7 +1136,7 @@ function ordenEnvioFabrica(nombre, unidades){
 // plan = lo que manda el servidor en calcularTodo / calcularEnvios (.plan):
 // null = provisorio (se calcula en vivo); { confirmado, responsable, hora }.
 // alCambiar = función que vuelve a cargar la pantalla.
-async function pintarBarraPlan(idCont, fecha, plan, alCambiar){
+async function pintarBarraPlan(idCont, fecha, plan, alCambiar, proyeccion){
   const cont = document.getElementById(idCont);
   if(!cont) return;
   if(plan === undefined){ cont.innerHTML = ''; return; } // Apps Script viejo: todavía no sabe de planes
@@ -1156,6 +1157,8 @@ async function pintarBarraPlan(idCont, fecha, plan, alCambiar){
     cont.innerHTML = `<div><strong>Plan provisorio</strong>: las cantidades pueden cambiar si se carga o corrige stock, o si se importa otra proyección. Cuando el stock esté cargado, confirmalo para dejarlo fijo todo el día (producción y órdenes de envío).</div>
       <div>${form('Confirmar plan del día', false)}</div>`;
   }
+  const aviso = avisoProyeccion(fecha, proyeccion);
+  if(aviso) cont.insertAdjacentHTML('beforeend', aviso);
   const btn = cont.querySelector('.btn-plan');
   btn.onclick = async () => {
     const responsable = cont.querySelector('.sel-plan').value;
@@ -2770,7 +2773,7 @@ async function cargarEnvios(){
     const guardadoPorLocal = rGuardado.porLocal || {};
     const traspasos = rGuardado.traspasos || {};
     DATOS_ENVIOS = { fecha, data, categorias, traspasos };
-    pintarBarraPlan('barraPlanEnvios', fecha, data.plan, cargarEnvios);
+    pintarBarraPlan('barraPlanEnvios', fecha, data.plan, cargarEnvios, data.proyeccion);
     const conDatos = LOCALES_VENTA.map(l => guardadoPorLocal[l]).concat(Object.values(traspasos)).find(g => g && g.responsable) || {};
 
     document.getElementById('inpResponsableEnvio').innerHTML = opcionesEmpleadosSeleccion(empleados, conDatos.responsable);
@@ -3478,6 +3481,21 @@ async function cargarHistorialEnvios(){
   }
 }
 
+// Aviso cuando la proyección POR FECHA se está por terminar (o un local no la
+// tiene): pasada la última fecha cargada, el cálculo vuelve a la semana tipo.
+// Se avisa con 5 días de margen porque Cocina produce hoy para 2-3 días más.
+function avisoProyeccion(fecha, proyeccion){
+  if(!proyeccion || !proyeccion.hayFechas) return '';
+  const limite = sumarDiasISO(fecha, 5);
+  const cortos = Object.keys(proyeccion.hasta).filter(l => !proyeccion.hasta[l] || proyeccion.hasta[l] < limite);
+  if(!cortos.length) return '';
+  const todas = Object.values(proyeccion.hasta);
+  const detalle = (cortos.length === todas.length && todas.every(h => h && h === todas[0]))
+    ? `cargada hasta el ${fmtFecha(todas[0])} (los ${todas.length} locales)`
+    : cortos.map(l => proyeccion.hasta[l] ? `${l} hasta el ${fmtFecha(proyeccion.hasta[l])}` : `${l} sin cargar`).join(' · ');
+  return `<div class="aviso-proy no-print">⚠ Proyección por fecha: ${detalle}. Después de esa fecha se calcula con la semana tipo — importá las dos semanas siguientes en Planificación.</div>`;
+}
+
 /* ---------------------------------------------------------------------
    Pantalla PLANIFICACIÓN: editar venta proyectada por local
    --------------------------------------------------------------------- */
@@ -3490,12 +3508,57 @@ async function renderPlanificacion(){
     </p>
 
     <div style="border:1px dashed var(--line);border-radius:4px;padding:14px 16px;margin:16px 0;">
-      <label style="margin-bottom:8px;">Importar desde Excel (reemplaza toda la planificación de los 3 locales)</label>
+      <label style="margin-bottom:8px;">Importar desde Excel</label>
+      <p style="color:var(--ink-soft);font-size:12.5px;margin:0 0 8px;">
+        Con <strong>fechas</strong> en los encabezados (ej. "LUNES 12/10"): carga la proyección de esos días puntuales (dos semanas o más) y reemplaza solo esas fechas.<br>
+        Con solo <strong>LUNES … DOMINGO</strong>: reemplaza la semana tipo, que se usa para los días que no tienen proyección por fecha.
+      </p>
       <input type="file" id="inputExcelPlan" accept=".xlsx,.xls">
       <div id="msgImportPlan" class="msg" style="margin-top:10px;"></div>
     </div>
+    <div id="resumenProyFechas" style="font-size:13px;color:var(--ink-soft);"></div>
   `;
   document.getElementById('inputExcelPlan').onchange = importarExcelPlanificacion;
+  pintarResumenProyFechas();
+}
+
+async function pintarResumenProyFechas(){
+  const cont = document.getElementById('resumenProyFechas');
+  if(!cont) return;
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=resumenProyeccionFechas`);
+    const data = await r.json();
+    if(data.error || !data.porLocal) { cont.textContent = ''; return; }
+    const locales = Object.keys(data.porLocal);
+    if(!locales.length){ cont.innerHTML = 'Todavía no hay proyección por fecha cargada: se usa la semana tipo.'; return; }
+    cont.innerHTML = '<strong>Proyección por fecha cargada:</strong> ' + LOCALES_VENTA.map(l => {
+      const x = data.porLocal[l];
+      return x ? `${l}: del ${fmtFecha(x.desde)} al ${fmtFecha(x.hasta)}` : `${l}: sin cargar`;
+    }).join(' · ');
+  }catch(err){ cont.textContent = ''; }
+}
+
+// Encabezado de columna → 'yyyy-MM-dd' si es una fecha (celda de fecha de
+// Excel o texto con dd/mm o dd/mm/aaaa, ej. "LUNES 12/10"); si no, null.
+function fechaDeEncabezado(v){
+  if(typeof v === 'number' && v > 40000 && v < 80000){
+    const d = XLSX.SSF.parse_date_code(v);
+    return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+  }
+  if(v instanceof Date && !isNaN(v)) return sumarDiasISO(`${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`, 0);
+  const m = String(v == null ? '' : v).match(/(\d{1,2})[\/\-.](\d{1,2})(?:[\/\-.](\d{2,4}))?/);
+  if(!m) return null;
+  const dia = Number(m[1]), mes = Number(m[2]);
+  if(mes < 1 || mes > 12 || dia < 1 || dia > 31) return null;
+  let anio;
+  if(m[3]) anio = Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3]);
+  else {
+    const [ay, am] = hoyISO().split('-').map(Number);
+    anio = ay;
+    if(mes - am > 6) anio = ay - 1;      // ej. cargando en enero una fecha de diciembre
+    else if(am - mes > 6) anio = ay + 1; // ej. cargando en diciembre fechas de enero
+  }
+  return `${anio}-${String(mes).padStart(2,'0')}-${String(dia).padStart(2,'0')}`;
 }
 
 // nombres de sabor en la planilla que no calzan tal cual con el sistema
@@ -3533,6 +3596,9 @@ async function importarExcelPlanificacion(ev){
     const sinMatch = [];
     let totalActualizados = 0;
     let totalCreados = 0;
+    let archivoPorFecha = false;           // algún encabezado de categoría trae fechas
+    let sinFechaEnArchivoConFechas = false; // filas bajo un encabezado sin fechas, en un archivo con fechas
+    const resumenFechas = [];
 
     for(const hoja of Object.keys(HOJA_A_LOCAL)){
       if(!wb.SheetNames.includes(hoja)){ continue; }
@@ -3540,17 +3606,39 @@ async function importarExcelPlanificacion(ev){
       const filasHoja = XLSX.utils.sheet_to_json(wb.Sheets[hoja], { header: 1, raw: true, defval: 0 });
 
       let categoriaActual = null;
+      let columnasFecha = null; // [{ col, fecha }] del último encabezado de categoría, si trae fechas
       const filasParaGuardar = [];
+      const porFecha = {};      // sabor -> { fecha: cantidad }
+      const fechasLocal = new Set();
       filasHoja.forEach(fila => {
         const primera = fila[0];
         if(primera === undefined || primera === null || primera === '') return;
         const texto = String(primera).trim();
-        if(CATEGORIAS_EXCEL.includes(texto.toUpperCase())){ categoriaActual = texto.toUpperCase(); return; }
+        if(CATEGORIAS_EXCEL.includes(texto.toUpperCase())){
+          categoriaActual = texto.toUpperCase();
+          const cols = [];
+          for(let c = 1; c < fila.length; c++){
+            const f = fechaDeEncabezado(fila[c]);
+            if(f) cols.push({ col: c, fecha: f });
+          }
+          columnasFecha = cols.length ? cols : null;
+          if(columnasFecha) archivoPorFecha = true;
+          return;
+        }
         if(texto.toUpperCase() === 'LUNES') return; // fila de encabezado de días
 
         const alias = ALIAS_IMPORT[`${categoriaActual}|${normalizarNombre(texto)}`];
         const saborReal = alias || porNombreNormalizado[normalizarNombre(texto)];
         if(!saborReal){ sinMatch.push(texto); return; }
+
+        if(columnasFecha){
+          porFecha[saborReal] = porFecha[saborReal] || {};
+          columnasFecha.forEach(({ col, fecha }) => {
+            porFecha[saborReal][fecha] = Number(fila[col]) || 0;
+            fechasLocal.add(fecha);
+          });
+          return;
+        }
 
         // columnas 1..7 = Lunes..Domingo
         filasParaGuardar.push({
@@ -3560,7 +3648,17 @@ async function importarExcelPlanificacion(ev){
         });
       });
 
-      if(filasParaGuardar.length > 0){
+      if(archivoPorFecha && filasParaGuardar.length) sinFechaEnArchivoConFechas = true;
+      if(fechasLocal.size > 0){
+        const fechas = [...fechasLocal].sort();
+        const resp = await postJSON({
+          action: 'actualizarPlanificacionFechas', local, fechas,
+          filas: Object.keys(porFecha).map(sabor => ({ sabor, valores: porFecha[sabor] }))
+        });
+        resumenFechas.push(`${local}: del ${fmtFecha(fechas[0])} al ${fmtFecha(fechas[fechas.length-1])} (${fechas.length} días, ${Object.keys(porFecha).length} ítems)`);
+        if(resp.filas === undefined) throw new Error('el Apps Script no reconoce la proyección por fecha (¿falta publicar la nueva versión?)');
+      }
+      if(filasParaGuardar.length > 0 && !archivoPorFecha){
         const r = await fetch(APPS_SCRIPT_URL, {
           method: 'POST',
           body: JSON.stringify({ action: 'actualizarPlanificacion', local, filas: filasParaGuardar })
@@ -3573,6 +3671,16 @@ async function importarExcelPlanificacion(ev){
     }
 
     const unicosSinMatch = [...new Set(sinMatch)];
+    if(archivoPorFecha){
+      msg.className = (unicosSinMatch.length || sinFechaEnArchivoConFechas) ? 'msg err' : 'msg ok';
+      msg.textContent = `Proyección por fecha importada — ${resumenFechas.join(' · ')}.` +
+        (sinFechaEnArchivoConFechas ? ' OJO: hay categorías cuyo encabezado no tiene fechas (dice solo LUNES…DOMINGO): esas filas NO se cargaron.' : '') +
+        (unicosSinMatch.length ? ` Sin encontrar en el sistema (se ignoraron): ${unicosSinMatch.join(', ')}` : '') +
+        ' Si el plan de hoy ya estaba confirmado, tocá "Recalcular…" para que tome esta proyección.';
+      pintarResumenProyFechas();
+      ev.target.value = '';
+      return;
+    }
     msg.className = unicosSinMatch.length ? 'msg err' : 'msg ok';
     msg.textContent = `Importado: ${totalActualizados} ítem(s) actualizados en los 3 locales.` +
       (totalCreados > 0 ? ` (${totalCreados} fila(s) nueva(s) creadas porque no existían todavía).` : '') +
