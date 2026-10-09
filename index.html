@@ -3797,22 +3797,40 @@ function htmlTrazabilidad(d){
   const dl = filas => `<dl>${filas.map(([k, x]) => `<dt>${k}</dt><dd>${x}</dd>`).join('')}</dl>`;
   const a = d.armado, rel = d.relleno, dis = d.discos, rep = d.reparto;
 
-  // 1) RELLENO
+  // 1) RELLENO (con sus preparados base, ej. Carne Picante ← Relleno Carne ← Sofrito)
+  const htmlCocina = (r, esBase) => {
+    let h = '';
+    if(!r.registrado){
+      h = dl([
+        [esBase ? 'Preparado' : 'Receta', r.receta],
+        ['Registro de Cocina', v('', esBase
+          ? `sin registro el ${fmtFecha(r.fechaBuscada)} ni en los 5 días anteriores`
+          : `Cocina no registró "${r.receta}" el ${fmtFecha(r.fechaBuscada)}`)]
+      ]);
+    } else {
+      h = dl([
+        [esBase ? 'Preparado' : 'Receta', r.receta],
+        [esBase ? 'Hecho el' : 'Fecha del relleno', fmtFecha(r.fecha) + (r.hora ? ` · enviada ${r.hora}` : '') + (esBase && r.fecha !== r.fechaBuscada ? ' <span style="font-weight:400;color:var(--ink-soft);">(último registro antes)</span>' : '')],
+        ['Hecha por', v(r.responsable)],
+        ['Total elaborado', r.total ? `${r.total} ${r.unidad}` : v('')]
+      ]);
+      if(r.insumos && r.insumos.length){
+        h += `<table class="prod" style="margin-top:10px;"><thead><tr><th>Insumo</th><th class="num">Bruto real</th><th class="num">Rinde real</th></tr></thead><tbody>
+          ${r.insumos.map(i => `<tr><td>${i.ingrediente}</td><td class="num">${i.bruto ? i.bruto + (i.medida ? ' ' + i.medida : '') : '—'}</td><td class="num">${i.rinde ? i.rinde + (i.medida ? ' ' + i.medida : '') : '—'}</td></tr>`).join('')}
+        </tbody></table><p class="traza-nota">Los insumos que no figuran se hicieron con la cantidad de la ficha técnica.</p>`;
+      }
+    }
+    (r.bases || []).forEach(b => {
+      h += `<div style="border-left:3px solid var(--line);margin:12px 0 0 6px;padding:2px 0 2px 12px;">
+        <div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:4px;">↳ "${r.receta}" lleva el preparado <strong>${b.receta}</strong></div>
+        ${htmlCocina(b, true)}</div>`;
+    });
+    return h;
+  };
   let hRel;
   if(!rel.fecha) hRel = dl([['Receta', rel.receta || '—'], ['Fecha del relleno', v('', 'Producción no cargó la fecha del relleno')]]);
-  else if(!rel.registrado) hRel = dl([['Receta', rel.receta], ['Fecha del relleno', fmtFecha(rel.fecha)], ['Registro de Cocina', v('', 'Cocina no registró esta receta ese día')]]);
   else {
-    hRel = dl([
-      ['Receta', rel.receta],
-      ['Fecha del relleno', fmtFecha(rel.fecha) + (rel.hora ? ` · enviada ${rel.hora}` : '')],
-      ['Hecha por', v(rel.responsable)],
-      ['Total elaborado', rel.total ? `${rel.total} ${rel.unidad}` : v('')]
-    ]);
-    if(rel.insumos && rel.insumos.length){
-      hRel += `<table class="prod" style="margin-top:10px;"><thead><tr><th>Insumo</th><th class="num">Bruto real</th><th class="num">Rinde real</th></tr></thead><tbody>
-        ${rel.insumos.map(i => `<tr><td>${i.ingrediente}</td><td class="num">${i.bruto ? i.bruto + (i.medida ? ' ' + i.medida : '') : '—'}</td><td class="num">${i.rinde ? i.rinde + (i.medida ? ' ' + i.medida : '') : '—'}</td></tr>`).join('')}
-      </tbody></table><p class="traza-nota">Los insumos que no figuran se hicieron con la cantidad de la ficha técnica.</p>`;
-    }
+    hRel = htmlCocina(rel, false);
     if(rel.usadoEn && rel.usadoEn.length > 1){
       hRel += `<p class="traza-nota">Con este mismo relleno también se armó: ${rel.usadoEn.filter(u => !(u.sabor === d.sabor && u.fecha === d.fecha)).map(u => `${u.sabor} (${fmtFecha(u.fecha)}, ${u.total} un.)`).join(' · ')}</p>`;
     }
