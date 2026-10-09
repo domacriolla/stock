@@ -213,6 +213,14 @@
   .leyenda-vencimiento i{width:12px;height:12px;border-radius:3px;display:inline-block;}
 
   .empty{color:var(--ink-soft);font-size:14px;padding:30px 0;text-align:center;}
+  .traza-paso{border:1px solid var(--line);border-left:4px solid var(--crust-dark);border-radius:6px;padding:12px 14px;margin:12px 0;background:var(--panel);page-break-inside:avoid;}
+  .traza-paso h3{margin:0 0 8px;font-size:15px;color:var(--crust-dark);}
+  .traza-paso dl{display:grid;grid-template-columns:max-content 1fr;gap:4px 14px;margin:0;font-size:13.5px;}
+  .traza-paso dt{color:var(--ink-soft);}
+  .traza-paso dd{margin:0;font-weight:600;}
+  .traza-falta{color:var(--alert);font-weight:600;}
+  .traza-nota{font-size:12.5px;color:var(--ink-soft);margin:8px 0 0;}
+  @media (max-width:560px){ .traza-paso dl{grid-template-columns:1fr;} .traza-paso dd{margin-bottom:6px;} }
   .loading{color:var(--ink-soft);font-size:14px;}
   footer.note{margin-top:40px;font-size:12px;color:var(--ink-soft);border-top:1px solid var(--line);padding-top:14px;}
 
@@ -377,6 +385,7 @@ function irA(pantalla){
   if(pantalla === 'historial') renderHistorialEnvios();
   if(pantalla === 'registro') renderRegistroProduccion();
   if(pantalla === 'fichas') renderFichasTecnicas();
+  if(pantalla === 'trazabilidad') renderTrazabilidad();
   // Informes: cada bloque abre directo su propio informe (sin solapas).
   if(pantalla === 'informeStock') renderInformes('stock');
   if(pantalla === 'informeStockFabrica') renderInformes('stockFabrica');
@@ -630,6 +639,7 @@ function renderHome(){
       ${tarjetaHome('historial', 'Historial de envíos', 'Comparar lo enviado contra lo recibido, por local y sabor.')}
       ${tarjetaHome('informeStockFabrica', 'Informe: Stock de fábrica', 'Última carga de stock de Producción, Cocina y Discos, con semáforo de vencimientos.')}
       ${tarjetaHome('informeInsumos', 'Informe: Consumo de insumos', 'Consumo real de insumos de Cocina por día.')}
+      ${tarjetaHome('trazabilidad', 'Consultar trazabilidad', 'Por fecha de armado y sabor: relleno, discos, máquina y personal, y a qué local fue.')}
     </div>
 
     <h3 class="home-seccion">Actualizar datos</h3>
@@ -1709,11 +1719,12 @@ async function pintarRegistroCocinaSector(){
   const cocina = (CALCULO_REGISTRO.cocina || []).filter(f => f.kilosDeRelleno > 0);
   const dipsPostres = (CALCULO_REGISTRO.produccion || []).filter(f => f.aHacerUnidades > 0 && (f.rubro === 'Dips' || f.rubro === 'Postres'));
 
-  const [recetas, ollasResp, trazaResp, finalResp] = await Promise.all([
+  const [recetas, ollasResp, trazaResp, finalResp, empleadosCocina] = await Promise.all([
     obtenerRecetas(),
     fetch(`${APPS_SCRIPT_URL}?action=calcularOllas&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({})),
     fetch(`${APPS_SCRIPT_URL}?action=listarTrazabilidadCocinaDia&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({})),
-    fetch(`${APPS_SCRIPT_URL}?action=listarRecetasFinalizadas&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({}))
+    fetch(`${APPS_SCRIPT_URL}?action=listarRecetasFinalizadas&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({})),
+    obtenerEmpleados().catch(() => [])
   ]);
   const ollasData = (ollasResp && !ollasResp.error) ? ollasResp : { preparados: [], rellenos: [] };
 
@@ -1864,6 +1875,8 @@ async function pintarRegistroCocinaSector(){
     pie.innerHTML = `
       <label style="display:inline-block;margin:0 8px 0 0;font-size:13px;color:var(--ink);font-weight:600;">Total elaborado hoy (${unidadTxt})</label>
       <input type="number" min="0" step="0.01" class="inp-total-receta" style="width:110px;" value="${totalGuardado ? totalGuardado.cantidad : ''}" ${finalizada ? 'disabled' : ''}>
+      <label style="display:inline-block;margin:0 0 0 10px;font-size:13px;color:var(--ink);font-weight:600;">Hecha por</label>
+      <select class="inp-responsable-receta" style="min-width:150px;" ${finalizada ? 'disabled' : ''}>${opcionesEmpleadosSeleccion(empleadosCocina, totalGuardado ? (totalGuardado.responsable || '') : '')}</select>
       <span class="celda-estado"></span>
       ${finalizada ? '' : `
         <span class="botones-receta no-print">
@@ -1983,9 +1996,16 @@ async function guardarReceta(bloque, unidadTxt, fecha, enviar){
   });
   const pie = bloque.querySelector('.pie-receta');
   const totalVal = pie.querySelector('.inp-total-receta').value;
+  const selResp = pie.querySelector('.inp-responsable-receta');
+  const responsable = selResp ? selResp.value : '';
   if(enviar && !(Number(totalVal) > 0)){
     avisar(`✗ Falta el "Total elaborado hoy" de ${receta}.`, 'err');
     pie.querySelector('.inp-total-receta').focus();
+    return;
+  }
+  if(enviar && !responsable){
+    avisar(`✗ Falta elegir quién hizo "${receta}".`, 'err');
+    if(selResp) selResp.focus();
     return;
   }
   if(enviar && !confirm(`¿Guardar y enviar final "${receta}"? Se bloquea su tabla y entra al informe de Totales del día.`)) return;
@@ -1995,13 +2015,14 @@ async function guardarReceta(bloque, unidadTxt, fecha, enviar){
   const cuerpo = {
     fecha, receta, items,
     borrar: vaciadas.map(tr => tr.dataset.ingrediente),
-    total: { cantidad: totalVal, unidad: unidadTxt }
+    total: { cantidad: totalVal, unidad: unidadTxt, responsable },
+    responsable
   };
   try{
     await postJSON(Object.assign({ action: enviar ? 'finalizarRecetaCocina' : 'registrarTrazabilidadCocinaLote' }, cuerpo));
     const hora = horaCorta();
     if(enviar){
-      avisar(`✓ "${receta}" enviada · ${hora} — ${items.length} insumo(s), total ${totalVal} ${unidadTxt}.`);
+      avisar(`✓ "${receta}" enviada · ${hora} — ${items.length} insumo(s), total ${totalVal} ${unidadTxt} · hecha por ${responsable}.`);
       pintarRegistroCocinaSector();
     } else {
       conDato.forEach(marcarFilaGuardada);
@@ -2309,7 +2330,7 @@ function filaRegistroProduccion(etiqueta, saborKey, aHacerMostrar, etiquetaExtra
     <td class="num" style="color:var(--ink-soft);">${aHacerMostrar != null ? ent(aHacerMostrar) : '—'}</td>
     <td>${celdaMaquina}</td>
     <td><input type="text" class="inp-maq-vel" style="width:64px;" value="${g.maquinaVelocidad || ''}" ${dis}></td>
-    <td><input type="text" class="inp-disco-lote" style="width:90px;" value="${g.discosLote || ''}" ${dis}></td>
+    <td><input type="date" class="inp-disco-lote" value="${/^\d{4}-\d{2}-\d{2}$/.test(g.discosLote || '') ? g.discosLote : ''}" ${dis}></td>
     <td><input type="number" min="0" step="0.01" class="inp-peso-prom" style="width:80px;" value="${g.pesoPromTandaDiscos || ''}" ${dis}></td>
     <td><input type="date" class="inp-relleno-fecha" value="${g.rellenoFecha || ''}" ${dis}></td>
     <td><input type="number" min="0" step="0.01" class="inp-peso-inicial" style="width:80px;" value="${g.pesoInicialRelleno || ''}" ${dis}></td>
@@ -2537,8 +2558,21 @@ async function guardarRegistroProduccion(enviar){
     avisar('✗ No se envió: hay sabores sin total producido (ver abajo).', 'err');
     return;
   }
-  if(enviar && !confirm('¿Guardar y enviar final el registro del turno? Se va a bloquear todo el registro de Producción de este día.')) return;
   const items = conTotal.map(leerFilaSabor);
+  // control de fechas de trazabilidad (relleno y lote de discos): que no sean
+  // posteriores al armado ni de hace más de 7 días (errores de tipeo), y en
+  // el envío final, avisar las que faltan.
+  const raras = [], faltan = [];
+  items.forEach(it => {
+    const esExtra = it.sabor === NOMBRE_ROLLOS_JYQ || it.sabor === NOMBRE_MOLDE_CANASTA;
+    [['relleno', it.rellenoFecha], ['discos', it.discosLote]].forEach(([q, f]) => {
+      if(f && (f > fecha || f < sumarDiasISO(fecha, -7))) raras.push(`${it.sabor}: fecha de ${q} ${fmtFecha(f)}`);
+      if(!f && !esExtra && !(q === 'relleno' && it.sabor === NOMBRE_MOLDE_CANASTA)) faltan.push(`${it.sabor} (${q})`);
+    });
+  });
+  if(raras.length && !confirm(`OJO — estas fechas parecen mal (posteriores al armado del ${fmtFecha(fecha)} o de hace más de 7 días):\n\n${raras.join('\n')}\n\n¿Están bien así? "Cancelar" para corregirlas.`)) return;
+  if(enviar && faltan.length && !confirm(`Faltan fechas de trazabilidad en:\n\n${faltan.join('\n')}\n\nSin esas fechas no se puede rastrear el relleno o los discos. ¿Enviar igual?`)) return;
+  if(enviar && !confirm('¿Guardar y enviar final el registro del turno? Se va a bloquear todo el registro de Producción de este día.')) return;
 
   const btn = document.getElementById(enviar ? 'btnGuardarRegistro' : 'btnProvisorioRegistro');
   const textoOriginal = btn.textContent;
@@ -3689,6 +3723,164 @@ async function importarExcelPlanificacion(ev){
     msg.className = 'msg err'; msg.textContent = 'No se pudo importar: ' + err.message;
   }
   ev.target.value = ''; // permite volver a subir el mismo archivo si hace falta
+}
+
+/* ---------------------------------------------------------------------
+   Pantalla TRAZABILIDAD (09/10/2026): se elige fecha de ARMADO y sabor y se
+   muestra la cadena relleno → discos → armado → reparto con lo que registró
+   cada sector (ver consultarTrazabilidad en Code.gs).
+   --------------------------------------------------------------------- */
+function renderTrazabilidad(){
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <div class="fab-toolbar">
+      <header class="top" style="margin:0;"><h1>Trazabilidad</h1></header>
+      <div class="field-row">
+        <label>Fecha de armado</label>
+        <input type="date" id="fechaTraza" value="${sumarDiasISO(hoyISO(), -1)}">
+      </div>
+      <div class="field-row">
+        <label>Sabor</label>
+        <select id="selSaborTraza" style="min-width:200px;max-width:100%;"><option value="">—</option></select>
+      </div>
+      <button class="btn secondary no-print" style="margin-left:auto;" onclick="window.print()">🖶 Imprimir</button>
+    </div>
+    <div id="contenidoTraza" class="loading">Cargando…</div>
+  `;
+  document.getElementById('fechaTraza').onchange = cargarSaboresTraza;
+  document.getElementById('selSaborTraza').onchange = pintarTrazabilidad;
+  cargarSaboresTraza();
+}
+
+async function cargarSaboresTraza(){
+  const fecha = document.getElementById('fechaTraza').value;
+  const sel = document.getElementById('selSaborTraza');
+  const cont = document.getElementById('contenidoTraza');
+  cont.className = 'loading'; cont.textContent = 'Buscando lo armado ese día…';
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=consultarTrazabilidad&fecha=${encodeURIComponent(fecha)}`);
+    const data = await r.json();
+    if(data.error) throw new Error(data.error);
+    const sabores = data.sabores || [];
+    sel.innerHTML = sabores.length
+      ? '<option value="">— Elegí un sabor —</option>' + sabores.map(s => `<option value="${s.sabor}">${s.sabor} (${s.total})</option>`).join('')
+      : '<option value="">—</option>';
+    cont.className = '';
+    cont.innerHTML = sabores.length
+      ? `<p style="color:var(--ink-soft);font-size:13px;">${sabores.length} sabor(es) armados el ${fmtFecha(fecha)}. Elegí uno.</p>`
+      : `<div class="empty">No hay nada registrado en Producción el ${fmtFecha(fecha)}.</div>`;
+  }catch(err){
+    cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo buscar: ${err.message}</div>`;
+  }
+}
+
+async function pintarTrazabilidad(){
+  const fecha = document.getElementById('fechaTraza').value;
+  const sabor = document.getElementById('selSaborTraza').value;
+  const cont = document.getElementById('contenidoTraza');
+  if(!sabor){ cont.innerHTML = ''; return; }
+  cont.className = 'loading'; cont.textContent = 'Armando la trazabilidad…';
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=consultarTrazabilidad&fecha=${encodeURIComponent(fecha)}&sabor=${encodeURIComponent(sabor)}`);
+    const d = await r.json();
+    if(d.error) throw new Error(d.error);
+    cont.className = '';
+    if(!d.encontrado){ cont.innerHTML = `<div class="empty">No hay registro de ${sabor} armado el ${fmtFecha(fecha)}.</div>`; return; }
+    cont.innerHTML = htmlTrazabilidad(d);
+  }catch(err){
+    cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo consultar: ${err.message}</div>`;
+  }
+}
+
+function htmlTrazabilidad(d){
+  const v = (x, falta) => (x !== '' && x != null) ? x : `<span class="traza-falta">${falta || 'no registrado'}</span>`;
+  const dl = filas => `<dl>${filas.map(([k, x]) => `<dt>${k}</dt><dd>${x}</dd>`).join('')}</dl>`;
+  const a = d.armado, rel = d.relleno, dis = d.discos, rep = d.reparto;
+
+  // 1) RELLENO
+  let hRel;
+  if(!rel.fecha) hRel = dl([['Receta', rel.receta || '—'], ['Fecha del relleno', v('', 'Producción no cargó la fecha del relleno')]]);
+  else if(!rel.registrado) hRel = dl([['Receta', rel.receta], ['Fecha del relleno', fmtFecha(rel.fecha)], ['Registro de Cocina', v('', 'Cocina no registró esta receta ese día')]]);
+  else {
+    hRel = dl([
+      ['Receta', rel.receta],
+      ['Fecha del relleno', fmtFecha(rel.fecha) + (rel.hora ? ` · enviada ${rel.hora}` : '')],
+      ['Hecha por', v(rel.responsable)],
+      ['Total elaborado', rel.total ? `${rel.total} ${rel.unidad}` : v('')]
+    ]);
+    if(rel.insumos && rel.insumos.length){
+      hRel += `<table class="prod" style="margin-top:10px;"><thead><tr><th>Insumo</th><th class="num">Bruto real</th><th class="num">Rinde real</th></tr></thead><tbody>
+        ${rel.insumos.map(i => `<tr><td>${i.ingrediente}</td><td class="num">${i.bruto ? i.bruto + (i.medida ? ' ' + i.medida : '') : '—'}</td><td class="num">${i.rinde ? i.rinde + (i.medida ? ' ' + i.medida : '') : '—'}</td></tr>`).join('')}
+      </tbody></table><p class="traza-nota">Los insumos que no figuran se hicieron con la cantidad de la ficha técnica.</p>`;
+    }
+    if(rel.usadoEn && rel.usadoEn.length > 1){
+      hRel += `<p class="traza-nota">Con este mismo relleno también se armó: ${rel.usadoEn.filter(u => !(u.sabor === d.sabor && u.fecha === d.fecha)).map(u => `${u.sabor} (${fmtFecha(u.fecha)}, ${u.total} un.)`).join(' · ')}</p>`;
+    }
+  }
+
+  // 2) DISCOS
+  let hDis;
+  if(!dis.fecha) hDis = dl([['Lote de discos', v(dis.loteTexto ? `"${dis.loteTexto}" (no es una fecha)` : '', 'Producción no cargó el lote de discos')], ['Peso prom. tanda', a.pesoPromTandaDiscos ? a.pesoPromTandaDiscos + ' g' : '—']]);
+  else {
+    const corr = (dis.registros || []).filter(x => x.corresponde);
+    hDis = dl([
+      ['Fecha del lote', fmtFecha(dis.fecha)],
+      ['Tipo de disco', dis.tipos.join(' + ') || '—'],
+      ['Hechos por', corr.length ? corr.map(x => `${x.responsable || '—'} (${x.tipo}: ${x.cantidad})`).join(' · ') : v('', 'Discos no registró ese tipo ese día')],
+      ['Peso prom. tanda', a.pesoPromTandaDiscos ? a.pesoPromTandaDiscos + ' g' : '—']
+    ]);
+    const otros = (dis.registros || []).filter(x => !x.corresponde);
+    if(otros.length) hDis += `<p class="traza-nota">Ese día Discos también registró: ${otros.map(x => `${x.tipo} — ${x.responsable} (${x.cantidad})`).join(' · ')}</p>`;
+  }
+
+  // 3) ARMADO
+  const filasArm = [['Fecha de armado', fmtFecha(a.fecha) + (a.horaInicio ? ` · ${a.horaInicio}${a.horaFin ? ' a ' + a.horaFin : ''}` : '')]];
+  if(a.maquinaNumero){
+    filasArm.push(['Máquina', `Nº ${a.maquinaNumero}${a.maquinaVelocidad ? ' · velocidad ' + a.maquinaVelocidad : ''}`]);
+    filasArm.push(['Entrada', v(a.puestos && a.puestos.entrada)], ['Relleno', v(a.puestos && a.puestos.relleno)], ['Salida', v(a.puestos && a.puestos.salida)]);
+  } else {
+    filasArm.push([d.categoria === 'Canasta' ? 'Armó la canasta' : 'Responsable', v(a.responsable)]);
+  }
+  filasArm.push(['Total producido', `${a.total} un.`], ['Discos dañados', a.discosDanados]);
+  if(a.pesoInicialRelleno || a.pesoFinalRelleno) filasArm.push(['Relleno (inicial → final)', `${a.pesoInicialRelleno || '—'} → ${a.pesoFinalRelleno || '—'} kg`]);
+  if(a.extra){
+    filasArm.push([a.extra.nombre, a.extra.encontrado
+      ? `${fmtFecha(a.extra.fecha)} · ${v(a.extra.responsable)} · ${a.extra.total} un.`
+      : v('', 'sin registro en los 10 días anteriores')]);
+  }
+  filasArm.push(['Turno enviado', a.turnoCerrado ? `${a.turnoCerrado.hora}${a.turnoCerrado.responsable ? ' · ' + a.turnoCerrado.responsable : ''}` : v('', 'turno sin enviar final')]);
+  let hArm = dl(filasArm);
+  if(a.observaciones) hArm += `<p class="traza-nota"><strong>Observaciones del turno:</strong> ${a.observaciones}</p>`;
+
+  // 4) REPARTO
+  const tablaEnv = lista => `<div style="overflow-x:auto;"><table class="prod" style="margin-top:8px;"><thead><tr>
+      <th>Envío</th><th>Local</th><th class="num">Enviado</th><th>Vence</th><th>Despachó</th><th>Repartidor</th><th>Acompañante</th><th>Recibió</th><th class="num">Recibido</th>
+    </tr></thead><tbody>${lista.map(e => `<tr>
+      <td>${fmtFecha(e.fechaEnvio)}</td>
+      <td>${e.origen ? `${e.origen} → ${e.local} <span style="color:var(--ink-soft);font-size:11px;">(traspaso)</span>` : e.local}</td>
+      <td class="num">${e.cantidad}</td><td>${fmtFecha(e.vencimiento)}</td>
+      <td>${e.responsableEnvio || '—'}</td><td>${e.repartidor || '—'}</td><td>${e.acompanante || '—'}</td>
+      <td>${e.fechaRecepcion ? `${e.responsableRecepcion || '—'} · ${fmtFecha(e.fechaRecepcion)}` : (e.estado === 'Preparando' ? 'en preparación' : 'sin confirmar')}</td>
+      <td class="num">${e.fechaRecepcion ? e.cantidadRecibida : '—'}</td>
+    </tr>`).join('')}</tbody></table></div>`;
+  let hRep;
+  if(!rep.vencimientoEsperado) hRep = `<p>${v('', 'Sin fecha del relleno no se puede saber qué envíos son de este armado.')}</p>` + (rep.otros.length ? `<p class="traza-nota">Envíos de ${d.sabor} desde el ${fmtFecha(d.fecha)}:</p>` + tablaEnv(rep.otros) : '');
+  else {
+    const tot = rep.envios.reduce((s, e) => s + e.cantidad, 0);
+    hRep = `<p style="font-size:13.5px;margin:0;">Envíos de ${d.sabor} con vencimiento <strong>${fmtFecha(rep.vencimientoEsperado)}</strong> (relleno del ${fmtFecha(rel.fecha)} + ${rep.vidaUtil} días) — <strong>${tot} un.</strong> en total.</p>`;
+    hRep += rep.envios.length ? tablaEnv(rep.envios) : `<p class="traza-nota">No hay envíos con ese vencimiento (puede seguir en stock de fábrica).</p>`;
+    if(rep.comparten.length) hRep += `<p class="traza-nota">⚠ Con el mismo relleno también se armó ${d.sabor} el ${rep.comparten.map(c => `${fmtFecha(c.fecha)} (${c.total} un.)`).join(', ')}: tienen el mismo vencimiento y estos envíos pueden ser de cualquiera de esos armados.</p>`;
+    if(rep.otros.length) hRep += `<p class="traza-nota">Otros envíos de ${d.sabor} en esos días, con OTRO vencimiento (son de otro armado, o el vencimiento se cargó distinto):</p>` + tablaEnv(rep.otros);
+  }
+
+  return `
+    <h2 style="margin:6px 0 2px;">${d.sabor}</h2>
+    <p style="color:var(--ink-soft);font-size:13px;margin:0 0 6px;">Armado el ${fmtFecha(d.fecha)} · ${a.total} unidades</p>
+    <div class="traza-paso"><h3>1 · Relleno (Cocina)</h3>${hRel}</div>
+    <div class="traza-paso"><h3>2 · Discos</h3>${hDis}</div>
+    <div class="traza-paso"><h3>3 · Armado (Producción)</h3>${hArm}</div>
+    <div class="traza-paso"><h3>4 · Reparto</h3>${hRep}</div>
+  `;
 }
 
 async function obtenerSaboresPlanos(){
