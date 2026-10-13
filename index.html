@@ -313,7 +313,13 @@ const MEMORIA_VERSION = 'v2';
 // categorías en orden fijo y productos de la A a la Z (también lo hace el
 // servidor; acá por si la tablet tiene guardada una lista vieja)
 const ORDEN_RUBROS = ['Empanadas Horno', 'Empanadas Frito', 'Dips', 'Postres', 'Toppings', 'Cajita Criolla'];
-function compararTexto(a, b){ return String(a).localeCompare(String(b), 'es', { sensitivity: 'base', numeric: true }); }
+// BALCARCE y CANASTA DE ÑOQUIS van al final de su categoría (pedido por Carolina 13/10/2026)
+const AL_FINAL = ['BALCARCE', 'CANASTA DE ÑOQUIS'];
+function compararTexto(a, b){
+  const fa = AL_FINAL.indexOf(String(a).toUpperCase()), fb = AL_FINAL.indexOf(String(b).toUpperCase());
+  if(fa !== -1 || fb !== -1){ if(fa === -1) return -1; if(fb === -1) return 1; return fa - fb; }
+  return String(a).localeCompare(String(b), 'es', { sensitivity: 'base', numeric: true });
+}
 function ordenarCategorias(porCat){
   const out = {};
   Object.keys(porCat).sort((a, b) => {
@@ -2385,7 +2391,7 @@ async function pintarRegistroProduccionSector(){
   const saboresCanasta = todasEmpanadas.filter(n => categoriaPorSabor[n] === 'Canasta');
 
   const porSabor = {};
-  (data.produccion || []).forEach(f => { if(f.tipoCalculo === 'Calendario') porSabor[f.sabor] = f; });
+  (data.produccion || []).forEach(f => { if(f.tipoCalculo === 'Calendario' || f.categoria === 'Canasta') porSabor[f.sabor] = f; });
   const canastaPorSabor = {};
   (prep.canastas || []).forEach(c => { canastaPorSabor[c.sabor] = c; });
 
