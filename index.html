@@ -220,6 +220,14 @@
   table.inf td.txt{text-align:left;font-size:11px;line-height:1.25;white-space:normal;min-width:70px;max-width:110px;}
   table.inf td.txt small{display:block;color:var(--ink-soft);}
   .tabla-fija table.inf td:first-child{z-index:2;}
+  /* Tiempos de máquina: todo centrado en las columnas de días (16/10) */
+  table.inf.inf-centrado td:not(:first-child), table.inf.inf-centrado td.txt, table.inf.inf-centrado td.lbl{text-align:center;}
+  table.inf.inf-centrado td:not(:first-child), table.inf.inf-centrado th.col-dia{border-left:1px solid #e3d6c1;}
+  /* ayudas (tooltip) en el informe de tiempos: pasar el mouse por la "i" */
+  .con-ayuda{cursor:help;}
+  .ayuda-i{display:inline-block;width:14px;height:14px;border-radius:50%;background:#e9dfcc;color:var(--ink-soft);font-size:9.5px;font-style:normal;font-weight:700;font-family:Georgia,serif;text-align:center;line-height:14px;margin-left:5px;vertical-align:1px;letter-spacing:0;}
+  table.inf tr.fila-sector .ayuda-i{background:rgba(255,255,255,.22);color:#fff;}
+  table.inf td.sab-maq small{display:block;font-size:10px;color:var(--ink-soft);line-height:1.2;}
   table.simple{border-collapse:collapse;font-size:12.5px;margin:6px 0 14px;}
   table.simple th{font-size:11px;color:var(--ink-soft);text-align:left;padding:6px 8px;border-bottom:1px solid var(--ink-soft);white-space:nowrap;}
   table.simple td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
@@ -4743,6 +4751,7 @@ function theadDias(titulo, dias, opts){
   return `<thead><tr><th>${titulo}</th>${dias.map(d => `<th class="col-dia${esFinde(d) ? ' finde' : ''}${d.fecha === hoy ? ' hoy' : ''}${o.marcarSinPlan && !d.conPlan ? ' sin-plan' : ''}" title="${fmtFecha(d.fecha)}${o.marcarSinPlan && !d.conPlan ? ' — sin plan guardado' : ''}"><div>${Number(d.fecha.slice(8))}</div><small>${DIA_CORTO[d.dia] || ''}</small></th>`).join('')}<th class="num col-total">${o.tituloTotal || 'Mes'}</th></tr></thead>`;
 }
 function tdDia(d, contenido, clase, title){ return `<td class="${clase || ''}${esFinde(d) ? ' finde' : ''}"${title ? ` title="${escHtml(title)}"` : ''}>${contenido}</td>`; }
+function conAyuda(lbl, ayuda){ return ayuda ? `<span class="con-ayuda" title="${escHtml(ayuda)}">${lbl}<i class="ayuda-i">i</i></span>` : lbl; }
 function filaSector(titulo, dias){ return `<tr class="fila-sector"><td>${titulo}</td><td colspan="${dias.length + 1}"></td></tr>`; }
 
 // encabezado común de las 3 pantallas
@@ -4828,8 +4837,10 @@ async function cargarInformePedido(){
           if(v.p != null) t.p = (t.p || 0) + v.p;
           if(v.h != null) t.h = (t.h || 0) + v.h;
         }));
-        const plegar = unidad && g.items.length > 1 && sec.sector !== 'Discos';
-        html += filasPedidoHecho(`<span class="caret">▾</span>${g.grupo}${unidad ? ` <span class="sub">(${unidad})</span>` : ''}`, unidad ? tot : null, dias, unidad, hoy, `data-gid="${gid}" data-plegado-inicial="${plegar ? '1' : ''}"`, true);
+        // un grupo de un solo ítem no repite el total (se veía duplicado);
+        // todo arranca desplegado (se puede plegar tocando el nombre del grupo)
+        const conTotal = unidad && g.items.length > 1;
+        html += filasPedidoHecho(`<span class="caret">▾</span>${g.grupo}${unidad ? ` <span class="sub">(${unidad})</span>` : ''}`, conTotal ? tot : null, dias, unidad, hoy, `data-gid="${gid}" data-plegado-inicial=""`, true, unidad ? '' : '— unidades distintas, ver el detalle');
         g.items.forEach(i => { html += filasPedidoHecho(escHtml(i.item) + (unidad ? '' : ` <span class="sub">(${i.unidad})</span>`), i.valores, dias, i.unidad, hoy, `data-pert="${gid}"`, false); });
       });
     });
@@ -4841,8 +4852,8 @@ async function cargarInformePedido(){
   }
 }
 // 3 renglones de un ítem (o del total de un grupo). valores = null -> grupo sin total (unidades mezcladas)
-function filasPedidoHecho(etiqueta, valores, dias, unidad, hoy, attrs, esGrupo){
-  if(!valores) return `<tr ${attrs || ''} class="primera fila-grupo-inf"><td>${etiqueta} <span class="sub" style="text-transform:none;">— unidades distintas, ver el detalle</span></td>${dias.map(d => tdDia(d, '', 'vacio')).join('')}<td class="col-total"></td></tr>`;
+function filasPedidoHecho(etiqueta, valores, dias, unidad, hoy, attrs, esGrupo, notaSinTotal){
+  if(!valores) return `<tr ${attrs || ''} class="primera fila-grupo-inf"><td>${etiqueta}${notaSinTotal ? ` <span class="sub" style="text-transform:none;">${notaSinTotal}</span>` : ''}</td>${dias.map(d => tdDia(d, '', 'vacio')).join('')}<td class="col-total"></td></tr>`;
   const cP = [], cH = [], cD = [];
   let sp = 0, sh = 0, hay = false;
   dias.forEach(d => {
@@ -5042,11 +5053,11 @@ async function cargarInformeTiempos(){
         <span><i style="background:var(--herb-bg);"></i>Bien</span>
         <span><i style="background:#fdf0d5;"></i>Para mirar</span>
         <span><i style="background:var(--alert-bg);"></i>Problema / falta registro</span>
-      </div><div class="tabla-fija"><table class="inf">${theadDias('', dias, { tituloTotal: 'Mes' })}<tbody>`;
+      </div><div class="tabla-fija"><table class="inf inf-centrado">${theadDias('', dias, { tituloTotal: 'Mes' })}<tbody>`;
 
     // 1) CALIDAD DEL REGISTRO
-    html += filaSector('CALIDAD DEL REGISTRO', dias);
-    const filaCal = (lbl, campo, ayuda, primera) => {
+    html += filaSector(conAyuda('CALIDAD DEL REGISTRO', 'Controla si Producción cargó todo bien cada día. ✓ = completo. Un número = cuántos sabores tienen ese problema (pasá el mouse por el número para ver cuáles).'), dias);
+    const filaCal = (lbl, campo, ayuda, primera, explica) => {
       let tot = 0;
       const celdas = dias.map(d => {
         const c = data.calidad[d.fecha];
@@ -5055,24 +5066,24 @@ async function cargarInformeTiempos(){
         tot += v.length;
         return tdDia(d, v.length ? v.length : '✓', v.length ? 'c-menos' : 'c-ok', v.length ? `${ayuda}: ${v.join(', ')}` : '');
       }).join('');
-      return `<tr${primera ? ' class="primera"' : ''}><td>${lbl}</td>${celdas}<td class="col-total ${tot ? 'c-menos' : ''}">${tot || ''}</td></tr>`;
+      return `<tr${primera ? ' class="primera"' : ''}><td>${conAyuda(lbl, explica)}</td>${celdas}<td class="col-total ${tot ? 'c-menos' : ''}">${tot || ''}</td></tr>`;
     };
     // registros del día
     let totReg = 0;
-    html += `<tr class="primera"><td><strong>Sabores registrados</strong></td>${dias.map(d => {
+    html += `<tr class="primera"><td>${conAyuda('<strong>Sabores registrados</strong>', 'Cuántos renglones (sabores) se cargaron en Registrar producción ese día. "sin reg." = ese día no se cargó nada; "franco" = lunes sin producción.')}</td>${dias.map(d => {
       const c = data.calidad[d.fecha];
       if(c){ totReg += c.registros; return tdDia(d, c.registros, ''); }
       if(esFrancoProduccion(d)) return tdDia(d, 'franco', 'c-gris');
       return d.fecha < hoy ? tdDia(d, 'sin reg.', 'c-falta', 'No hay nada registrado en Producción este día') : tdDia(d, '', 'vacio');
     }).join('')}<td class="col-total">${totReg}</td></tr>`;
-    html += filaCal('Sin hora inicio / fin', 'sinHora', 'Sin hora', false);
-    html += filaCal('Horas raras (no se cuentan)', 'horaMal', 'Fin antes que inicio, antes de las 5 o más de 4 h', false);
-    html += filaCal('Sin pesos de relleno', 'sinPesos', 'Falta peso inicial o final', false);
-    html += filaCal('Sin máquina', 'sinMaquina', 'Sin máquina', false);
-    html += filaCal('Sin fecha de relleno', 'sinFechaRelleno', 'Sin fecha de relleno', false);
-    html += filaCal('Sin lote de discos', 'sinLoteDiscos', 'Sin lote de discos', false);
-    html += filaCal('Puestos / manual sin cargar', 'sinPuestos', 'Falta quién', false);
-    html += filaCal('Turno sin enviar final', 'turnoSinEnviar', 'Turno sin "Guardar y enviar final"', false);
+    html += filaCal('Sin hora inicio / fin', 'sinHora', 'Sin hora', false, 'Sabores sin hora de inicio o de fin. No entran en el tiempo armando ni en U/hora.');
+    html += filaCal('Horas raras (no se cuentan)', 'horaMal', 'Fin antes que inicio, antes de las 5 o más de 4 h', false, 'Horas que parecen mal tipeadas: fin antes que inicio, inicio antes de las 5 de la mañana o más de 4 h en un solo sabor (ej. 01:00 en vez de 13:00). No se cuentan en los tiempos.');
+    html += filaCal('Sin pesos de relleno', 'sinPesos', 'Falta peso inicial o final', false, 'Sabores sin peso inicial o final del relleno. Sin los dos pesos no se puede comparar el relleno usado contra la ficha.');
+    html += filaCal('Sin máquina', 'sinMaquina', 'Sin máquina', false, 'Empanadas guardadas sin elegir máquina (1, 2 o manual). Van al bloque "Sin máquina cargada".');
+    html += filaCal('Sin fecha de relleno', 'sinFechaRelleno', 'Sin fecha de relleno', false, 'No se cargó la fecha de elaboración del relleno que se usó (trazabilidad).');
+    html += filaCal('Sin lote de discos', 'sinLoteDiscos', 'Sin lote de discos', false, 'No se cargó la fecha del lote de discos que se usó (trazabilidad).');
+    html += filaCal('Puestos / manual sin cargar', 'sinPuestos', 'Falta quién', false, 'Máquina 1 o 2 sin alguno de los 3 puestos (entrada, relleno, salida), o máquina manual con sabores pero sin el nombre de quién la usó.');
+    html += filaCal('Turno sin enviar final', 'turnoSinEnviar', 'Turno sin "Guardar y enviar final"', false, 'El turno quedó sin tocar "Guardar y enviar final".');
 
     // métricas por día de un conjunto de máquinas
     const metDia = (ids, fecha) => {
@@ -5095,31 +5106,62 @@ async function cargarInformeTiempos(){
       dias.forEach(d => { const m = md[d.fecha] = metDia(ids, d.fecha); if(m.hay){ ['minutos', 'unidades', 'unidadesConHora', 'danados', 'kgUsado', 'kgTeorico'].forEach(k => tot[k] += m[k]); if(m.inicio != null && m.fin != null) tot.span += m.fin - m.inicio; } });
       const v = (d, f) => md[d.fecha].hay ? f(md[d.fecha]) : tdDia(d, '', 'vacio');
       let h = '';
-      h += filaMet('<strong>Producción</strong> <span class="sub">u.</span>', d => v(d, m => tdDia(d, fmtCant(m.unidades))), () => fmtCant(tot.unidades), true);
-      h += filaMet('Horario <span class="sub">inicio–fin</span>', d => v(d, m => tdDia(d, m.inicio != null ? `${fmtHora(m.inicio)}<small>${fmtHora(m.fin)}</small>` : '—', 'txt')), () => '');
-      h += filaMet('Tiempo armando <span class="sub">h:mm</span>', d => v(d, m => tdDia(d, m.minutos ? fmtMin(m.minutos) : '—')), () => fmtMin(tot.minutos));
+      h += filaMet(conAyuda('<strong>Producción</strong> <span class="sub">u.</span>', 'Unidades armadas: suma de todos los sabores.'), d => v(d, m => tdDia(d, fmtCant(m.unidades))), () => fmtCant(tot.unidades), true);
+      h += filaMet(conAyuda('Horario <span class="sub">inicio–fin</span>', 'Primera hora de inicio del día y, abajo, la última hora de fin.'), d => v(d, m => tdDia(d, m.inicio != null ? `${fmtHora(m.inicio)}<small>${fmtHora(m.fin)}</small>` : '—', 'txt')), () => '');
+      h += filaMet(conAyuda('Tiempo armando <span class="sub">h:mm</span>', 'Suma de (hora fin − hora inicio) de cada sabor: el tiempo que se estuvo armando. En el total de fábrica suma todas las máquinas.'), d => v(d, m => tdDia(d, m.minutos ? fmtMin(m.minutos) : '—')), () => fmtMin(tot.minutos));
       // el tiempo muerto tiene sentido por máquina (en el total, las máquinas trabajan a la vez)
-      if(ids.length === 1) h += filaMet('Tiempo muerto <span class="sub">h:mm</span>', d => v(d, m => { if(m.inicio == null) return tdDia(d, '—'); const span = m.fin - m.inicio, muerto = Math.max(span - m.minutos, 0); const pct = span ? muerto / span * 100 : 0; return tdDia(d, fmtMin(muerto), pct > 35 ? 'c-menos' : pct > 20 ? 'c-mas' : 'c-ok', `${Math.round(pct)}% del horario`); }), () => fmtMin(Math.max(tot.span - tot.minutos, 0)));
-      h += filaMet('<strong>U/hora</strong>', d => v(d, m => tdDia(d, uh(m.unidadesConHora, m.minutos) || '—')), () => uh(tot.unidadesConHora, tot.minutos) || '');
-      h += filaMet('Discos dañados <span class="sub">u. (%)</span>', d => v(d, m => { const pct = m.unidades ? m.danados / m.unidades * 100 : null; return tdDia(d, `${fmtCant(m.danados)}<small>${pct == null ? '' : pct.toFixed(1) + '%'}</small>`, 'txt ' + claseDanados(pct)); }), () => tot.unidades ? `${fmtCant(tot.danados)} (${(tot.danados / tot.unidades * 100).toFixed(1)}%)` : '');
-      h += filaMet('Relleno usado vs ficha', d => v(d, m => { if(!m.kgTeorico) return tdDia(d, '—', 'c-gris', 'Sin pesos de relleno cargados'); const pct = (m.kgUsado - m.kgTeorico) / m.kgTeorico * 100; return tdDia(d, (pct > 0 ? '+' : '') + pct.toFixed(1) + '%', claseRelleno(pct), `Usado ${m.kgUsado.toFixed(1)} kg vs ficha ${m.kgTeorico.toFixed(1)} kg`); }), () => tot.kgTeorico ? `${((tot.kgUsado - tot.kgTeorico) / tot.kgTeorico * 100).toFixed(1)}%` : '');
+      if(ids.length === 1) h += filaMet(conAyuda('Tiempo muerto <span class="sub">h:mm</span>', 'Del primer inicio al último fin, menos el tiempo armando: cambios de sabor, limpieza, esperas. Verde hasta 20% del horario, amarillo hasta 35%, rojo más.'), d => v(d, m => { if(m.inicio == null) return tdDia(d, '—'); const span = m.fin - m.inicio, muerto = Math.max(span - m.minutos, 0); const pct = span ? muerto / span * 100 : 0; return tdDia(d, fmtMin(muerto), pct > 35 ? 'c-menos' : pct > 20 ? 'c-mas' : 'c-ok', `${Math.round(pct)}% del horario`); }), () => fmtMin(Math.max(tot.span - tot.minutos, 0)));
+      h += filaMet(conAyuda('<strong>U/hora</strong>', 'Unidades por hora: unidades ÷ tiempo armando (solo sabores con las dos horas bien cargadas).'), d => v(d, m => tdDia(d, uh(m.unidadesConHora, m.minutos) || '—')), () => uh(tot.unidadesConHora, tot.minutos) || '');
+      h += filaMet(conAyuda('Discos dañados <span class="sub">u. (%)</span>', 'Discos dañados cargados y su % sobre lo producido. Verde hasta 3%, amarillo hasta 6%, rojo más.'), d => v(d, m => { const pct = m.unidades ? m.danados / m.unidades * 100 : null; return tdDia(d, `${fmtCant(m.danados)}<small>${pct == null ? '' : pct.toFixed(1) + '%'}</small>`, 'txt ' + claseDanados(pct)); }), () => tot.unidades ? `${fmtCant(tot.danados)} (${(tot.danados / tot.unidades * 100).toFixed(1)}%)` : '');
+      h += filaMet(conAyuda('Relleno usado vs ficha', 'Kilos de relleno usados (peso inicial − final) contra unidades × gramaje de la ficha. + = se puso más relleno que la ficha. Verde ±3%, amarillo ±8%, rojo más.'), d => v(d, m => { if(!m.kgTeorico) return tdDia(d, '—', 'c-gris', 'Sin pesos de relleno cargados'); const pct = (m.kgUsado - m.kgTeorico) / m.kgTeorico * 100; return tdDia(d, (pct > 0 ? '+' : '') + pct.toFixed(1) + '%', claseRelleno(pct), `Usado ${m.kgUsado.toFixed(1)} kg vs ficha ${m.kgTeorico.toFixed(1)} kg`); }), () => tot.kgTeorico ? `${((tot.kgUsado - tot.kgTeorico) / tot.kgTeorico * 100).toFixed(1)}%` : '');
       return h;
     };
 
     // 2) TOTAL DE FÁBRICA
-    html += filaSector('TOTAL FÁBRICA (todas las máquinas y a mano)', dias);
+    html += filaSector(conAyuda('TOTAL FÁBRICA (todas las máquinas y a mano)', 'Todo lo producido en el día: máquinas 1 y 2, manuales y lo hecho a mano (canastas, rollos y moldes).'), dias);
     html += bloqueMetricas(data.maquinas.map(m => m.id));
 
     // 3) CADA MÁQUINA
+    const AYUDA_BLOQUE = {
+      '1': 'Máquina automática 1: 3 personas (entrada, relleno, salida), cargadas en el turno.',
+      '2': 'Máquina automática 2: 3 personas (entrada, relleno, salida), cargadas en el turno.',
+      M1: 'Máquina manual 1: la usa una sola persona (se carga en el turno). Los sabores son los guardados con máquina "M1".',
+      M2: 'Máquina manual 2: la usa una sola persona (se carga en el turno). Los sabores son los guardados con máquina "M2".',
+      M3: 'Máquina manual 3: la usa una sola persona (se carga en el turno). Los sabores son los guardados con máquina "M3".',
+      CAN: 'Canastas guardadas sin máquina: se arman a mano.',
+      EXT: 'Rollos de jamón y queso y moldes de canasta (para el día siguiente), hechos a mano.',
+      SIN: 'Empanadas que se guardaron sin elegir máquina: no se sabe en qué máquina se hicieron. Suman en el Total fábrica, pero no en ninguna máquina. Se corrige poniendo la máquina en la planilla (TrazabilidadProduccion, columna MaquinaNumero).'
+    };
     data.maquinas.forEach(mq => {
-      html += filaSector(mq.nombre.toUpperCase(), dias);
-      html += filaMet('Personal', d => { const m = mq.dias[d.fecha]; if(!m) return tdDia(d, '', 'vacio');
+      html += filaSector(conAyuda(mq.nombre.toUpperCase(), AYUDA_BLOQUE[mq.id]), dias);
+      html += filaMet(conAyuda('Personal', (mq.id === '1' || mq.id === '2') ? 'Entrada / relleno / salida, según el turno.' : (/^M\d$/.test(mq.id) ? 'Quién usó la manual (del turno).' : 'Quién cargó los renglones.')), d => { const m = mq.dias[d.fecha]; if(!m) return tdDia(d, '', 'vacio');
         if(m.puestos) return tdDia(d, ['entrada', 'relleno', 'salida'].map(p => m.puestos[p] ? escHtml(nombreCorto(m.puestos[p])) : '<span style="color:var(--alert);">falta</span>').join('<br>'), 'txt', `Entrada: ${m.puestos.entrada || '—'} · Relleno: ${m.puestos.relleno || '—'} · Salida: ${m.puestos.salida || '—'}`);
         return tdDia(d, m.personas.length ? m.personas.map(n => escHtml(nombreCorto(n))).join('<br>') : '<span style="color:var(--alert);">falta</span>', 'txt', m.personas.join(', ')); }, () => '', true);
-      html += filaMet('Sabores', d => { const m = mq.dias[d.fecha]; return m ? tdDia(d, m.sabores.length, '', m.sabores.join(', ')) : tdDia(d, '', 'vacio'); }, () => '');
+      html += filaMet(conAyuda('Sabores', 'Cuántos sabores hizo ese día. Pasá el mouse por el número para ver cuáles.'), d => { const m = mq.dias[d.fecha]; return m ? tdDia(d, m.sabores.length, '', m.sabores.join(', ')) : tdDia(d, '', 'vacio'); }, () => '');
       html += bloqueMetricas([mq.id]);
-      if(mq.id === '1' || mq.id === '2') html += filaMet('Velocidad registrada', d => { const m = mq.dias[d.fecha]; if(!m) return tdDia(d, '', 'vacio'); const vs = m.velocidades || []; return tdDia(d, vs.length ? Math.round(vs.reduce((a, b) => a + b, 0) / vs.length) : '—', vs.length ? '' : 'c-gris'); }, () => '');
+      if(mq.id === '1' || mq.id === '2') html += filaMet(conAyuda('Velocidad registrada', 'Promedio de la velocidad de máquina cargada en los sabores del día.'), d => { const m = mq.dias[d.fecha]; if(!m) return tdDia(d, '', 'vacio'); const vs = m.velocidades || []; return tdDia(d, vs.length ? Math.round(vs.reduce((a, b) => a + b, 0) / vs.length) : '—', vs.length ? '' : 'c-gris'); }, () => '');
     });
+
+    // 3b) TODOS LOS SABORES JUNTOS, con lo que hizo cada máquina (16/10)
+    const CORTO_MAQ = { '1': 'Máq 1', '2': 'Máq 2', M1: 'Man 1', M2: 'Man 2', M3: 'Man 3', CAN: 'a mano', EXT: 'a mano', SIN: 'sin máq.' };
+    html += filaSector(conAyuda('SABORES (qué hizo cada máquina)', 'Todos los sabores juntos, día a día. En cada celda: las unidades y abajo en qué máquina se hicieron (si fueron varias, lo de cada una). Pasá el mouse por la celda para ver los horarios.'), dias);
+    (data.sabores || []).forEach((sb, i) => {
+      let tot = 0;
+      const celdas = dias.map(d => {
+        const regs = sb.dias[d.fecha];
+        if(!regs) return tdDia(d, '', 'vacio');
+        const porMaq = {};
+        regs.forEach(r => { porMaq[r.maquina] = (porMaq[r.maquina] || 0) + (Number(r.unidades) || 0); });
+        const u = regs.reduce((a, r) => a + (Number(r.unidades) || 0), 0);
+        tot += u;
+        const maqs = Object.keys(porMaq);
+        const abajo = maqs.length === 1 ? CORTO_MAQ[maqs[0]] : maqs.map(k => `${CORTO_MAQ[k]}: ${fmtCant(porMaq[k])}`).join('<br>');
+        const tip = regs.map(r => `${data.nombresMaquinas[r.maquina] || r.maquina}: ${fmtCant(r.unidades)} u.${r.inicio || r.fin ? ` (${r.inicio || '?'}–${r.fin || '?'})` : ''}`).join(' · ');
+        return tdDia(d, `${fmtCant(u)}<small>${abajo}</small>`, 'sab-maq' + (porMaq.SIN ? ' c-mas' : ''), tip);
+      }).join('');
+      html += `<tr${i === 0 ? ' class="primera"' : ''}><td>${escHtml(sb.sabor)}</td>${celdas}<td class="col-total">${fmtCant(tot)}</td></tr>`;
+    });
+    if(!(data.sabores || []).length) html += `<tr class="primera"><td colspan="${dias.length + 2}" class="c-gris">Sin sabores registrados este mes.</td></tr>`;
     html += `</tbody></table></div>`;
 
     // 4) POR SABOR
