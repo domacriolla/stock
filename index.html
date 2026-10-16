@@ -129,6 +129,104 @@
   .tabla-fija tr.fila-grupo td{background:#efe6d3;font-weight:700;font-size:12.5px;text-transform:uppercase;letter-spacing:.03em;color:var(--crust-dark);padding:8px;}
   .tabla-fija tr.fila-grupo td:first-child{background:#efe6d3;}
   @media print{.tabla-fija{max-height:none;overflow:visible;}}
+  /* ===== 16/10/2026: inicio ordenado por bloques, paneles fijos en todas
+     las tablas largas y los informes mensuales (Pedido vs hecho, Envíos y
+     recepción, Tiempos de máquina) ===== */
+  .home-bloque{margin-top:6px;}
+  .home-sub{display:flex;align-items:center;gap:10px;margin:22px 0 10px;font-size:12px;font-weight:700;color:var(--crust-dark);text-transform:uppercase;letter-spacing:.07em;}
+  .home-sub::after{content:"";flex:1;height:1px;background:var(--line);}
+  .home-sub .num-paso{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--accent-bg);color:var(--crust-dark);font-size:11px;}
+  .home-grid.compacta{grid-template-columns:repeat(3,1fr);gap:12px;}
+  .home-grid.compacta .home-card{padding:16px 16px;}
+  .home-grid.compacta .home-card h2{font-size:15.5px;margin-bottom:4px;}
+  .home-grid.compacta .home-card p{font-size:12.5px;line-height:1.4;}
+  .home-card .etiqueta-nueva{display:inline-block;font-family:'Poppins',sans-serif;font-size:10px;font-weight:700;color:#fff;background:var(--accent);border-radius:8px;padding:1px 7px;margin-left:6px;vertical-align:middle;letter-spacing:.04em;}
+  @media (max-width:820px){.home-grid.compacta{grid-template-columns:1fr 1fr;}}
+  @media (max-width:520px){.home-grid.compacta{grid-template-columns:1fr;}}
+
+  /* 16/10/2026: semáforo de registros, sugerencia de lotes, vencidos en rojo */
+  .control-reg{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:12px 14px;margin:0 0 22px;}
+  .control-reg h3{font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--crust-dark);margin:0 0 8px;}
+  .control-reg .fila-ctrl{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin:6px 0;}
+  .control-reg .dia-ctrl{font-size:12px;font-weight:700;color:var(--ink-soft);width:64px;flex:0 0 64px;}
+  .chip{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;border-radius:12px;padding:3px 9px;border:1px solid transparent;white-space:nowrap;}
+  .chip.ok{background:var(--herb-bg);color:var(--herb);}
+  .chip.falta{background:var(--alert-bg);color:var(--alert);border-color:#e7b7ae;}
+  .chip.pend{background:#fdf6e3;color:#8a5a00;border-color:#ecd9a6;}
+  .chip.na{background:#f1ece3;color:var(--ink-soft);}
+  .sug-lotes{font-size:11.5px;color:var(--herb);margin-top:3px;line-height:1.3;}
+  .sug-lotes.vencidos{color:var(--alert);}
+  input.venc-rojo{border-color:var(--alert) !important;background:var(--alert-bg) !important;color:var(--alert) !important;font-weight:700;}
+  td.dif-rec{font-weight:700;font-variant-numeric:tabular-nums;text-align:right;}
+  td.dif-rec.ok{color:var(--herb);} td.dif-rec.mal{color:var(--alert);background:var(--alert-bg);}
+  .ok-txt{color:var(--herb);font-weight:600;} .mal-txt{color:var(--alert);font-weight:700;} .gris-txt{color:var(--ink-soft);}
+  /* botones Empezó / Terminó (hora automática) */
+  .hora-auto{display:flex;align-items:center;gap:4px;}
+  .hora-auto input{width:96px;}
+  .btn-ahora{background:var(--accent-bg);color:var(--crust-dark);border:1px solid #e8c48f;border-radius:3px;font-size:11.5px;font-weight:700;padding:6px 7px;white-space:nowrap;}
+  .btn-ahora:hover{background:#f6dcb4;}
+  .btn-ahora:disabled{display:none;}
+  /* paneles fijos automáticos (encabezado arriba + primera columna) */
+  .tabla-fija.auto tbody td:first-child{min-width:0;}
+  .tabla-fija table.prod{margin-top:0;}
+  .tabla-fija tr.fila-vencido td:first-child{background:var(--alert-bg);}
+  .tabla-fija tr.fila-vence-hoy td:first-child{background:var(--pink-bg);}
+  .tabla-fija tr.fila-vence-manana td:first-child{background:var(--herb-bg);}
+  .tabla-fija tr.fila-grupo-resumen td:first-child{background:#efe6d3;}
+  .tabla-fija tr.fila-subtotal-resumen td:first-child{background:#faf5ea;}
+
+  /* informes mensuales */
+  body.pantalla-ancha .wrap{max-width:1500px;}
+  .inf-toolbar{display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap;margin-bottom:12px;}
+  .inf-toolbar .field-row{margin:0;}
+  .inf-ayuda{color:var(--ink-soft);font-size:12.5px;line-height:1.5;max-width:900px;margin:0 0 10px;}
+  .leyenda-inf{display:flex;gap:14px;flex-wrap:wrap;font-size:11.5px;color:var(--ink-soft);margin:4px 0 10px;}
+  .leyenda-inf span{display:inline-flex;align-items:center;gap:5px;}
+  .leyenda-inf i{width:12px;height:12px;border-radius:3px;display:inline-block;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin:6px 0 14px;}
+  .kpi{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:10px 12px;}
+  .kpi .v{font-size:20px;font-weight:700;color:var(--crust-dark);font-variant-numeric:tabular-nums;}
+  .kpi .l{font-size:11.5px;color:var(--ink-soft);margin-top:2px;line-height:1.3;}
+  .kpi.malo .v{color:var(--alert);}
+  .kpi.ojo .v{color:#a86a00;}
+  .kpi.bien .v{color:var(--herb);}
+  table.inf{border-collapse:separate;border-spacing:0;font-size:12px;width:max-content;min-width:100%;}
+  table.inf th{font-size:11px;color:var(--ink-soft);font-weight:600;padding:6px 6px;border-bottom:1px solid var(--ink-soft);text-align:left;white-space:nowrap;}
+  table.inf th.col-dia{text-align:center;min-width:54px;padding:5px 3px;line-height:1.15;}
+  table.inf th.col-dia div{font-size:13px;color:var(--ink);font-weight:700;}
+  table.inf th.col-dia small{font-size:10px;font-weight:600;}
+  table.inf th.finde, table.inf td.finde{background-color:#fbf6ec;}
+  table.inf th.hoy div{color:var(--accent);}
+  table.inf th.sin-plan small::after{content:" ·";color:var(--ink-soft);}
+  table.inf td{padding:3px 6px;border-bottom:1px solid #f1e9dc;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  table.inf td:first-child{text-align:left;min-width:190px;max-width:240px;white-space:normal;}
+  table.inf td.col-total, table.inf th.col-total{border-left:2px solid var(--line);font-weight:700;background-color:#faf7f0;}
+  table.inf tr.primera td{border-top:1px solid var(--line);}
+  table.inf .sub{color:var(--ink-soft);font-size:10.5px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;}
+  table.inf td.lbl{text-align:right;padding-right:10px;}
+  table.inf tr.fila-sector td{background:var(--crust-dark);color:#fff;font-family:'Cinzel',serif;font-size:13px;font-weight:700;letter-spacing:.05em;padding:7px 8px;}
+  .tabla-fija table.inf tr.fila-sector td:first-child{background:var(--crust-dark);}
+  table.inf tr.fila-grupo-inf td{background:#efe6d3;font-weight:700;}
+  .tabla-fija table.inf tr.fila-grupo-inf td:first-child{background:#efe6d3;cursor:pointer;}
+  table.inf tr.fila-grupo-inf td:first-child .caret{display:inline-block;width:14px;color:var(--crust);}
+  table.inf tr.oculta{display:none;}
+  table.inf td.c-ok{color:var(--herb);font-weight:600;}
+  table.inf td.c-mas{background:#fdf0d5;color:#8a5a00;font-weight:700;}
+  table.inf td.c-menos{background:var(--alert-bg);color:var(--alert);font-weight:700;}
+  table.inf td.c-falta{background:var(--alert-bg);color:var(--alert);font-style:italic;}
+  table.inf td.c-gris{color:var(--ink-soft);}
+  table.inf td.c-info{background:#eef3fa;color:#2c4f7c;}
+  table.inf td.vacio{color:#cbbfae;}
+  table.inf td.txt{text-align:left;font-size:11px;line-height:1.25;white-space:normal;min-width:70px;max-width:110px;}
+  table.inf td.txt small{display:block;color:var(--ink-soft);}
+  .tabla-fija table.inf td:first-child{z-index:2;}
+  table.simple{border-collapse:collapse;font-size:12.5px;margin:6px 0 14px;}
+  table.simple th{font-size:11px;color:var(--ink-soft);text-align:left;padding:6px 8px;border-bottom:1px solid var(--ink-soft);white-space:nowrap;}
+  table.simple td{padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top;}
+  .inf-tabs{display:flex;gap:4px;border-bottom:1px solid var(--line);margin:4px 0 14px;flex-wrap:wrap;}
+  h3.inf-titulo{font-size:15px;margin:22px 0 6px;color:var(--crust-dark);}
+  @media print{ body.pantalla-ancha .wrap{max-width:none;} .inf-toolbar{display:none;} }
+
   .fila-agregar{display:flex;gap:8px;align-items:center;margin:10px 0 4px;flex-wrap:wrap;}
   .fila-agregar select{max-width:340px;}
   .unidad-prod{color:var(--ink-soft);font-size:11.5px;font-weight:400;white-space:nowrap;}
@@ -294,6 +392,9 @@ window.fetch = async function(url, opts){
 };
 
 const LOCALES = ['Centro', 'Patagonia', 'Zelarrayan', 'Fábrica - Producción', 'Fábrica - Cocina', 'Fábrica - Discos'];
+// LUNES FRANCO de Producción (desde el 19/10/2026): ese día no se arman
+// empanadas y el molde de canasta del martes lo hace Cocina.
+const DIA_FRANCO_PRODUCCION = 'Lunes';
 const TIPOS_DISCO = ['Horno', 'Frito', 'Recorte'];
 let SABORES_CACHE = null;
 let RELLENOS_CACHE = null;
@@ -377,6 +478,9 @@ const app = document.getElementById('app');
    Router muy simple (sin librerías) — 3 pantallas
    --------------------------------------------------------------------- */
 function irA(pantalla){
+  // los informes mensuales usan todo el ancho; el resto vuelve al ancho normal
+  document.body.classList.toggle('pantalla-ancha', ['informePedido', 'informeEnviosRecepcion', 'informeTiempos'].indexOf(pantalla) !== -1);
+  window.scrollTo(0, 0);
   if(pantalla === 'home') renderHome();
   // Cargar stock: se entra desde el bloque LOCALES o desde el bloque FÁBRICA,
   // y el selector "¿Dónde estás cargando?" muestra solo los de ese bloque.
@@ -396,12 +500,16 @@ function irA(pantalla){
   if(pantalla === 'informeStock') renderInformes('stock');
   if(pantalla === 'informeStockFabrica') renderInformes('stockFabrica');
   if(pantalla === 'informeInsumos') renderInformes('consumo');
+  // informes mensuales (16/10/2026)
+  if(pantalla === 'informePedido') renderInformePedido();
+  if(pantalla === 'informeEnviosRecepcion') renderInformeEnvios();
+  if(pantalla === 'informeTiempos') renderInformeTiempos();
 }
 
-function tarjetaHome(destino, titulo, texto){
+function tarjetaHome(destino, titulo, texto, nueva){
   return `
       <button class="home-card" onclick="irA('${destino}')">
-        <h2>${titulo}</h2>
+        <h2>${titulo}${nueva ? '<span class="etiqueta-nueva">NUEVO</span>' : ''}</h2>
         <p>${texto}</p>
       </button>`;
 }
@@ -628,6 +736,8 @@ function renderHome(){
       <div class="sub">Stock y producción</div>
     </header>
 
+    <div class="control-reg" id="controlRegistros"><h3>Control de registros</h3><div class="loading" style="font-size:12.5px;">Revisando…</div></div>
+
     <h3 class="home-seccion">Locales</h3>
     <div class="home-grid">
       ${tarjetaHome('stockLocales', 'Cargar stock del local', 'Registrar cuánto queda de cada sabor, con su fecha de vencimiento.')}
@@ -637,15 +747,26 @@ function renderHome(){
     </div>
 
     <h3 class="home-seccion">Fábrica</h3>
-    <div class="home-grid">
-      ${tarjetaHome('stockFabrica', 'Cargar stock de fábrica', 'Stock de Producción, Cocina (rellenos en kilos) y Discos.')}
-      ${tarjetaHome('fabrica', 'Ver qué producir hoy', 'Calculado a partir del stock cargado y la venta estimada de cada sabor.')}
-      ${tarjetaHome('registro', 'Registrar producción', 'Trazabilidad del turno: máquina, disco, relleno, horas y total producido por sabor.')}
-      ${tarjetaHome('envios', 'Despachar envíos', 'Cuánto hay que mandarle hoy a cada local, calculado con lo que vende y lo que ya tiene cargado.')}
-      ${tarjetaHome('historial', 'Historial de envíos', 'Comparar lo enviado contra lo recibido, por local y sabor.')}
-      ${tarjetaHome('informeStockFabrica', 'Informe: Stock de fábrica', 'Última carga de stock de Producción, Cocina y Discos, con semáforo de vencimientos.')}
-      ${tarjetaHome('informeInsumos', 'Informe: Consumo de insumos', 'Consumo real de insumos de Cocina por día.')}
-      ${tarjetaHome('trazabilidad', 'Consultar trazabilidad', 'Por fecha de armado y sabor: relleno, discos, máquina y personal, y a qué local fue.')}
+    <div class="home-bloque">
+      <div class="home-sub"><span class="num-paso">1</span>Producción del día</div>
+      <div class="home-grid">
+        ${tarjetaHome('fabrica', 'Ver qué producir hoy', 'Cocina, Producción y Discos: calculado con el stock cargado y la venta proyectada.')}
+        ${tarjetaHome('envios', 'Despachar envíos', 'Cuánto mandarle hoy a cada local, con lo que vende y lo que ya tiene.')}
+      </div>
+      <div class="home-sub"><span class="num-paso">2</span>Registros</div>
+      <div class="home-grid">
+        ${tarjetaHome('stockFabrica', 'Cargar stock de fábrica', 'Stock de Producción, Cocina (rellenos en kilos) y Discos.')}
+        ${tarjetaHome('registro', 'Registrar producción', 'Cocina, Producción y Discos: quién, cuánto, máquina, horas y trazabilidad.')}
+      </div>
+      <div class="home-sub"><span class="num-paso">3</span>Informes</div>
+      <div class="home-grid compacta">
+        ${tarjetaHome('informePedido', 'Pedido vs hecho', 'Día por día: lo que pidió la app y lo que hicieron Cocina, Producción y Discos.', true)}
+        ${tarjetaHome('informeEnviosRecepcion', 'Envíos y recepción', 'Pidió, envió y recibió cada local, con quién preparó, repartió y recibió.', true)}
+        ${tarjetaHome('informeTiempos', 'Tiempos de máquina', 'Personal, tiempos, unidades por hora, relleno y calidad del registro.', true)}
+        ${tarjetaHome('informeStockFabrica', 'Stock de fábrica', 'Última carga de Producción, Cocina y Discos, con semáforo de vencimientos.')}
+        ${tarjetaHome('informeInsumos', 'Consumo de insumos', 'Consumo real de insumos de Cocina por día.')}
+        ${tarjetaHome('trazabilidad', 'Consultar trazabilidad', 'Por fecha de armado y sabor: relleno, discos, máquina, personal y reparto.')}
+      </div>
     </div>
 
     <h3 class="home-seccion">Actualizar datos</h3>
@@ -660,6 +781,42 @@ function renderHome(){
     </div>
     <footer class="note">Doma Criolla — herramienta interna de planificación de producción.</footer>
   `;
+  pintarControlRegistros();
+}
+
+// CONTROL DE REGISTROS DEL DÍA (16/10/2026, Carolina): semáforo de lo que se
+// cargó y lo que falta, de ayer y de hoy. Verde = hecho; amarillo = todavía
+// está a tiempo; rojo = ya debería estar; gris = ese día no corresponde.
+// Hora límite (Argentina) a partir de la cual HOY pasa a rojo:
+const HORA_LIMITE_REGISTRO = { 'Plan del día': 8, 'Cocina': 15, 'Producción': 15, 'Discos': 15, 'Stock Producción': 16, 'Stock Cocina': 16, 'Stock Discos': 16, 'Envío': 15, 'Recepción': 19 };
+async function pintarControlRegistros(){
+  const cont = document.getElementById('controlRegistros');
+  if(!cont) return;
+  const hoy = hoyISO(), ayer = sumarDiasISO(hoy, -1);
+  try{
+    const [rAyer, rHoy] = await Promise.all([ayer, hoy].map(f => fetch(`${APPS_SCRIPT_URL}?action=estadoRegistrosDia&fecha=${f}`).then(x => x.json())));
+    if(rAyer.error) throw new Error(rAyer.error);
+    if(!document.getElementById('controlRegistros')) return;
+    const hora = horaArgentina();
+    const limite = n => { const k = Object.keys(HORA_LIMITE_REGISTRO).find(x => n === x || n.startsWith(x + ' ')); return k ? HORA_LIMITE_REGISTRO[k] : 99; };
+    const chip = (it, esHoy) => {
+      let cls, txt = it.nombre;
+      if(!it.aplica){ cls = 'na'; txt += it.detalle ? ' · ' + it.detalle : ''; }
+      else if(it.hecho){ cls = 'ok'; txt = '✓ ' + txt; }
+      else if(esHoy && hora < limite(it.nombre)){ cls = 'pend'; txt += it.detalle ? ' · ' + it.detalle : ''; }
+      else { cls = 'falta'; txt = '✗ ' + txt + (it.detalle ? ' · ' + it.detalle : ''); }
+      return `<span class="chip ${cls}">${txt}</span>`;
+    };
+    // los locales cargan su stock después de medianoche: el de HOY nunca está en rojo
+    const fila = (r, lbl, esHoy) => `<div class="fila-ctrl"><span class="dia-ctrl">${lbl}<br><span style="font-weight:400;">${fmtFecha(r.fecha).slice(0, 5)}</span></span>${r.items.map(it => {
+      if(esHoy && /^Stock (Centro|Patagonia|Zelarrayan)$/.test(it.nombre) && !it.hecho) return `<span class="chip pend">${it.nombre}</span>`;
+      return chip(it, esHoy);
+    }).join('')}</div>`;
+    const faltanAyer = rAyer.items.filter(i => i.aplica && !i.hecho).length;
+    cont.innerHTML = `<h3>Control de registros ${faltanAyer ? `<span class="chip falta" style="margin-left:6px;">ayer faltaron ${faltanAyer}</span>` : '<span class="chip ok" style="margin-left:6px;">ayer completo</span>'}</h3>${fila(rAyer, 'Ayer', false)}${fila(rHoy, 'Hoy', true)}`;
+  }catch(err){
+    cont.innerHTML = `<h3>Control de registros</h3><p style="font-size:12px;color:var(--ink-soft);margin:0;">No se pudo revisar: ${err.message}</p>`;
+  }
 }
 
 /* ---------------------------------------------------------------------
@@ -1173,7 +1330,7 @@ async function pintarBarraPlan(idCont, fecha, plan, alCambiar, proyeccion){
     cont.innerHTML = `<div><strong>Plan provisorio</strong>: las cantidades pueden cambiar si se carga o corrige stock, o si se importa otra proyección. Cuando el stock esté cargado, confirmalo para dejarlo fijo todo el día (producción y órdenes de envío).</div>
       <div>${form('Confirmar plan del día', false)}</div>`;
   }
-  const aviso = avisoProyeccion(fecha, proyeccion);
+  const aviso = avisoProyeccion(fecha, proyeccion) + avisoNormal(fecha, proyeccion);
   if(aviso) cont.insertAdjacentHTML('beforeend', aviso);
   const btn = cont.querySelector('.btn-plan');
   btn.onclick = async () => {
@@ -1228,12 +1385,15 @@ function bloquePrepDiaAnterior(){
   if(!prep) return '';
   const rollos = Number(prep.rollosJyQ) || 0;
   const canastas = (prep.canastas || []).filter(c => c.aHacerUnidades > 0);
-  if(rollos <= 0 && canastas.length === 0) return '';
+  const moldesDesc = Number(prep.moldesDisponibles) || 0;
+  const pedidoSinStock = (prep.canastas || []).reduce((a, c) => a + (Number(c.pedidoSinStock) || 0), 0);
+  if(rollos <= 0 && canastas.length === 0 && !(pedidoSinStock > 0)) return '';
   const filaRollos = rollos > 0 ? `<tr><td>Rollos de Jamón y Queso</td><td class="num"><strong>${ent(rollos)}</strong></td></tr>` : '';
   // un solo molde para todas las canastas: se muestra el total (con el detalle por sabor al lado)
   const totalMoldes = canastas.reduce((a, c) => a + (Number(c.aHacerUnidades) || 0), 0);
-  const filasCanastas = canastas.length
-    ? `<tr><td>Molde de canasta <span style="color:var(--ink-soft);font-size:11px;">(${canastas.map(c => `${c.sabor}: ${ent(c.aHacerUnidades)}`).join(' · ')})</span></td><td class="num"><strong>${ent(totalMoldes)}</strong></td></tr>`
+  const notaMoldes = moldesDesc > 0 ? `<div style="font-size:11.5px;color:var(--herb);">Ya descontados ${ent(Math.min(moldesDesc, pedidoSinStock))} moldes armados en stock (hay ${ent(prep.moldesEnStock)}${prep.moldesUsoHoy ? `, ${ent(prep.moldesUsoHoy)} se usan hoy` : ''})</div>` : '';
+  const filasCanastas = (canastas.length || pedidoSinStock > 0)
+    ? `<tr><td>Molde de canasta <span style="color:var(--ink-soft);font-size:11px;">${canastas.length ? '(' + canastas.map(c => `${c.sabor}: ${ent(c.aHacerUnidades)}`).join(' · ') + ')' : ''}</span>${notaMoldes}</td><td class="num"><strong>${ent(totalMoldes)}</strong></td></tr>`
     : '';
   // el % lo registra Producción (aparte del de Cocina) — pedido por Carolina 06/10/2026
   const pctGuardado = prep.porcentajeProduccion;
@@ -1261,7 +1421,9 @@ function pintarProduccion(data){
   // pestaña Cocina, junto con Preparados y Rellenos.
   // La salsa (litros) también la elabora Cocina.
   const filas = data.produccion.filter(f => f.aHacerUnidades > 0 && f.rubro !== 'Dips' && f.rubro !== 'Postres' && !esDecimal(f.sabor));
-  const prepHtml = bloquePrepDiaAnterior();
+  // el lunes (franco de Producción) el molde de canasta lo hace Cocina: el
+  // bloque "para mañana" se muestra en la pestaña Cocina
+  const prepHtml = data.dia === DIA_FRANCO_PRODUCCION ? '' : bloquePrepDiaAnterior();
 
   const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Producción</h2>`;
 
@@ -1304,7 +1466,7 @@ function pintarProduccion(data){
             <tr>
               <td>${f.sabor}</td>
               ${esEmpanada ? `<td>${f.diaCocina}${f.diaCocina !== f.diaArmado ? ` <span class="badge reposo">reposo</span>` : ''}</td>` : ''}
-              <td class="num">${ent(f.objetivoUnidades)}</td>
+              <td class="num"${f.colchonUnidades ? ` title="Venta normal de los días que cubre + colchón una vez (${ent(f.colchonUnidades)})"` : ''}>${ent(f.objetivoUnidades)}</td>
               ${esEmpanada ? `<td style="color:var(--ink-soft);font-size:12.5px;">${f.diasQueCubre}</td>` : ''}
               ${celdasStock(f)}
               <td class="num"><strong>${ent(f.aHacerUnidades)}</strong></td>
@@ -1315,10 +1477,41 @@ function pintarProduccion(data){
   }).join('');
 
   cont.className = '';
-  cont.innerHTML = tituloSector + prepHtml + `
+  cont.innerHTML = tituloSector + prepHtml + bloqueRellenoCamara(data) + `
     <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)} — ${filas.length} ítem(s) con faltante</p>
     ${bloques}
   `;
+}
+
+// RELLENO EN CÁMARA (16/10/2026, Carolina): para cada relleno que se usa hoy,
+// cuántos kilos hacen falta para lo que hay que armar y qué lotes hay en
+// cámara (lo que cargó Cocina en su stock), del que vence antes al que vence
+// después — para agarrar primero el más viejo.
+function bloqueRellenoCamara(data){
+  const porRelleno = {};
+  (data.produccion || []).filter(f => f.tipoCalculo === 'Calendario' && f.aHacerUnidades > 0 && f.kgNecesarios != null).forEach(f => {
+    const r = porRelleno[f.relleno] = porRelleno[f.relleno] || { relleno: f.relleno, sabores: [], kg: 0, lotes: f.rellenoCamara || [], mismoDia: f.diaCocina === f.diaArmado };
+    r.sabores.push(f.sabor); r.kg += f.kgNecesarios || 0;
+  });
+  const lista = Object.values(porRelleno).sort((a, b) => compararTexto(a.relleno, b.relleno));
+  if(!lista.length) return '';
+  const fila = r => {
+    const vigentes = r.lotes.filter(l => !l.vencido).reduce((a, l) => a + l.kg, 0);
+    const lotes = r.lotes.length ? r.lotes.map((l, i) => `<span class="${l.vencido ? 'mal-txt' : ''}">${i === 0 ? '<strong>1º</strong> ' : ''}${dec(l.kg)} kg · vence ${fmtFecha(l.vence).slice(0, 5)}${l.vencido ? ' (vencido)' : ''}</span>`).join('<br>') : '<span class="gris-txt">sin carga de Cocina</span>';
+    let estado;
+    if(r.mismoDia) estado = '<span class="gris-txt">se cocina hoy</span>';
+    else if(!r.lotes.length) estado = '<span class="gris-txt">—</span>';
+    else if(vigentes + 0.05 >= r.kg) estado = '<span class="ok-txt">✓ alcanza</span>';
+    else estado = `<span class="mal-txt">faltan ${dec(r.kg - vigentes)} kg</span>`;
+    return `<tr><td><strong>${r.relleno}</strong><div style="font-size:11.5px;color:var(--ink-soft);">${r.sabores.join(', ')}</div></td><td class="num">${dec(r.kg)} kg</td><td style="font-size:12.5px;">${lotes}</td><td>${estado}</td></tr>`;
+  };
+  return `
+    <h3 style="font-size:15px;margin:20px 0 4px;">Relleno en cámara — usar primero el que vence antes</h3>
+    <p style="color:var(--ink-soft);font-size:12px;margin:0 0 6px;">Lotes según la última carga de stock de Cocina. "Kg necesarios" = unidades a armar hoy × gramaje de la ficha.</p>
+    <table class="prod">
+      <thead><tr><th>Relleno</th><th class="num">Kg necesarios</th><th>En cámara (orden de uso)</th><th>¿Alcanza?</th></tr></thead>
+      <tbody>${lista.map(fila).join('')}</tbody>
+    </table>`;
 }
 
 /* ---- Pestaña COCINA: todo lo que elabora Cocina hoy — Preparados, Rellenos,
@@ -1371,9 +1564,10 @@ function pintarCocina(data){
   const bloqueDips = tablaSimple('Dips', 'Dips');
   const bloquePostres = tablaSimple('Postres', 'Postres') + tablaSimple('Salsas', 'Salsas');
 
+  const prepLunes = data.dia === DIA_FRANCO_PRODUCCION ? bloquePrepDiaAnterior() : '';
   if(filasRelleno.length === 0 && !bloqueDips && !bloquePostres){
     cont.className = '';
-    cont.innerHTML = tituloSector + `<div class="empty">Cocina no elabora nada el ${data.dia.toLowerCase()}.</div>`;
+    cont.innerHTML = tituloSector + prepLunes + `<div class="empty">Cocina no elabora nada el ${data.dia.toLowerCase()}.</div>`;
     return;
   }
 
@@ -1385,18 +1579,20 @@ function pintarCocina(data){
     </div>
     <p style="color:var(--ink-soft);font-size:13px;"><span id="totalKilosCocina"></span> kg de relleno en total</p>
     <table class="prod">
-      <thead><tr><th>Relleno</th><th>Sabores que arma</th><th>Días que cubre</th><th class="num">Kg de relleno</th><th class="num">Ollas</th></tr></thead>
+      <thead><tr><th>Relleno</th><th>Sabores que arma</th><th>Días que cubre</th><th class="num">Sobrante en cámara (descontado)</th><th class="num">Kg de relleno</th><th class="num">Ollas</th></tr></thead>
       <tbody>
         ${filasRelleno.map(f => `
           <tr data-kilos-base="${f.kilosDeRelleno}" data-relleno="${f.relleno}">
             <td><strong>${f.relleno}</strong></td>
             <td style="color:var(--ink-soft);font-size:12.5px;">${f.sabores.map(s => s.sabor).join(', ')}</td>
             <td style="color:var(--ink-soft);font-size:12.5px;">${f.diasQueCubre}</td>
+            <td class="num" style="font-size:12.5px;">${celdaSobrante(f.sobrante)}</td>
             <td class="num kg-relleno"><strong></strong></td>
             <td class="num ollas-relleno">—</td>
           </tr>`).join('')}
       </tbody>
     </table>
+    <p style="color:var(--ink-soft);font-size:11.5px;margin:4px 0 0;">Sobrante: el relleno que quedó del último armado (peso final que carga Producción, comparado con lo que contó Cocina en su stock: se descuenta el menor). Si Producción no cargó el peso final, no se descuenta nada.</p>
     <div id="gramajeOllasRellenos"></div>`;
 
   cont.className = '';
@@ -1407,11 +1603,14 @@ function pintarCocina(data){
   cont.dataset.pctBase = data.porcentajeCocina || 100;
   cont.innerHTML = tituloSector + `
     <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)}</p>
+    ${prepLunes}
     <div id="preparadosCocina"></div>
     ${tablaRellenos}
     ${bloqueDips}
     ${bloquePostres}
+    <div id="materiaPrimaCocina"></div>
   `;
+  cargarMateriaPrima(data.fecha);
 
   if(filasRelleno.length > 0){
     pintarControlPctCocina(data.fecha, data.porcentajeCocina);
@@ -1478,6 +1677,44 @@ async function guardarPctCocina(fecha){
   }catch(err){
     btn.disabled = false; btn.textContent = 'Guardar %';
     alert('No se pudo guardar el %: ' + err.message);
+  }
+}
+
+function celdaSobrante(sob){
+  if(!sob || (sob.kgProduccion == null && sob.kgCocina == null)) return '<span class="gris-txt">—</span>';
+  const det = `Producción: ${sob.kgProduccion == null ? 'sin registro' : dec(sob.kgProduccion) + ' kg'}${sob.fecha ? ' (armado del ' + fmtFecha(sob.fecha).slice(0, 5) + ')' : ''} · Cocina contó: ${sob.kgCocina == null ? 'sin carga' : dec(sob.kgCocina) + ' kg'}${sob.vence ? ' · vence ' + fmtFecha(sob.vence).slice(0, 5) : ''}`;
+  if(sob.vencido) return `<span class="gris-txt" title="${det}">vencido</span>`;
+  if(sob.sinDato) return `<span class="mal-txt" title="${det}">falta peso final</span>`;
+  if(!sob.kgDescontado) return `<span class="gris-txt" title="${det}">0</span>`;
+  return `<span class="ok-txt" title="${det}">−${dec(sob.kgDescontado)} kg</span>`;
+}
+
+// MATERIA PRIMA DEL DÍA (16/10/2026): lo que hace falta de cada ingrediente
+// para todo lo que elabora Cocina hoy, según las fichas técnicas.
+async function cargarMateriaPrima(fecha){
+  const cont = document.getElementById('materiaPrimaCocina');
+  if(!cont) return;
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=calcularMateriaPrimaDia&fecha=${encodeURIComponent(fecha)}`);
+    const d = await r.json();
+    if(d.error) throw new Error(d.error);
+    if(!document.getElementById('materiaPrimaCocina')) return;
+    if(!(d.totales || []).length){ cont.innerHTML = ''; return; }
+    const cant = (x, u) => `${cantIng(x)} ${u}`;
+    cont.innerHTML = `
+      <h3 style="font-size:15px;margin:24px 0 4px;">Materia prima del día (según fichas técnicas)</h3>
+      <p style="color:var(--ink-soft);font-size:12px;margin:0 0 6px;">Total de cada ingrediente para todo lo que se elabora hoy (rellenos, preparados, dips y postres), ya con el % y el sobrante descontado.</p>
+      ${(d.avisos || []).length ? `<div class="msg err" style="display:block;">${d.avisos.join('<br>')}</div>` : ''}
+      <table class="prod">
+        <thead><tr><th>Ingrediente</th><th class="num">Cantidad</th><th>Se usa en</th></tr></thead>
+        <tbody>${d.totales.map(t => `<tr><td>${t.ingrediente}</td><td class="num"><strong>${cant(t.cantidad, t.unidad)}</strong></td><td style="font-size:12px;color:var(--ink-soft);">${t.usadoEn.join(', ')}</td></tr>`).join('')}</tbody>
+      </table>
+      <details style="margin-top:8px;font-size:13px;"><summary style="cursor:pointer;color:var(--ink-soft);">Ver por receta</summary>
+        ${d.porReceta.map(p => `<h4 class="cat-heading" style="text-transform:none;">${p.receta} — ${cantIng(p.cantidad)} ${p.unidad} <span class="gris-txt" style="font-weight:400;">(${p.tipo})</span></h4>
+          <table class="prod"><tbody>${p.ingredientes.map(i => `<tr><td>${i.ingrediente}${i.preparado ? ' <span class="gris-txt">(preparado)</span>' : ''}</td><td class="num">${cant(i.cantidad, i.unidad)}</td></tr>`).join('')}</tbody></table>`).join('')}
+      </details>`;
+  }catch(err){
+    cont.innerHTML = `<p style="color:var(--ink-soft);font-size:12px;">No se pudo calcular la materia prima: ${err.message}</p>`;
   }
 }
 
@@ -1765,6 +2002,7 @@ async function pintarRegistroCocinaSector(){
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
   intro.textContent = `${CALCULO_REGISTRO.dia}, ${fmtFecha(fecha)} — cargá el bruto real de cada insumo (y el rinde real cuando aplique) sobre el TOTAL de hoy; si no cargás nada, se toma el valor de la ficha.`;
   cont.appendChild(intro);
+  if(CALCULO_REGISTRO.dia === DIA_FRANCO_PRODUCCION) await bloqueMoldeLunesCocina(cont, fecha, empleadosCocina);
 
   if((ollasData.preparados || []).length){
     const hPrep = document.createElement('h4');
@@ -1981,6 +2219,54 @@ async function pintarRegistroCocinaSector(){
     if(!cab) return;
     agregarAdicional(cab);
     selWrap.querySelector('#selAgregarReceta').innerHTML = `<option value="">— Elegí una receta para agregar —</option>${opcionesAd()}`;
+  };
+}
+
+// LUNES (franco de Producción): Cocina arma y registra el molde de canasta
+// para el martes. Se guarda en el mismo lugar que cuando lo hace Producción
+// (TrazabilidadProduccion, "Molde de canasta"), así Trazabilidad y los
+// informes lo encuentran igual. 16/10/2026, Carolina.
+async function bloqueMoldeLunesCocina(cont, fecha, empleados){
+  const prep = PREP_REGISTRO || {};
+  const aHacer = (prep.canastas || []).reduce((a, c) => a + (Number(c.aHacerUnidades) || 0), 0);
+  let guardado = null;
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=obtenerRegistroProduccionDia&fecha=${encodeURIComponent(fecha)}`);
+    const est = await r.json();
+    guardado = ((est && est.items) || []).find(it => it.sabor === NOMBRE_MOLDE_CANASTA) || null;
+  }catch(err){}
+  const div = document.createElement('div');
+  div.className = 'bloque-receta';
+  div.innerHTML = `<h4 class="cat-heading receta-heading">Molde de canasta — para mañana (${prep.diaManana || 'martes'})</h4>
+    <p style="color:var(--ink-soft);font-size:12.5px;margin:2px 0 6px;">Lunes: franco de Producción, el molde lo hace Cocina. Cargá el total, las horas y quién lo hizo, y tocá "Guardar molde".</p>`;
+  const { table, tbody } = crearTablaExtras();
+  const tr = filaRegistroExtra(NOMBRE_MOLDE_CANASTA, NOMBRE_MOLDE_CANASTA, aHacer, '', empleados, guardado, false);
+  tbody.appendChild(tr);
+  div.appendChild(table);
+  const pie = document.createElement('div');
+  pie.className = 'actions no-print';
+  pie.style.marginTop = '8px';
+  pie.innerHTML = '<button type="button" class="btn" id="btnGuardarMoldeLunes">Guardar molde</button>';
+  div.appendChild(pie);
+  cont.appendChild(div);
+  seguirCambios(table);
+  pie.querySelector('#btnGuardarMoldeLunes').onclick = async () => {
+    const item = leerFilaSabor(tr);
+    if(!(Number(item.totalProduccion) > 0)){ avisar('✗ Falta el total realizado del molde.', 'err'); return; }
+    if(!item.responsable){ avisar('✗ Falta elegir quién hizo el molde.', 'err'); return; }
+    const horasMal = horasRaras([item]);
+    if(horasMal.length && !confirm(`OJO — revisá estas horas:\n\n${horasMal.join('\n')}\n\n¿Están bien así? "Cancelar" para corregirlas.`)) return;
+    const b = pie.querySelector('#btnGuardarMoldeLunes');
+    b.disabled = true; b.textContent = 'Guardando...';
+    try{
+      await postJSON({ action: 'registrarTrazabilidadItem', fecha, item });
+      marcarFilaGuardada(tr);
+      avisar(`✓ Molde de canasta guardado · ${horaCorta()} — ${item.totalProduccion} un. · ${item.responsable}`);
+    }catch(err){
+      avisar('✗ NO se guardó el molde — ' + err.message, 'err');
+    }finally{
+      b.disabled = false; b.textContent = 'Guardar molde';
+    }
   };
 }
 
@@ -2275,6 +2561,68 @@ function bloquePuestosMaquina(titulo, idBase, empleados, valoresGuardados, bloqu
   return div;
 }
 
+// MÁQUINAS MANUALES (16/10/2026, Carolina): una persona por cada manual.
+// En cada sabor se elige "Manual 1/2/3" en la columna Máquina.
+function bloqueManuales(empleados, guardados, bloqueado){
+  const v = guardados || {};
+  const dis = bloqueado ? 'disabled' : '';
+  const div = document.createElement('div');
+  div.style.marginBottom = '16px';
+  div.innerHTML = `
+    <h4 class="cat-heading">Máquinas manuales — quién usa cada una</h4>
+    <table class="lotes" data-manuales="1">
+      <thead><tr><th>Manual 1</th><th>Manual 2</th><th>Manual 3</th></tr></thead>
+      <tbody><tr>
+        ${['Manual1', 'Manual2', 'Manual3'].map(k => `<td><select class="inp-manual" data-manual="${k}" ${dis}>${opcionesEmpleadosSeleccion(empleados, v[k])}</select></td>`).join('')}
+      </tr></tbody>
+    </table>`;
+  return div;
+}
+function leerManuales(){
+  const out = {};
+  document.querySelectorAll('.inp-manual').forEach(sel => { out[sel.dataset.manual] = sel.value; });
+  return out;
+}
+
+// ROLLOS DE JyQ y MOLDE DE CANASTA (16/10/2026, Carolina): tabla propia y
+// simple — A hacer / Total realizado / Hora inicio / Hora fin / Quién lo hizo.
+// Se guardan igual que antes (misma hoja), solo que sin las columnas de
+// máquina, discos y relleno que no usan.
+const THEAD_REGISTRO_EXTRAS = `
+    <thead><tr>
+      <th>Producto</th>
+      <th class="num">A hacer (calc.)</th>
+      <th>Total realizado</th>
+      <th>Hora inicio</th>
+      <th>Hora fin</th>
+      <th>Quién lo hizo</th>
+      <th class="no-print"></th>
+    </tr></thead>`;
+function filaRegistroExtra(etiqueta, saborKey, aHacerMostrar, etiquetaExtra, empleados, guardado, bloqueado){
+  const g = guardado || {};
+  const dis = bloqueado ? 'disabled' : '';
+  const tr = document.createElement('tr');
+  tr.dataset.sabor = saborKey;
+  tr.dataset.extra = '1';
+  if(guardado) tr.classList.add('fila-guardada');
+  tr.innerHTML = `
+    <td>${etiqueta}${etiquetaExtra || ''}</td>
+    <td class="num" style="color:var(--ink-soft);">${aHacerMostrar != null ? ent(aHacerMostrar) : '—'}</td>
+    <td><input type="number" min="0" step="1" class="inp-total-prod" style="width:90px;" value="${g.totalProduccion || ''}" ${dis}></td>
+    <td>${celdaHora('inp-hora-inicio', g.horaInicio, 'Empezó', dis)}</td>
+    <td>${celdaHora('inp-hora-fin', g.horaFin, 'Terminó', dis)}</td>
+    <td><select class="inp-responsable-canasta" style="min-width:150px;" ${dis}>${opcionesEmpleadosSeleccion(empleados, g.responsable)}</select></td>
+    <td class="no-print celda-estado" style="white-space:nowrap;"></td>`;
+  if(guardado){ tr.dataset.guardado = '1'; ponerSello(tr, null); }
+  return tr;
+}
+function crearTablaExtras(){
+  const table = document.createElement('table');
+  table.className = 'lotes traza';
+  table.innerHTML = THEAD_REGISTRO_EXTRAS + '<tbody></tbody>';
+  return { table, tbody: table.querySelector('tbody') };
+}
+
 const THEAD_REGISTRO_PRODUCCION = `
     <thead><tr>
       <th>Sabor</th>
@@ -2315,6 +2663,54 @@ function crearTablaRegistroProduccion(){
 // - guardado: item ya guardado para este saborKey (o undefined).
 // - bloqueadoGlobal: turno ya cerrado -> toda la fila queda de solo lectura,
 //   sin botones de Guardar/Editar.
+// HORA AUTOMÁTICA (16/10/2026, Carolina): en cada sabor, "Empezó" y
+// "Terminó" ponen la hora del reloj (Argentina) — no se tipea y no se puede
+// poner 01:00 por 13:00. Se puede corregir a mano; antes de guardar se
+// avisa si alguna hora quedó rara (ver horasRaras).
+function celdaHora(clase, valor, textoBoton, dis){
+  return `<div class="hora-auto"><input type="time" class="${clase}" value="${valor || ''}" ${dis}><button type="button" class="btn-ahora no-print" data-para="${clase}" ${dis}>${textoBoton}</button></div>`;
+}
+function horaActualAR(){
+  return new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
+}
+// un solo listener para toda la app: cualquier botón Empezó/Terminó
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.btn-ahora');
+  if(!b || b.disabled) return;
+  const inp = b.parentElement.querySelector('input.' + b.dataset.para);
+  if(!inp) return;
+  const ahora = horaActualAR();
+  if(inp.value && inp.value !== ahora && !confirm(`Ya tiene cargado ${inp.value}. ¿Reemplazar por la hora actual (${ahora})?`)) return;
+  inp.value = ahora;
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  inp.dispatchEvent(new Event('change', { bubbles: true }));
+});
+// horas que casi seguro están mal: fin antes que inicio, antes de las 5 de la
+// mañana o más de 4 horas para un solo sabor. items = [{ sabor, horaInicio, horaFin }]
+function horasRaras(items){
+  const min = h => { const m = /^(\d{1,2}):(\d{2})/.exec(h || ''); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  const out = [];
+  items.forEach(it => {
+    const i = min(it.horaInicio), f = min(it.horaFin);
+    const motivos = [];
+    if(i !== null && i < 300) motivos.push(`empezó ${it.horaInicio} (de madrugada)`);
+    if(f !== null && f < 300) motivos.push(`terminó ${it.horaFin} (de madrugada)`);
+    if(i !== null && f !== null && f <= i) motivos.push(`terminó (${it.horaFin}) antes de empezar (${it.horaInicio})`);
+    else if(i !== null && f !== null && f - i > 240) motivos.push(`${Math.floor((f - i) / 60)} h ${(f - i) % 60} min armando (más de 4 horas)`);
+    if(motivos.length) out.push(`• ${it.sabor}: ${motivos.join(', ')}`);
+  });
+  return out;
+}
+
+// máquinas donde se puede armar un sabor: las 2 automáticas y las 3 manuales
+// (16/10/2026, Carolina). En la planilla se guarda "1", "2", "M1", "M2", "M3".
+const OPCIONES_MAQUINA = [['1', 'Máq. 1'], ['2', 'Máq. 2'], ['M1', 'Manual 1'], ['M2', 'Manual 2'], ['M3', 'Manual 3']];
+function maquinaGuardada(v){
+  const t = String(v == null ? '' : v).trim().toUpperCase();
+  if(/^M\s*[123]$/.test(t)) return 'M' + t.replace(/\D/g, '');
+  const n = Number(t);
+  return t && !isNaN(n) ? String(n) : t;
+}
 function filaRegistroProduccion(etiqueta, saborKey, aHacerMostrar, etiquetaExtra, usaResponsable, empleados, guardado, bloqueadoGlobal){
   const g = guardado || {};
   const yaGuardado = !!guardado;
@@ -2322,10 +2718,9 @@ function filaRegistroProduccion(etiqueta, saborKey, aHacerMostrar, etiquetaExtra
   const dis = bloqueado ? 'disabled' : '';
   const celdaMaquina = usaResponsable
     ? `<select class="inp-responsable-canasta" style="min-width:130px;" ${dis}>${opcionesEmpleadosSeleccion(empleados, g.responsable)}</select>`
-    : `<select class="inp-maq-num" style="width:56px;" ${dis}>
+    : `<select class="inp-maq-num" style="width:112px;" ${dis}>
         <option value=""></option>
-        <option value="1" ${g.maquinaNumero === '1' ? 'selected' : ''}>1</option>
-        <option value="2" ${g.maquinaNumero === '2' ? 'selected' : ''}>2</option>
+        ${OPCIONES_MAQUINA.map(([v, t]) => `<option value="${v}" ${maquinaGuardada(g.maquinaNumero) === v ? 'selected' : ''}>${t}</option>`).join('')}
       </select>`;
 
   const tr = document.createElement('tr');
@@ -2341,8 +2736,8 @@ function filaRegistroProduccion(etiqueta, saborKey, aHacerMostrar, etiquetaExtra
     <td><input type="date" class="inp-relleno-fecha" value="${g.rellenoFecha || ''}" ${dis}></td>
     <td><input type="number" min="0" step="0.01" class="inp-peso-inicial" style="width:80px;" value="${g.pesoInicialRelleno || ''}" ${dis}></td>
     <td><input type="number" min="0" step="0.01" class="inp-peso-final" style="width:80px;" value="${g.pesoFinalRelleno || ''}" ${dis}></td>
-    <td><input type="time" class="inp-hora-inicio" value="${g.horaInicio || ''}" ${dis}></td>
-    <td><input type="time" class="inp-hora-fin" value="${g.horaFin || ''}" ${dis}></td>
+    <td>${celdaHora('inp-hora-inicio', g.horaInicio, 'Empezó', dis)}</td>
+    <td>${celdaHora('inp-hora-fin', g.horaFin, 'Terminó', dis)}</td>
     <td><input type="number" min="0" step="1" class="inp-total-prod" style="width:80px;" value="${g.totalProduccion || ''}" ${dis}></td>
     <td><input type="number" min="0" step="1" class="inp-discos-danados" style="width:64px;" value="${g.discosDanados || ''}" ${dis}></td>
     <td class="no-print celda-estado" style="white-space:nowrap;"></td>
@@ -2417,6 +2812,7 @@ async function pintarRegistroProduccionSector(){
 
   cont.appendChild(bloquePuestosMaquina('Máquina 1', 'm1', EMPLEADOS_REGISTRO, estado.maquina1, bloqueadoGlobal));
   cont.appendChild(bloquePuestosMaquina('Máquina 2', 'm2', EMPLEADOS_REGISTRO, estado.maquina2, bloqueadoGlobal));
+  cont.appendChild(bloqueManuales(EMPLEADOS_REGISTRO, estado.manuales, bloqueadoGlobal));
 
   // UNA sola tabla con encabezado y columna "Sabor" inmovilizados (se ven
   // siempre al desplazarse, también en notebook), agrupada por categoría y
@@ -2453,23 +2849,34 @@ async function pintarRegistroProduccionSector(){
   // (es el mismo molde para todas las canastas — se suma lo de todas).
   const notaPct = (prep.porcentajeProduccion != null && Number(prep.porcentajeProduccion) !== 100)
     ? `<span style="color:var(--ink-soft);font-size:11.5px;font-weight:400;">Ya aplicado el ${ent(prep.porcentajeProduccion)}% guardado hoy por Producción.</span>` : '';
-  filaGrupo('Extras de producción (para mañana)', notaPct);
   const etiquetaManana = ' <span style="color:var(--ink-soft);font-size:11px;">(armar hoy para mañana)</span>';
-  tbody.appendChild(filaRegistroProduccion(NOMBRE_ROLLOS_JYQ, NOMBRE_ROLLOS_JYQ, prep.rollosJyQ, etiquetaManana, true, EMPLEADOS_REGISTRO, guardadoPorSabor[NOMBRE_ROLLOS_JYQ], bloqueadoGlobal));
+  const extras = crearTablaExtras();
+  extras.tbody.appendChild(filaRegistroExtra(NOMBRE_ROLLOS_JYQ, NOMBRE_ROLLOS_JYQ, prep.rollosJyQ, etiquetaManana, EMPLEADOS_REGISTRO, guardadoPorSabor[NOMBRE_ROLLOS_JYQ], bloqueadoGlobal));
   if(saboresCanasta.length){
     const totalMoldes = saboresCanasta.reduce((acc, n) => acc + ((canastaPorSabor[n] && Number(canastaPorSabor[n].aHacerUnidades)) || 0), 0);
-    tbody.appendChild(filaRegistroProduccion(NOMBRE_MOLDE_CANASTA, NOMBRE_MOLDE_CANASTA, totalMoldes, etiquetaManana, true, EMPLEADOS_REGISTRO, guardadoPorSabor[NOMBRE_MOLDE_CANASTA], bloqueadoGlobal));
+    extras.tbody.appendChild(filaRegistroExtra(NOMBRE_MOLDE_CANASTA, NOMBRE_MOLDE_CANASTA, totalMoldes, etiquetaManana, EMPLEADOS_REGISTRO, guardadoPorSabor[NOMBRE_MOLDE_CANASTA], bloqueadoGlobal));
   }
 
   // Producción adicional: cualquier producto que se elaboró aunque el
   // cálculo del día no lo pidiera (o que no está en las listas de arriba).
-  const yaListados = new Set([...tbody.querySelectorAll('tr[data-sabor]')].map(tr => tr.dataset.sabor));
+  const yaListados = new Set([...tbody.querySelectorAll('tr[data-sabor]')].map(tr => tr.dataset.sabor).concat([NOMBRE_ROLLOS_JYQ, NOMBRE_MOLDE_CANASTA]));
   filaGrupo('Producción adicional (fuera del cálculo)');
   const adicionalesGuardados = Object.keys(guardadoPorSabor).filter(k => !yaListados.has(k)).sort(compararTexto);
   adicionalesGuardados.forEach(k => {
     tbody.appendChild(filaRegistroProduccion(k, k, null, '', true, EMPLEADOS_REGISTRO, guardadoPorSabor[k], bloqueadoGlobal));
   });
   cont.appendChild(wrap);
+  const hExtras = document.createElement('h4');
+  hExtras.className = 'cat-heading';
+  hExtras.innerHTML = `Para mañana — rollos de Jamón y Queso y molde de canasta ${notaPct}`;
+  cont.appendChild(hExtras);
+  if(CALCULO_REGISTRO && CALCULO_REGISTRO.dia === DIA_FRANCO_PRODUCCION){
+    const nota = document.createElement('p');
+    nota.style.cssText = 'color:var(--ink-soft);font-size:12.5px;margin:2px 0 6px;';
+    nota.textContent = 'Lunes: franco de Producción — el molde de canasta del martes lo hace y lo registra Cocina (también se puede cargar acá).';
+    cont.appendChild(nota);
+  }
+  cont.appendChild(extras.table);
   if(!bloqueadoGlobal){
     const todos = Object.values(categorias).flat().sort(compararTexto);
     const selWrap = document.createElement('div');
@@ -2515,22 +2922,23 @@ async function pintarRegistroProduccionSector(){
 // celda de "máquina" puede ser el desplegable de Máquina Nº (sabores
 // normales) o el de Responsable (Canastas) — nunca los dos a la vez.
 function leerFilaSabor(tr){
-  const maq = tr.querySelector('.inp-maq-num');
-  const resp = tr.querySelector('.inp-responsable-canasta');
+  // las filas de rollos y moldes (tabla simple) no tienen todas las columnas:
+  // lo que no está va vacío
+  const v = sel => { const el = tr.querySelector(sel); return el ? el.value : ''; };
   return {
     sabor: tr.dataset.sabor,
-    maquinaNumero: maq ? maq.value : '',
-    responsable: resp ? resp.value : '',
-    maquinaVelocidad: tr.querySelector('.inp-maq-vel').value,
-    discosLote: tr.querySelector('.inp-disco-lote').value,
-    pesoPromTandaDiscos: tr.querySelector('.inp-peso-prom').value,
-    rellenoFecha: tr.querySelector('.inp-relleno-fecha').value,
-    pesoInicialRelleno: tr.querySelector('.inp-peso-inicial').value,
-    pesoFinalRelleno: tr.querySelector('.inp-peso-final').value,
-    horaInicio: tr.querySelector('.inp-hora-inicio').value,
-    horaFin: tr.querySelector('.inp-hora-fin').value,
-    totalProduccion: tr.querySelector('.inp-total-prod').value,
-    discosDanados: tr.querySelector('.inp-discos-danados').value
+    maquinaNumero: v('.inp-maq-num'),
+    responsable: v('.inp-responsable-canasta'),
+    maquinaVelocidad: v('.inp-maq-vel'),
+    discosLote: v('.inp-disco-lote'),
+    pesoPromTandaDiscos: v('.inp-peso-prom'),
+    rellenoFecha: v('.inp-relleno-fecha'),
+    pesoInicialRelleno: v('.inp-peso-inicial'),
+    pesoFinalRelleno: v('.inp-peso-final'),
+    horaInicio: v('.inp-hora-inicio'),
+    horaFin: v('.inp-hora-fin'),
+    totalProduccion: v('.inp-total-prod'),
+    discosDanados: v('.inp-discos-danados')
   };
 }
 
@@ -2576,6 +2984,25 @@ async function guardarRegistroProduccion(enviar){
       if(!f && !esExtra && !(q === 'relleno' && it.sabor === NOMBRE_MOLDE_CANASTA)) faltan.push(`${it.sabor} (${q})`);
     });
   });
+  // PESO DE RELLENO OBLIGATORIO al enviar final (16/10/2026, Carolina): con el
+  // peso final se sabe cuánto relleno sobró y se descuenta de lo que cocina
+  // Cocina. Aplica a empanadas y canastas (no a rollos, moldes ni JyQ).
+  if(enviar){
+    const empanadas = new Set([...(CATEGORIAS_REGISTRO['Empanadas Horno'] || []), ...(CATEGORIAS_REGISTRO['Empanadas Frito'] || [])]);
+    const sinPeso = items.filter(it => {
+      const base = String(it.sabor).replace(/\s*\(adicional\)\s*$/i, '');
+      if(!empanadas.has(base) || /^JAMON Y QUESO/i.test(normalizarFicha(base))) return false;
+      return it.pesoInicialRelleno === '' || it.pesoFinalRelleno === '';
+    }).map(it => it.sabor);
+    if(sinPeso.length){
+      msg.className = 'msg err';
+      msg.textContent = 'No se envió: falta el peso inicial o final del relleno en — ' + sinPeso.join(', ') + '. Si no sobró nada, poné 0 en el peso final.';
+      avisar('✗ Falta el peso de relleno en ' + sinPeso.length + ' sabor(es) (ver abajo).', 'err');
+      return;
+    }
+  }
+  const horasMal = horasRaras(items);
+  if(horasMal.length && !confirm(`OJO — revisá estas horas:\n\n${horasMal.join('\n')}\n\n¿Están bien así? "Cancelar" para corregirlas.`)) return;
   if(raras.length && !confirm(`OJO — estas fechas parecen mal (posteriores al armado del ${fmtFecha(fecha)} o de hace más de 7 días):\n\n${raras.join('\n')}\n\n¿Están bien así? "Cancelar" para corregirlas.`)) return;
   if(enviar && faltan.length && !confirm(`Faltan fechas de trazabilidad en:\n\n${faltan.join('\n')}\n\nSin esas fechas no se puede rastrear el relleno o los discos. ¿Enviar igual?`)) return;
   if(enviar && !confirm('¿Guardar y enviar final el registro del turno? Se va a bloquear todo el registro de Producción de este día.')) return;
@@ -2585,7 +3012,7 @@ async function guardarRegistroProduccion(enviar){
   btn.disabled = true; btn.textContent = 'Guardando...';
   try{
     const borrar = vaciadas.map(tr => tr.dataset.sabor);
-    const data = await postJSON({ action: 'registrarTrazabilidadProduccion', fecha, maquina1, maquina2, observaciones, items, borrar, provisorio: !enviar });
+    const data = await postJSON({ action: 'registrarTrazabilidadProduccion', fecha, maquina1, maquina2, manuales: leerManuales(), observaciones, items, borrar, provisorio: !enviar });
     vaciadas.forEach(marcarFilaBorrada);
     const hora = horaCorta();
     if(enviar){
@@ -2977,6 +3404,13 @@ function filaEnvio(nombre, ordenCalculada, esExtra, guardado, conOrden, panelEst
   return tr;
 }
 
+function htmlSugerenciaLotes(it){
+  let h = '';
+  const sug = it.sugerencia || [];
+  if(sug.length) h += `<div class="sug-lotes no-print">Mandar primero: ${sug.map(x => `${ent(x.cant)} que vencen ${fmtFecha(x.venc).slice(0, 5)}`).join(' · ')}${Math.round(it.aHacerUnidades || 0) > sug.reduce((a, x) => a + x.cant, 0) ? ' · el resto, de lo armado hoy' : ''}</div>`;
+  if(it.vencidosEnFabrica) h += `<div class="sug-lotes vencidos no-print">⚠ En fábrica hay ${ent(it.vencidosEnFabrica)} vencidas (no se sugieren)</div>`;
+  return h;
+}
 function pintarPanelEnvio({ origen, destino, itemsCalculados, data, categorias, guardado }){
   const clave = claveDespacho(origen, destino);
   const id = cssId(clave);
@@ -3034,8 +3468,11 @@ function pintarPanelEnvio({ origen, destino, itemsCalculados, data, categorias, 
     categorias[cat].forEach(nombre => {
       const orden = (porSabor[nombre] && porSabor[nombre].aHacerUnidades) || 0;
       const gs = guardadosPorItem[nombre] || [];
-      if(gs.length === 0) tbody.appendChild(filaEnvio(nombre, orden, false, null, conOrden, panelEstado));
-      else gs.forEach((g, k) => tbody.appendChild(filaEnvio(nombre, orden, k > 0, g, conOrden, panelEstado)));
+      const filas = gs.length === 0 ? [filaEnvio(nombre, orden, false, null, conOrden, panelEstado)] : gs.map((g, k) => filaEnvio(nombre, orden, k > 0, g, conOrden, panelEstado));
+      filas.forEach(tr => tbody.appendChild(tr));
+      // MANDAR PRIMERO LO QUE VENCE ANTES (16/10/2026)
+      const it = porSabor[nombre];
+      if(conOrden && it) filas[0].cells[0].insertAdjacentHTML('beforeend', htmlSugerenciaLotes(it));
     });
     // subtotal de la clasificación: orden calculada y enviado (real), se
     // actualiza mientras cargan (pedido por Carolina 30/09/2026)
@@ -3309,7 +3746,7 @@ async function cargarPendientesRecepcion(){
       agrupar(pendientes).forEach(g => {
         html += `<h4 class="cat-heading">${g.cat}</h4>
           <table class="lotes">
-            <thead><tr><th>Sabor / ítem</th><th>Viene de</th><th>Enviado el</th><th class="col-cant">Cant. enviada</th><th>Vencimiento</th><th class="col-cant">Cant. recibida</th><th></th></tr></thead>
+            <thead><tr><th>Sabor / ítem</th><th>Viene de</th><th>Enviado el</th><th class="col-cant">Cant. enviada</th><th>Vencimiento</th><th class="col-cant">Cant. recibida</th><th class="num">Diferencia</th><th></th></tr></thead>
             <tbody>
               ${g.items.map(p => {
                 // lo que manda FÁBRICA por kilo (muzzarella) el local lo recibe
@@ -3317,23 +3754,25 @@ async function cargarPendientesRecepcion(){
                 const kg = !p.Origen ? ENVIO_EN_KILOS[p.Sabor] : null;
                 const aKg = v => Math.round(Number(v) * kg * 100) / 100;
                 if(kg) return `
-                <tr data-id="${p.ID}" data-kg-porcion="${kg}">
+                <tr data-id="${p.ID}" data-kg-porcion="${kg}" data-enviado="${aKg(p.Cantidad_Enviada)}">
                   <td>${nombreFabrica(p.Sabor)}${etiquetaUnidad(p.Sabor, 'kg')}</td>
                   <td><span style="color:var(--ink-soft);">Fábrica</span></td>
                   <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Fecha_envio)}</td>
                   <td class="num" style="color:var(--ink-soft);">${dec(aKg(p.Cantidad_Enviada))}</td>
                   <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Vencimiento)}</td>
                   <td><input type="number" min="0" step="0.25" class="inp-recibido" style="max-width:90px;" value="${aKg(p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? p.Cantidad_Recibida : p.Cantidad_Enviada)}"></td>
+                  <td class="dif-rec"></td>
                   <td class="celda-estado" style="white-space:nowrap;">${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? '<span class="sello-guardado">✓ Guardado</span>' : ''}</td>
                 </tr>`;
                 return `
-                <tr data-id="${p.ID}">
+                <tr data-id="${p.ID}" data-enviado="${Number(p.Cantidad_Enviada) || 0}">
                   <td>${p.Sabor}${etiquetaUnidad(p.Sabor, 'porciones')}</td>
                   <td>${p.Origen ? `<strong class="origen-traspaso">Ingresa desde ${p.Origen}</strong>` : '<span style="color:var(--ink-soft);">Fábrica</span>'}</td>
                   <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Fecha_envio)}</td>
                   <td class="num" style="color:var(--ink-soft);">${cantProd(p.Sabor, p.Cantidad_Enviada)}</td>
                   <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Vencimiento)}</td>
                   <td><input type="number" min="0" step="${pasoProd(p.Sabor)}" class="inp-recibido" style="max-width:90px;" value="${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? p.Cantidad_Recibida : p.Cantidad_Enviada}"></td>
+                  <td class="dif-rec"></td>
                   <td class="celda-estado" style="white-space:nowrap;">${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? '<span class="sello-guardado">✓ Guardado</span>' : ''}</td>
                 </tr>`; }).join('')}
             </tbody>
@@ -3368,6 +3807,17 @@ async function cargarPendientesRecepcion(){
     }
     cont.innerHTML = html;
     seguirCambios(cont);
+    // DIFERENCIA en vivo: recibido − enviado (16/10/2026)
+    const pintarDif = () => cont.querySelectorAll('tr[data-enviado]').forEach(tr => {
+      const td = tr.querySelector('.dif-rec'); const inp = tr.querySelector('.inp-recibido');
+      if(!td || !inp) return;
+      if(inp.value === ''){ td.textContent = ''; td.className = 'dif-rec'; return; }
+      const d = Math.round((Number(inp.value) - Number(tr.dataset.enviado)) * 100) / 100;
+      td.textContent = d === 0 ? '✓ 0' : (d > 0 ? '+' : '') + d.toLocaleString('es-AR');
+      td.className = 'dif-rec ' + (d === 0 ? 'ok' : 'mal');
+    });
+    cont.addEventListener('input', e => { if(e.target.classList.contains('inp-recibido')) pintarDif(); });
+    pintarDif();
     const bP = document.getElementById('btnProvisorioRecepcion');
     if(bP) bP.onclick = () => guardarRecepcion(false);
     const bC = document.getElementById('btnConfirmarRecepcion');
@@ -3535,6 +3985,15 @@ function avisoProyeccion(fecha, proyeccion){
     : cortos.map(l => proyeccion.hasta[l] ? `${l} hasta el ${fmtFecha(proyeccion.hasta[l])}` : `${l} sin cargar`).join(' · ');
   return `<div class="aviso-proy no-print">⚠ Proyección por fecha: ${detalle}. Después de esa fecha se calcula con la semana tipo — importá las dos semanas siguientes en Planificación.</div>`;
 }
+// la venta NORMAL (tandas de fábrica) se termina antes que la de envíos: las
+// tandas vuelven a sumar lo que se manda a los locales (con el colchón cada día)
+function avisoNormal(fecha, proyeccion){
+  if(!proyeccion || !proyeccion.hastaNormal) return '';
+  const limite = sumarDiasISO(fecha, 5);
+  const cortos = LOCALES_VENTA.filter(l => !proyeccion.hastaNormal[l] || proyeccion.hastaNormal[l] < limite);
+  if(!cortos.length) return '';
+  return `<div class="aviso-proy no-print">⚠ Venta normal para las tandas de fábrica: ${cortos.map(l => proyeccion.hastaNormal[l] ? `${l} hasta el ${fmtFecha(proyeccion.hastaNormal[l])}` : `${l} sin cargar`).join(' · ')}. Sin ella las tandas suman el colchón todos los días — importá el Excel de proyección con las solapas NORMAL.</div>`;
+}
 
 /* ---------------------------------------------------------------------
    Pantalla PLANIFICACIÓN: editar venta proyectada por local
@@ -3571,8 +4030,11 @@ async function pintarResumenProyFechas(){
     if(data.error || !data.porLocal) { cont.textContent = ''; return; }
     const locales = Object.keys(data.porLocal);
     if(!locales.length){ cont.innerHTML = 'Todavía no hay proyección por fecha cargada: se usa la semana tipo.'; return; }
-    cont.innerHTML = '<strong>Proyección por fecha cargada:</strong> ' + LOCALES_VENTA.map(l => {
+    cont.innerHTML = '<strong>Proyección por fecha cargada (envíos):</strong> ' + LOCALES_VENTA.map(l => {
       const x = data.porLocal[l];
+      return x ? `${l}: del ${fmtFecha(x.desde)} al ${fmtFecha(x.hasta)}` : `${l}: sin cargar`;
+    }).join(' · ') + '<br><strong>Venta normal (tandas de fábrica):</strong> ' + LOCALES_VENTA.map(l => {
+      const x = (data.porLocalNormal || {})[l];
       return x ? `${l}: del ${fmtFecha(x.desde)} al ${fmtFecha(x.hasta)}` : `${l}: sin cargar`;
     }).join(' · ');
   }catch(err){ cont.textContent = ''; }
@@ -3710,10 +4172,55 @@ async function importarExcelPlanificacion(ev){
       }
     }
 
+    // VENTA NORMAL (solapas NORMAL CENTRO / PATAGONIA / ZELARRAYAN) y
+    // PARÁMETROS (colchón y mínimo por local): los usan las tandas de fábrica
+    // (venta normal + colchón una sola vez). 16/10/2026.
+    const resumenNormal = [];
+    for(const hoja of Object.keys(HOJA_A_LOCAL)){
+      const hojaNormal = 'NORMAL ' + hoja;
+      if(!wb.SheetNames.includes(hojaNormal)) continue;
+      const local = HOJA_A_LOCAL[hoja];
+      const filasHoja = XLSX.utils.sheet_to_json(wb.Sheets[hojaNormal], { header: 1, raw: true, defval: 0 });
+      let cols = null;
+      const porFecha = {}, fechasLocal = new Set();
+      filasHoja.forEach(fila => {
+        const texto = String(fila[0] == null ? '' : fila[0]).trim();
+        if(!texto) return;
+        if(texto.toUpperCase() === 'EMPANADAS'){
+          cols = [];
+          for(let c = 1; c < fila.length; c++){ const f = fechaDeEncabezado(fila[c]); if(f) cols.push({ col: c, fecha: f }); }
+          return;
+        }
+        if(!cols) return;
+        const saborReal = porNombreNormalizado[normalizarNombre(texto)];
+        if(!saborReal) return; // TOTAL, títulos
+        porFecha[saborReal] = porFecha[saborReal] || {};
+        cols.forEach(({ col, fecha }) => { porFecha[saborReal][fecha] = Number(fila[col]) || 0; fechasLocal.add(fecha); });
+      });
+      if(fechasLocal.size){
+        const fechas = [...fechasLocal].sort();
+        await postJSON({ action: 'actualizarPlanificacionFechas', tipo: 'normal', local, fechas, filas: Object.keys(porFecha).map(sabor => ({ sabor, valores: porFecha[sabor] })) });
+        resumenNormal.push(`${local} (${fechas.length} días)`);
+      }
+    }
+    if(wb.SheetNames.includes('PARAMETROS')){
+      const filasPar = XLSX.utils.sheet_to_json(wb.Sheets['PARAMETROS'], { header: 1, raw: true, defval: '' });
+      const parametros = [];
+      filasPar.forEach(f => {
+        const local = LOCALES_VENTA.find(l => normalizarNombre(l) === normalizarNombre(f[0]));
+        if(local && f[1] !== '' && !isNaN(Number(f[1]))) parametros.push({ local, colchon: Number(f[1]), minimo: Number(f[2]) || 0 });
+      });
+      if(parametros.length){
+        await postJSON({ action: 'guardarParametrosProyeccion', parametros });
+        resumenNormal.push('parámetros: ' + parametros.map(p => `${p.local} colchón ${Math.round(p.colchon * 100)}% mín. ${p.minimo}`).join(', '));
+      }
+    }
+
     const unicosSinMatch = [...new Set(sinMatch)];
     if(archivoPorFecha){
       msg.className = (unicosSinMatch.length || sinFechaEnArchivoConFechas) ? 'msg err' : 'msg ok';
       msg.textContent = `Proyección por fecha importada — ${resumenFechas.join(' · ')}.` +
+        (resumenNormal.length ? ` Venta normal para las tandas de fábrica: ${resumenNormal.join(' · ')}.` : ' OJO: el archivo no trae las solapas NORMAL — las tandas de fábrica se siguen calculando con lo que se manda a los locales.') +
         (sinFechaEnArchivoConFechas ? ' OJO: hay categorías cuyo encabezado no tiene fechas (dice solo LUNES…DOMINGO): esas filas NO se cargaron.' : '') +
         (unicosSinMatch.length ? ` Sin encontrar en el sistema (se ignoraron): ${unicosSinMatch.join(', ')}` : '') +
         ' Si el plan de hoy ya estaba confirmado, tocá "Recalcular…" para que tome esta proyección.';
@@ -3859,7 +4366,10 @@ function htmlTrazabilidad(d){
 
   // 3) ARMADO
   const filasArm = [['Fecha de armado', fmtFecha(a.fecha) + (a.horaInicio ? ` · ${a.horaInicio}${a.horaFin ? ' a ' + a.horaFin : ''}` : '')]];
-  if(a.maquinaNumero){
+  if(a.manual){
+    filasArm.push(['Máquina', `Manual ${a.manual.numero}`]);
+    filasArm.push(['La usó', v(a.manual.persona, 'no se cargó quién usó la manual')]);
+  } else if(a.maquinaNumero){
     filasArm.push(['Máquina', `Nº ${a.maquinaNumero}${a.maquinaVelocidad ? ' · velocidad ' + a.maquinaVelocidad : ''}`]);
     filasArm.push(['Entrada', v(a.puestos && a.puestos.entrada)], ['Relleno', v(a.puestos && a.puestos.relleno)], ['Salida', v(a.puestos && a.puestos.salida)]);
   } else {
@@ -4181,6 +4691,497 @@ async function cargarRecetasCargadas(){
     cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo buscar: ${err.message}</div>`;
   }
 }
+
+/* =====================================================================
+   INFORMES MENSUALES (16/10/2026, pedido por Carolina). Solo lectura.
+   Mismo esquema en los tres: se elige el mes, los días van en columnas
+   (con el día de la semana abajo) y la primera columna y el encabezado
+   quedan fijos.
+     - Pedido vs hecho: Cocina / Producción / Discos — PIDIÓ / HIZO / DIF.
+     - Envíos y recepción: solapas Global / Centro / Patagonia /
+       Zelarrayán — PIDIÓ / ENVIÓ / RECIBIÓ / DIF + quién preparó,
+       repartió y recibió.
+     - Tiempos de máquina: calidad del registro, total de fábrica, cada
+       máquina (y manuales), por sabor y por persona.
+   "Pidió" existe desde que se publicó esta versión (se guarda al confirmar
+   el plan del día). Lo REAL (hecho, enviado, recibido, tiempos) se ve
+   también para atrás.
+   ===================================================================== */
+const DIA_CORTO = { 'Lunes': 'Lun', 'Martes': 'Mar', 'Miércoles': 'Mié', 'Jueves': 'Jue', 'Viernes': 'Vie', 'Sábado': 'Sáb', 'Domingo': 'Dom' };
+const INICIO_LUNES_FRANCO = '2026-10-19';
+let MES_INFORME = null;
+function mesInforme(){ return MES_INFORME || hoyISO().slice(0, 7); }
+function esFinde(d){ return d.dia === 'Sábado' || d.dia === 'Domingo'; }
+function esFrancoProduccion(d){ return d.dia === DIA_FRANCO_PRODUCCION && d.fecha >= INICIO_LUNES_FRANCO; }
+function escHtml(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+// "GARCIA LUIS" -> "Garcia L." (los nombres de la hoja Empleados); el resto, tal cual
+function nombreCorto(n){
+  const t = String(n || '').trim();
+  if(!t) return '';
+  const p = t.split(/\s+/);
+  if(t !== t.toUpperCase() || p.length < 2) return t;
+  const cap = w => w.charAt(0) + w.slice(1).toLowerCase();
+  return cap(p[0]) + ' ' + p[1].charAt(0) + '.';
+}
+function fmtCant(n, unidad){
+  if(n === null || n === undefined || n === '') return '';
+  const x = Number(n) || 0, u = String(unidad || '').toLowerCase();
+  if(['kg', 'l', 'litros', 'docenas'].indexOf(u) !== -1) return x.toLocaleString('es-AR', { maximumFractionDigits: Math.abs(x) < 100 ? 1 : 0 });
+  return Math.round(x).toLocaleString('es-AR');
+}
+function fmtSigno(n, unidad){ const t = fmtCant(n, unidad); return (Number(n) > 0 ? '+' : '') + t; }
+function fmtMin(min){ if(min == null) return ''; const m = Math.round(min); return Math.floor(m / 60) + ':' + String(m % 60).padStart(2, '0'); }
+function fmtHora(min){ return min == null ? '' : String(Math.floor(min / 60)).padStart(2, '0') + ':' + String(min % 60).padStart(2, '0'); }
+function tolerancia(p, unidad){ const u = String(unidad || '').toLowerCase(); return Math.max(Math.abs(p) * 0.10, u === 'kg' || u === 'docenas' || u === 'l' || u === 'litros' ? 1 : 5); }
+function claseDif(p, h, unidad){ const d = h - p; if(Math.abs(d) <= tolerancia(p, unidad)) return 'c-ok'; return d > 0 ? 'c-mas' : 'c-menos'; }
+function pctTxt(h, p){ return p ? Math.round((h - p) / p * 100) + '%' : ''; }
+
+// encabezado: primera columna + un día por columna + total del mes
+function theadDias(titulo, dias, opts){
+  const o = opts || {};
+  const hoy = hoyISO();
+  return `<thead><tr><th>${titulo}</th>${dias.map(d => `<th class="col-dia${esFinde(d) ? ' finde' : ''}${d.fecha === hoy ? ' hoy' : ''}${o.marcarSinPlan && !d.conPlan ? ' sin-plan' : ''}" title="${fmtFecha(d.fecha)}${o.marcarSinPlan && !d.conPlan ? ' — sin plan guardado' : ''}"><div>${Number(d.fecha.slice(8))}</div><small>${DIA_CORTO[d.dia] || ''}</small></th>`).join('')}<th class="num col-total">${o.tituloTotal || 'Mes'}</th></tr></thead>`;
+}
+function tdDia(d, contenido, clase, title){ return `<td class="${clase || ''}${esFinde(d) ? ' finde' : ''}"${title ? ` title="${escHtml(title)}"` : ''}>${contenido}</td>`; }
+function filaSector(titulo, dias){ return `<tr class="fila-sector"><td>${titulo}</td><td colspan="${dias.length + 1}"></td></tr>`; }
+
+// encabezado común de las 3 pantallas
+function pantallaInforme(titulo, ayuda, onCambio){
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <header class="top" style="margin-bottom:12px;"><h1>${titulo}</h1></header>
+    <div class="inf-toolbar no-print">
+      <div class="field-row"><label>Mes</label><input type="month" id="mesInforme" value="${mesInforme()}"></div>
+      <button class="btn secondary" id="btnDesplegarInf">Desplegar todo</button>
+      <button class="btn secondary" id="btnPlegarInf">Plegar todo</button>
+      <button class="btn secondary" style="margin-left:auto;" onclick="window.print()">🖶 Imprimir</button>
+    </div>
+    <p class="inf-ayuda">${ayuda}</p>
+    <div id="contenidoInf" class="loading">Cargando…</div>`;
+  document.getElementById('mesInforme').onchange = (e) => { if(e.target.value){ MES_INFORME = e.target.value; onCambio(); } };
+  document.getElementById('btnDesplegarInf').onclick = () => plegarGrupos(false);
+  document.getElementById('btnPlegarInf').onclick = () => plegarGrupos(true);
+}
+function plegarGrupos(plegar){
+  document.querySelectorAll('#contenidoInf tr.fila-grupo-inf').forEach(tr => ponerPlegado(tr, plegar));
+}
+function ponerPlegado(trGrupo, plegar){
+  const id = trGrupo.dataset.gid;
+  trGrupo.dataset.plegado = plegar ? '1' : '';
+  const c = trGrupo.querySelector('.caret'); if(c) c.textContent = plegar ? '▸' : '▾';
+  trGrupo.closest('table').querySelectorAll(`tr[data-pert="${id}"]`).forEach(r => r.classList.toggle('oculta', plegar));
+}
+function conectarGrupos(raiz){
+  raiz.querySelectorAll('tr.fila-grupo-inf').forEach(tr => {
+    const td = tr.querySelector('td');
+    td.onclick = () => ponerPlegado(tr, !tr.dataset.plegado);
+    ponerPlegado(tr, tr.dataset.plegadoInicial === '1');
+  });
+}
+let GID = 0;
+async function pedirInforme(action){
+  const mes = mesInforme();
+  const r = await fetch(`${APPS_SCRIPT_URL}?action=${action}&mes=${encodeURIComponent(mes)}`);
+  const data = await r.json();
+  if(data.error) throw new Error(data.error);
+  if(document.getElementById('mesInforme') && document.getElementById('mesInforme').value !== mes) return null; // cambió el mes
+  return data;
+}
+
+/* ---------------- PEDIDO VS HECHO ---------------- */
+function renderInformePedido(){
+  pantallaInforme('Pedido vs hecho',
+    'Cada ítem tiene 3 renglones: <strong>PIDIÓ</strong> (lo que pidió la app ese día, con el % de Cocina/Producción aplicado), <strong>HIZO</strong> (lo registrado) y <strong>DIF</strong> (hizo − pidió). Tocá el nombre de un grupo para ver el detalle por relleno o sabor. Lo que pidió la app se guarda desde que se publicó este informe, en los días con plan confirmado; lo hecho se ve también para atrás. El total del mes compara solo los días que tienen las dos cosas.',
+    cargarInformePedido);
+  cargarInformePedido();
+}
+async function cargarInformePedido(){
+  const cont = document.getElementById('contenidoInf');
+  cont.className = 'loading'; cont.textContent = 'Cargando…';
+  try{
+    const data = await pedirInforme('informePedidoVsHecho');
+    if(!data) return;
+    cont.className = '';
+    const dias = data.dias;
+    const hoy = hoyISO();
+    const conPlan = dias.filter(d => d.conPlan).length;
+    let html = `<div class="leyenda-inf">
+        <span><i style="background:var(--herb-bg);"></i>DIF dentro del ±10%</span>
+        <span><i style="background:#fdf0d5;"></i>Se hizo de más</span>
+        <span><i style="background:var(--alert-bg);"></i>Se hizo de menos / pedido sin registro</span>
+        <span><i style="background:#eef3fa;"></i>Se hizo sin pedido (día sin plan o fuera del cálculo)</span>
+        <span>· en el encabezado = día sin plan guardado</span>
+      </div>
+      ${conPlan === 0 ? `<div class="msg err" style="display:block;margin-bottom:10px;">Este mes todavía no hay ningún día con lo que pidió la app guardado (se guarda al confirmar el plan del día, desde que se publicó este informe). Por ahora se ve solo lo hecho.</div>` : ''}
+      <div class="tabla-fija"><table class="inf">${theadDias('Ítem', dias, { marcarSinPlan: true })}<tbody>`;
+    data.secciones.forEach(sec => {
+      if(!sec.grupos.length) return;
+      html += filaSector(sec.sector.toUpperCase(), dias);
+      sec.grupos.forEach(g => {
+        const gid = 'g' + (++GID);
+        const unidades = [...new Set(g.items.map(i => i.unidad))];
+        const unidad = unidades.length === 1 ? unidades[0] : null;
+        // total del grupo (solo si todos en la misma unidad)
+        const tot = {};
+        if(unidad) g.items.forEach(i => Object.keys(i.valores).forEach(f => {
+          const v = i.valores[f]; const t = tot[f] = tot[f] || { p: null, h: null };
+          if(v.p != null) t.p = (t.p || 0) + v.p;
+          if(v.h != null) t.h = (t.h || 0) + v.h;
+        }));
+        const plegar = unidad && g.items.length > 1 && sec.sector !== 'Discos';
+        html += filasPedidoHecho(`<span class="caret">▾</span>${g.grupo}${unidad ? ` <span class="sub">(${unidad})</span>` : ''}`, unidad ? tot : null, dias, unidad, hoy, `data-gid="${gid}" data-plegado-inicial="${plegar ? '1' : ''}"`, true);
+        g.items.forEach(i => { html += filasPedidoHecho(escHtml(i.item) + (unidad ? '' : ` <span class="sub">(${i.unidad})</span>`), i.valores, dias, i.unidad, hoy, `data-pert="${gid}"`, false); });
+      });
+    });
+    html += `</tbody></table></div>`;
+    cont.innerHTML = html;
+    conectarGrupos(cont);
+  }catch(err){
+    cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar: ${err.message}</div>`;
+  }
+}
+// 3 renglones de un ítem (o del total de un grupo). valores = null -> grupo sin total (unidades mezcladas)
+function filasPedidoHecho(etiqueta, valores, dias, unidad, hoy, attrs, esGrupo){
+  if(!valores) return `<tr ${attrs || ''} class="primera fila-grupo-inf"><td>${etiqueta} <span class="sub" style="text-transform:none;">— unidades distintas, ver el detalle</span></td>${dias.map(d => tdDia(d, '', 'vacio')).join('')}<td class="col-total"></td></tr>`;
+  const cP = [], cH = [], cD = [];
+  let sp = 0, sh = 0, hay = false;
+  dias.forEach(d => {
+    const v = valores ? valores[d.fecha] : null;
+    const p = v && v.p != null ? v.p : null, h = v && v.h != null ? v.h : null;
+    if(!valores){ cP.push(tdDia(d, '', 'vacio')); cH.push(tdDia(d, '', 'vacio')); cD.push(tdDia(d, '', 'vacio')); return; }
+    cP.push(tdDia(d, p == null ? '·' : fmtCant(p, unidad), p == null ? 'vacio' : ''));
+    cH.push(tdDia(d, h == null ? '·' : fmtCant(h, unidad), h == null ? 'vacio' : ''));
+    if(p != null && h != null){ cD.push(tdDia(d, fmtSigno(h - p, unidad), claseDif(p, h, unidad), pctTxt(h, p))); sp += p; sh += h; hay = true; }
+    else if(p != null){ cD.push(tdDia(d, d.fecha < hoy ? 'sin reg.' : '', d.fecha < hoy ? 'c-falta' : 'vacio', d.fecha < hoy ? 'Se pidió y no hay registro de lo hecho' : '')); if(d.fecha < hoy){ sp += p; hay = true; } }
+    else if(h != null && d.conPlan){ cD.push(tdDia(d, 's/pedido', 'c-info', 'Ese día la app no lo pidió')); }
+    else cD.push(tdDia(d, '', 'vacio'));
+  });
+  const tP = hay ? fmtCant(sp, unidad) : '', tH = hay ? fmtCant(sh, unidad) : '';
+  const tD = hay ? `<td class="col-total ${claseDif(sp, sh, unidad)}" title="${pctTxt(sh, sp)}">${fmtSigno(sh - sp, unidad)}</td>` : '<td class="col-total"></td>';
+  const a = attrs || '';
+  return `<tr ${a} class="primera${esGrupo ? ' fila-grupo-inf' : ''}"><td>${etiqueta} <span class="sub">pidió</span></td>${cP.join('')}<td class="col-total">${tP}</td></tr>`
+    + `<tr ${esGrupo ? '' : a}><td class="lbl"><span class="sub">hizo</span></td>${cH.join('')}<td class="col-total">${tH}</td></tr>`
+    + `<tr ${esGrupo ? '' : a}><td class="lbl"><span class="sub">dif</span></td>${cD.join('')}${tD}</tr>`;
+}
+
+/* ---------------- ENVÍOS Y RECEPCIÓN ---------------- */
+let TAB_INF_ENVIOS = 'Global';
+let DATOS_INF_ENVIOS = null;
+function renderInformeEnvios(){
+  pantallaInforme('Envíos y recepción',
+    'Por día y producto: <strong>PIDIÓ</strong> (orden calculada por la app, desde que se publicó este informe), <strong>ENVIÓ</strong> (lo despachado desde fábrica), <strong>RECIBIÓ</strong> (lo que confirmó el local) y <strong>DIF</strong> (recibió − envió). Arriba de cada local: quién preparó el envío y a qué hora se envió, repartidor, acompañante y quién recibió. Los traspasos entre locales van aparte, abajo.',
+    cargarInformeEnvios);
+  cargarInformeEnvios();
+}
+async function cargarInformeEnvios(){
+  const cont = document.getElementById('contenidoInf');
+  cont.className = 'loading'; cont.textContent = 'Cargando…';
+  try{
+    const data = await pedirInforme('informeEnvios');
+    if(!data) return;
+    DATOS_INF_ENVIOS = data;
+    cont.className = '';
+    const tabs = ['Global'].concat(data.ordenLocales);
+    cont.innerHTML = `<div class="inf-tabs no-print">${tabs.map(t => `<button class="tab-btn ${t === TAB_INF_ENVIOS ? 'active' : ''}" data-tab="${t}">${t}</button>`).join('')}</div><div id="panelInfEnvios"></div>`;
+    cont.querySelectorAll('.inf-tabs .tab-btn').forEach(b => b.onclick = () => {
+      TAB_INF_ENVIOS = b.dataset.tab;
+      cont.querySelectorAll('.inf-tabs .tab-btn').forEach(x => x.classList.toggle('active', x === b));
+      pintarPanelInfEnvios();
+    });
+    pintarPanelInfEnvios();
+  }catch(err){
+    cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar: ${err.message}</div>`;
+  }
+}
+// suma los valores de varios productos/locales: { fecha: {p,e,r,sc,prep} }
+function sumarValoresEnv(lista){
+  const out = {};
+  lista.forEach(valores => Object.keys(valores).forEach(f => {
+    const v = valores[f]; const t = out[f] = out[f] || { p: null, e: null, r: null, sc: null, prep: null };
+    ['p', 'e', 'r', 'sc', 'prep'].forEach(k => { if(v[k] != null) t[k] = (t[k] || 0) + v[k]; });
+  }));
+  return out;
+}
+function kpisEnvios(valores, dias){
+  let p = 0, eConP = 0, e = 0, r = 0, eConf = 0, sc = 0, diasDif = 0, diasEnvio = 0;
+  dias.forEach(d => {
+    const v = valores[d.fecha]; if(!v) return;
+    if(v.e) diasEnvio++;
+    if(v.p != null && v.e != null){ p += v.p; eConP += v.e; }
+    e += v.e || 0; r += v.r || 0; sc += v.sc || 0;
+    eConf += (v.e || 0) - (v.sc || 0);
+    if(v.r != null && Math.abs((v.r || 0) - ((v.e || 0) - (v.sc || 0))) > 0.01) diasDif++;
+  });
+  const difRec = r - eConf;
+  return `<div class="kpis">
+    <div class="kpi"><div class="v">${fmtCant(e)}</div><div class="l">enviado en el mes · ${diasEnvio} día(s) con envío</div></div>
+    <div class="kpi ${p ? (Math.abs(eConP - p) > p * 0.1 ? 'ojo' : 'bien') : ''}"><div class="v">${p ? fmtSigno(eConP - p) : '—'}</div><div class="l">enviado vs pedido de la app${p ? ` (${pctTxt(eConP, p)})` : ' — sin pedidos guardados todavía'}</div></div>
+    <div class="kpi ${difRec ? 'malo' : 'bien'}"><div class="v">${fmtSigno(difRec)}</div><div class="l">recibido − enviado (solo lo confirmado)</div></div>
+    <div class="kpi ${diasDif ? 'malo' : 'bien'}"><div class="v">${diasDif}</div><div class="l">día(s) con diferencia en la recepción</div></div>
+    <div class="kpi ${sc ? 'ojo' : 'bien'}"><div class="v">${fmtCant(sc)}</div><div class="l">unidades enviadas sin confirmar recepción</div></div>
+  </div>`;
+}
+// 4 renglones: pidió / envió / recibió / dif (recibió − envió)
+function filasEnvio(etiqueta, valores, dias, attrs, esGrupo){
+  const cP = [], cE = [], cR = [], cD = [];
+  let sp = 0, se = 0, seP = 0, sr = 0, seConf = 0, haySp = false;
+  dias.forEach(d => {
+    const v = valores[d.fecha] || {};
+    const p = v.p, e = v.e, r = v.r, sc = v.sc || 0, prep = v.prep || 0;
+    cP.push(tdDia(d, p == null ? '·' : fmtCant(p), p == null ? 'vacio' : ''));
+    if(e == null && prep) cE.push(tdDia(d, 'prep.', 'c-gris', `En preparación (sin "Guardar y enviar"): ${fmtCant(prep)}`));
+    else if(e == null) cE.push(tdDia(d, p != null && d.fecha < hoyISO() ? '0' : '·', p != null && d.fecha < hoyISO() ? 'c-menos' : 'vacio'));
+    else cE.push(tdDia(d, fmtCant(e), p != null ? claseDif(p, e) : '', p != null ? `vs pedido: ${pctTxt(e, p)}` : ''));
+    if(e == null) cR.push(tdDia(d, '·', 'vacio'));
+    else if(sc && !r) cR.push(tdDia(d, 's/conf.', 'c-gris', `Sin confirmar: ${fmtCant(sc)}`));
+    else cR.push(tdDia(d, fmtCant(r || 0) + (sc ? '*' : ''), sc ? 'c-gris' : '', sc ? `Falta confirmar ${fmtCant(sc)}` : ''));
+    if(e != null){
+      const conf = e - sc;
+      const dif = (r || 0) - conf;
+      if(conf > 0 || r) cD.push(tdDia(d, Math.abs(dif) < 0.01 ? '0' : fmtSigno(dif), Math.abs(dif) < 0.01 ? 'c-ok' : 'c-menos'));
+      else cD.push(tdDia(d, '', 'vacio'));
+      se += e; sr += r || 0; seConf += conf;
+      if(p != null){ sp += p; seP += e; haySp = true; }
+    } else {
+      cD.push(tdDia(d, '', 'vacio'));
+      if(p != null && d.fecha < hoyISO()){ sp += p; haySp = true; }
+    }
+  });
+  const a = attrs || '';
+  const dTot = sr - seConf;
+  return `<tr ${a} class="primera${esGrupo ? ' fila-grupo-inf' : ''}"><td>${etiqueta} <span class="sub">pidió</span></td>${cP.join('')}<td class="col-total">${haySp ? fmtCant(sp) : ''}</td></tr>`
+    + `<tr ${esGrupo ? '' : a}><td class="lbl"><span class="sub">envió</span></td>${cE.join('')}<td class="col-total ${haySp ? claseDif(sp, seP) : ''}" title="${haySp ? 'vs pedido (días con pedido): ' + pctTxt(seP, sp) : ''}">${se ? fmtCant(se) : ''}</td></tr>`
+    + `<tr ${esGrupo ? '' : a}><td class="lbl"><span class="sub">recibió</span></td>${cR.join('')}<td class="col-total">${se ? fmtCant(sr) : ''}</td></tr>`
+    + `<tr ${esGrupo ? '' : a}><td class="lbl"><span class="sub">dif</span></td>${cD.join('')}<td class="col-total ${se ? (Math.abs(dTot) < 0.01 ? 'c-ok' : 'c-menos') : ''}">${se ? (Math.abs(dTot) < 0.01 ? '0' : fmtSigno(dTot)) : ''}</td></tr>`;
+}
+function filasPersonas(local, info, dias, conLocal){
+  const per = info.personas || {};
+  const cel = (d, f) => { const x = per[d.fecha]; return x ? f(x) : tdDia(d, '', 'vacio'); };
+  const pref = conLocal ? `<strong>${local}</strong> · ` : '';
+  const fila = (lbl, f, primera) => `<tr${primera ? ' class="primera"' : ''}><td>${pref}<span class="sub">${lbl}</span></td>${dias.map(d => cel(d, x => f(d, x))).join('')}<td class="col-total"></td></tr>`;
+  return fila('preparó / hora', (d, x) => tdDia(d, `${escHtml(nombreCorto(x.preparo)) || '—'}<small>${x.hora || ''}</small>`, 'txt', `${x.preparo || ''}${x.hora ? ' · enviado a las ' + x.hora : ''}`), true)
+    + fila('repartidor / acomp.', (d, x) => tdDia(d, `${escHtml(nombreCorto(x.repartidor)) || '—'}<small>${escHtml(nombreCorto(x.acompanante))}</small>`, 'txt', `${x.repartidor || ''}${x.acompanante ? ' + ' + x.acompanante : ''}`))
+    + fila('recibió', (d, x) => {
+      if(x.sinConfirmar && !x.recibio.length) return tdDia(d, 'sin confirmar', 'txt c-falta', `${x.sinConfirmar} renglón(es) sin confirmar`);
+      const otraFecha = x.fechasRecepcion.some(f => f !== d.fecha);
+      return tdDia(d, `${x.recibio.map(n => escHtml(nombreCorto(n))).join(', ') || '—'}${otraFecha ? `<small>el ${x.fechasRecepcion.map(f => fmtFecha(f).slice(0, 5)).join(', ')}</small>` : ''}${x.sinConfirmar ? '<small>falta parte</small>' : ''}`, 'txt' + (otraFecha || x.sinConfirmar ? ' c-mas' : ''), (otraFecha ? 'Recibido otro día. ' : '') + (x.sinConfirmar ? `${x.sinConfirmar} renglón(es) sin confirmar` : ''));
+    });
+}
+function pintarPanelInfEnvios(){
+  const data = DATOS_INF_ENVIOS; if(!data) return;
+  const panel = document.getElementById('panelInfEnvios');
+  const dias = data.dias;
+  const leyenda = `<div class="leyenda-inf">
+      <span><i style="background:var(--herb-bg);"></i>Envió lo pedido (±10%) / recibió lo enviado</span>
+      <span><i style="background:#fdf0d5;"></i>Envió de más / recibido otro día</span>
+      <span><i style="background:var(--alert-bg);"></i>Envió de menos / diferencia en la recepción</span>
+      <span>s/conf. = enviado sin confirmar · * = falta confirmar una parte · prep. = en preparación</span>
+    </div>`;
+  let html = '';
+  if(TAB_INF_ENVIOS === 'Global'){
+    const todos = data.ordenLocales.map(l => sumarValoresEnv(data.locales[l].grupos.flatMap(g => g.items.map(i => i.valores))));
+    html += kpisEnvios(sumarValoresEnv(todos), dias) + leyenda;
+    html += `<h3 class="inf-titulo">Por local (todos los productos)</h3><div class="tabla-fija"><table class="inf">${theadDias('Local', dias, { marcarSinPlan: true })}<tbody>`;
+    data.ordenLocales.forEach((l, i) => { html += filasEnvio(`<strong>${l}</strong>`, todos[i], dias, '', false); });
+    html += filasEnvio('<strong>TOTAL</strong>', sumarValoresEnv(todos), dias, '', false);
+    html += `</tbody></table></div>`;
+    html += `<h3 class="inf-titulo">Quién preparó, repartió y recibió</h3><div class="tabla-fija"><table class="inf">${theadDias('Local', dias)}<tbody>`;
+    data.ordenLocales.forEach(l => { html += filasPersonas(l, data.locales[l], dias, true); });
+    html += `</tbody></table></div>`;
+    // detalle por producto con los 3 locales sumados
+    const porProd = {};
+    data.ordenLocales.forEach(l => data.locales[l].grupos.forEach(g => g.items.forEach(it => {
+      const k = g.grupo + '|' + it.item;
+      (porProd[k] = porProd[k] || { grupo: g.grupo, item: it.item, lista: [] }).lista.push(it.valores);
+    })));
+    const grupos = {};
+    Object.values(porProd).forEach(x => { (grupos[x.grupo] = grupos[x.grupo] || []).push(x); });
+    html += `<h3 class="inf-titulo">Detalle por producto (3 locales juntos)</h3>` + tablaGruposEnvio(Object.keys(grupos).sort((a, b) => ordenRubro(a) - ordenRubro(b)).map(g => ({ grupo: g, items: grupos[g].sort((a, b) => compararTexto(a.item, b.item)).map(x => ({ item: x.item, valores: sumarValoresEnv(x.lista) })) })), dias);
+  } else {
+    const info = data.locales[TAB_INF_ENVIOS];
+    html += kpisEnvios(sumarValoresEnv(info.grupos.flatMap(g => g.items.map(i => i.valores))), dias) + leyenda;
+    html += `<h3 class="inf-titulo">Personas</h3><div class="tabla-fija"><table class="inf">${theadDias('', dias)}<tbody>${filasPersonas(TAB_INF_ENVIOS, info, dias, false)}</tbody></table></div>`;
+    html += `<h3 class="inf-titulo">Productos</h3>` + tablaGruposEnvio(info.grupos, dias);
+    const tr = info.traspasos || [];
+    html += `<h3 class="inf-titulo">Traspasos entre locales (${tr.length})</h3>`;
+    html += tr.length ? `<div class="tabla-fija"><table class="simple"><thead><tr><th>Fecha</th><th>Movimiento</th><th>Producto</th><th class="num">Enviado</th><th class="num">Recibido</th><th>Llevó</th><th>Recibió</th></tr></thead><tbody>
+      ${tr.map(t => `<tr><td>${fmtFecha(t.fecha)}</td><td>${t.sentido === 'sale' ? `sale a <strong>${t.destino}</strong>` : `entra de <strong>${t.origen}</strong>`}</td><td>${escHtml(t.sabor)}</td><td class="num">${fmtCant(t.enviado)}</td><td class="num">${t.recibido == null ? '<span style="color:var(--ink-soft);">sin confirmar</span>' : fmtCant(t.recibido)}</td><td>${escHtml(t.repartidor || t.responsable || '—')}</td><td>${escHtml(t.recibio || '—')}${t.fechaRecepcion && t.fechaRecepcion !== t.fecha ? ` <span style="color:var(--ink-soft);">(${fmtFecha(t.fechaRecepcion)})</span>` : ''}</td></tr>`).join('')}
+    </tbody></table></div>` : '<p class="inf-ayuda">Sin traspasos este mes.</p>';
+  }
+  panel.innerHTML = html;
+  conectarGrupos(panel);
+}
+function ordenRubro(g){ const i = ORDEN_RUBROS.indexOf(g); return i === -1 ? 99 : i; }
+function tablaGruposEnvio(grupos, dias){
+  let html = `<div class="tabla-fija"><table class="inf">${theadDias('Producto', dias, { marcarSinPlan: true })}<tbody>`;
+  grupos.forEach(g => {
+    const gid = 'g' + (++GID);
+    html += filasEnvio(`<span class="caret">▾</span>${g.grupo}`, sumarValoresEnv(g.items.map(i => i.valores)), dias, `data-gid="${gid}" data-plegado-inicial="1"`, true);
+    g.items.forEach(i => { html += filasEnvio(escHtml(i.item), i.valores, dias, `data-pert="${gid}"`, false); });
+  });
+  return html + `</tbody></table></div>`;
+}
+
+/* ---------------- TIEMPOS DE MÁQUINA ---------------- */
+function renderInformeTiempos(){
+  pantallaInforme('Tiempos de máquina',
+    '<strong>Tiempo armando</strong> = suma de (hora fin − hora inicio) de cada sabor. <strong>Tiempo muerto</strong> = de la primera hora de inicio a la última hora de fin, menos el tiempo armando (cambios de sabor, limpieza, esperas). <strong>U/hora</strong> = unidades ÷ tiempo armando (solo sabores con las dos horas). <strong>Relleno</strong> = kilos usados (peso inicial − final) contra unidades × gramaje de la ficha: + es relleno de más. Arriba de todo está la <strong>calidad del registro</strong> de cada día, para ver qué días no se cargó bien.',
+    cargarInformeTiempos);
+  cargarInformeTiempos();
+}
+async function cargarInformeTiempos(){
+  const cont = document.getElementById('contenidoInf');
+  cont.className = 'loading'; cont.textContent = 'Cargando…';
+  try{
+    const data = await pedirInforme('informeTiemposMaquina');
+    if(!data) return;
+    cont.className = '';
+    const dias = data.dias, hoy = hoyISO();
+    const uh = (u, min) => min > 0 ? Math.round(u / (min / 60)) : null;
+    let html = `<div class="leyenda-inf">
+        <span><i style="background:var(--herb-bg);"></i>Bien</span>
+        <span><i style="background:#fdf0d5;"></i>Para mirar</span>
+        <span><i style="background:var(--alert-bg);"></i>Problema / falta registro</span>
+      </div><div class="tabla-fija"><table class="inf">${theadDias('', dias, { tituloTotal: 'Mes' })}<tbody>`;
+
+    // 1) CALIDAD DEL REGISTRO
+    html += filaSector('CALIDAD DEL REGISTRO', dias);
+    const filaCal = (lbl, campo, ayuda, primera) => {
+      let tot = 0;
+      const celdas = dias.map(d => {
+        const c = data.calidad[d.fecha];
+        if(!c) return tdDia(d, '', 'vacio');
+        const v = campo === 'turnoSinEnviar' ? (c.turnoSinEnviar ? ['turno'] : []) : (c[campo] || []);
+        tot += v.length;
+        return tdDia(d, v.length ? v.length : '✓', v.length ? 'c-menos' : 'c-ok', v.length ? `${ayuda}: ${v.join(', ')}` : '');
+      }).join('');
+      return `<tr${primera ? ' class="primera"' : ''}><td>${lbl}</td>${celdas}<td class="col-total ${tot ? 'c-menos' : ''}">${tot || ''}</td></tr>`;
+    };
+    // registros del día
+    let totReg = 0;
+    html += `<tr class="primera"><td><strong>Sabores registrados</strong></td>${dias.map(d => {
+      const c = data.calidad[d.fecha];
+      if(c){ totReg += c.registros; return tdDia(d, c.registros, ''); }
+      if(esFrancoProduccion(d)) return tdDia(d, 'franco', 'c-gris');
+      return d.fecha < hoy ? tdDia(d, 'sin reg.', 'c-falta', 'No hay nada registrado en Producción este día') : tdDia(d, '', 'vacio');
+    }).join('')}<td class="col-total">${totReg}</td></tr>`;
+    html += filaCal('Sin hora inicio / fin', 'sinHora', 'Sin hora', false);
+    html += filaCal('Horas raras (no se cuentan)', 'horaMal', 'Fin antes que inicio, antes de las 5 o más de 4 h', false);
+    html += filaCal('Sin pesos de relleno', 'sinPesos', 'Falta peso inicial o final', false);
+    html += filaCal('Sin máquina', 'sinMaquina', 'Sin máquina', false);
+    html += filaCal('Sin fecha de relleno', 'sinFechaRelleno', 'Sin fecha de relleno', false);
+    html += filaCal('Sin lote de discos', 'sinLoteDiscos', 'Sin lote de discos', false);
+    html += filaCal('Puestos / manual sin cargar', 'sinPuestos', 'Falta quién', false);
+    html += filaCal('Turno sin enviar final', 'turnoSinEnviar', 'Turno sin "Guardar y enviar final"', false);
+
+    // métricas por día de un conjunto de máquinas
+    const metDia = (ids, fecha) => {
+      const m = { minutos: 0, unidades: 0, unidadesConHora: 0, danados: 0, kgUsado: 0, kgTeorico: 0, inicio: null, fin: null, hay: false };
+      data.maquinas.filter(x => ids.indexOf(x.id) !== -1).forEach(x => {
+        const d = x.dias[fecha]; if(!d) return;
+        m.hay = true;
+        ['minutos', 'unidades', 'unidadesConHora', 'danados', 'kgUsado', 'kgTeorico'].forEach(k => { m[k] += d[k] || 0; });
+        if(d.inicio != null) m.inicio = m.inicio == null ? d.inicio : Math.min(m.inicio, d.inicio);
+        if(d.fin != null) m.fin = m.fin == null ? d.fin : Math.max(m.fin, d.fin);
+      });
+      return m;
+    };
+    const filaMet = (lbl, f, fTot, primera) => `<tr${primera ? ' class="primera"' : ''}><td>${lbl}</td>${dias.map(d => f(d)).join('')}<td class="col-total">${fTot()}</td></tr>`;
+    const claseRelleno = pct => pct == null ? '' : (Math.abs(pct) <= 3 ? 'c-ok' : Math.abs(pct) <= 8 ? 'c-mas' : 'c-menos');
+    const claseDanados = pct => pct == null ? '' : (pct <= 3 ? 'c-ok' : pct <= 6 ? 'c-mas' : 'c-menos');
+    const bloqueMetricas = (ids) => {
+      const tot = { minutos: 0, unidades: 0, unidadesConHora: 0, danados: 0, kgUsado: 0, kgTeorico: 0, span: 0 };
+      const md = {};
+      dias.forEach(d => { const m = md[d.fecha] = metDia(ids, d.fecha); if(m.hay){ ['minutos', 'unidades', 'unidadesConHora', 'danados', 'kgUsado', 'kgTeorico'].forEach(k => tot[k] += m[k]); if(m.inicio != null && m.fin != null) tot.span += m.fin - m.inicio; } });
+      const v = (d, f) => md[d.fecha].hay ? f(md[d.fecha]) : tdDia(d, '', 'vacio');
+      let h = '';
+      h += filaMet('<strong>Producción</strong> <span class="sub">u.</span>', d => v(d, m => tdDia(d, fmtCant(m.unidades))), () => fmtCant(tot.unidades), true);
+      h += filaMet('Horario <span class="sub">inicio–fin</span>', d => v(d, m => tdDia(d, m.inicio != null ? `${fmtHora(m.inicio)}<small>${fmtHora(m.fin)}</small>` : '—', 'txt')), () => '');
+      h += filaMet('Tiempo armando <span class="sub">h:mm</span>', d => v(d, m => tdDia(d, m.minutos ? fmtMin(m.minutos) : '—')), () => fmtMin(tot.minutos));
+      // el tiempo muerto tiene sentido por máquina (en el total, las máquinas trabajan a la vez)
+      if(ids.length === 1) h += filaMet('Tiempo muerto <span class="sub">h:mm</span>', d => v(d, m => { if(m.inicio == null) return tdDia(d, '—'); const span = m.fin - m.inicio, muerto = Math.max(span - m.minutos, 0); const pct = span ? muerto / span * 100 : 0; return tdDia(d, fmtMin(muerto), pct > 35 ? 'c-menos' : pct > 20 ? 'c-mas' : 'c-ok', `${Math.round(pct)}% del horario`); }), () => fmtMin(Math.max(tot.span - tot.minutos, 0)));
+      h += filaMet('<strong>U/hora</strong>', d => v(d, m => tdDia(d, uh(m.unidadesConHora, m.minutos) || '—')), () => uh(tot.unidadesConHora, tot.minutos) || '');
+      h += filaMet('Discos dañados <span class="sub">u. (%)</span>', d => v(d, m => { const pct = m.unidades ? m.danados / m.unidades * 100 : null; return tdDia(d, `${fmtCant(m.danados)}<small>${pct == null ? '' : pct.toFixed(1) + '%'}</small>`, 'txt ' + claseDanados(pct)); }), () => tot.unidades ? `${fmtCant(tot.danados)} (${(tot.danados / tot.unidades * 100).toFixed(1)}%)` : '');
+      h += filaMet('Relleno usado vs ficha', d => v(d, m => { if(!m.kgTeorico) return tdDia(d, '—', 'c-gris', 'Sin pesos de relleno cargados'); const pct = (m.kgUsado - m.kgTeorico) / m.kgTeorico * 100; return tdDia(d, (pct > 0 ? '+' : '') + pct.toFixed(1) + '%', claseRelleno(pct), `Usado ${m.kgUsado.toFixed(1)} kg vs ficha ${m.kgTeorico.toFixed(1)} kg`); }), () => tot.kgTeorico ? `${((tot.kgUsado - tot.kgTeorico) / tot.kgTeorico * 100).toFixed(1)}%` : '');
+      return h;
+    };
+
+    // 2) TOTAL DE FÁBRICA
+    html += filaSector('TOTAL FÁBRICA (todas las máquinas y a mano)', dias);
+    html += bloqueMetricas(data.maquinas.map(m => m.id));
+
+    // 3) CADA MÁQUINA
+    data.maquinas.forEach(mq => {
+      html += filaSector(mq.nombre.toUpperCase(), dias);
+      html += filaMet('Personal', d => { const m = mq.dias[d.fecha]; if(!m) return tdDia(d, '', 'vacio');
+        if(m.puestos) return tdDia(d, ['entrada', 'relleno', 'salida'].map(p => m.puestos[p] ? escHtml(nombreCorto(m.puestos[p])) : '<span style="color:var(--alert);">falta</span>').join('<br>'), 'txt', `Entrada: ${m.puestos.entrada || '—'} · Relleno: ${m.puestos.relleno || '—'} · Salida: ${m.puestos.salida || '—'}`);
+        return tdDia(d, m.personas.length ? m.personas.map(n => escHtml(nombreCorto(n))).join('<br>') : '<span style="color:var(--alert);">falta</span>', 'txt', m.personas.join(', ')); }, () => '', true);
+      html += filaMet('Sabores', d => { const m = mq.dias[d.fecha]; return m ? tdDia(d, m.sabores.length, '', m.sabores.join(', ')) : tdDia(d, '', 'vacio'); }, () => '');
+      html += bloqueMetricas([mq.id]);
+      if(mq.id === '1' || mq.id === '2') html += filaMet('Velocidad registrada', d => { const m = mq.dias[d.fecha]; if(!m) return tdDia(d, '', 'vacio'); const vs = m.velocidades || []; return tdDia(d, vs.length ? Math.round(vs.reduce((a, b) => a + b, 0) / vs.length) : '—', vs.length ? '' : 'c-gris'); }, () => '');
+    });
+    html += `</tbody></table></div>`;
+
+    // 4) POR SABOR
+    const ids = data.maquinas.map(m => m.id).filter(id => id !== 'EXT');
+    const porSabor = {};
+    (data.porSabor || []).forEach(x => { (porSabor[x.sabor] = porSabor[x.sabor] || {})[x.maquina] = x; });
+    const sabores = Object.keys(porSabor).sort(compararTexto);
+    html += `<h3 class="inf-titulo">Unidades por hora, por sabor y máquina (promedio del mes)</h3>`;
+    html += sabores.length ? `<div class="tabla-fija"><table class="simple"><thead><tr><th>Sabor</th>${ids.map(id => `<th class="num">${data.nombresMaquinas[id]}</th>`).join('')}<th class="num">Total</th></tr></thead><tbody>
+      ${sabores.map(s => { let u = 0, mi = 0; const tds = ids.map(id => { const x = porSabor[s][id]; if(!x) return '<td class="num" style="color:#cbbfae;">·</td>'; u += x.unidades; mi += x.minutos; return `<td class="num" title="${fmtCant(x.unidades)} u. en ${fmtMin(x.minutos)} (${x.veces} vez/veces)"><strong>${uh(x.unidades, x.minutos) || '—'}</strong> <span style="color:var(--ink-soft);font-size:10.5px;">u/h</span></td>`; }).join('');
+        return `<tr><td>${escHtml(s)}</td>${tds}<td class="num"><strong>${uh(u, mi) || '—'}</strong></td></tr>`; }).join('')}
+    </tbody></table></div>` : '<p class="inf-ayuda">Sin sabores con horas cargadas este mes.</p>';
+
+    // 5) POR PERSONA
+    html += `<h3 class="inf-titulo">Por persona</h3><p class="inf-ayuda">En las máquinas 1 y 2 las unidades por hora son del <strong>equipo</strong> (3 personas), no individuales. En las manuales y en lo hecho a mano sí son de la persona.</p>`;
+    html += (data.personas || []).length ? `<div class="tabla-fija"><table class="simple"><thead><tr><th>Persona</th><th class="num">Días</th><th>Dónde estuvo (veces)</th><th class="num">U/hora de sus equipos</th></tr></thead><tbody>
+      ${data.personas.map(p => `<tr><td>${escHtml(p.persona)}</td><td class="num">${p.dias}</td><td style="font-size:12px;">${Object.keys(p.lugares).sort((a, b) => p.lugares[b] - p.lugares[a]).map(l => `${escHtml(l)} ×${p.lugares[l]}`).join(' · ')}</td><td class="num"><strong>${uh(p.unidades, p.minutos) || '—'}</strong></td></tr>`).join('')}
+    </tbody></table></div>` : '<p class="inf-ayuda">Sin personas registradas este mes.</p>';
+
+    cont.innerHTML = html;
+  }catch(err){
+    cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar: ${err.message}</div>`;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   PANELES FIJOS EN TODAS LAS TABLAS (16/10/2026, Carolina): toda tabla
+   larga (más de 10 renglones) o más ancha que la pantalla queda dentro de
+   un recuadro con el encabezado fijo arriba y la primera columna fija a la
+   izquierda — igual que "Registrar producción". Se aplica sola a cualquier
+   tabla que se dibuje en la app.
+   --------------------------------------------------------------------- */
+function fijarTablas(){
+  app.querySelectorAll('table.prod, table.lotes').forEach(t => {
+    if(t.closest('.tabla-fija') || t.classList.contains('print-tabla') || !t.parentNode) return;
+    const filas = t.tBodies[0] ? t.tBodies[0].rows.length : 0;
+    const ancha = t.offsetParent && t.parentElement && t.scrollWidth > t.parentElement.clientWidth + 4;
+    if(filas <= 10 && !ancha) return;
+    const activo = document.activeElement;
+    const div = document.createElement('div');
+    div.className = 'tabla-fija auto';
+    t.parentNode.insertBefore(div, t);
+    div.appendChild(t);
+    if(activo && div.contains(activo) && activo.focus) activo.focus();
+  });
+}
+// LOTES VENCIDOS EN ROJO (16/10/2026, Carolina): en la carga de stock y en el
+// despacho, el vencimiento anterior a la fecha de carga queda en rojo. Se
+// puede guardar igual (se avisa antes), y se ve en rojo en los informes.
+function marcarVencidosEnRojo(){
+  const ref = document.getElementById('fechaCarga') || document.getElementById('fechaEnvios');
+  if(!ref || !ref.value) return;
+  app.querySelectorAll('input.inp-venc').forEach(inp => inp.classList.toggle('venc-rojo', !!inp.value && inp.value < ref.value));
+}
+document.addEventListener('input', e => { if(e.target.matches && (e.target.matches('input.inp-venc') || e.target.id === 'fechaCarga' || e.target.id === 'fechaEnvios')) marcarVencidosEnRojo(); });
+document.addEventListener('change', e => { if(e.target.matches && (e.target.matches('input.inp-venc') || e.target.id === 'fechaCarga' || e.target.id === 'fechaEnvios')) marcarVencidosEnRojo(); });
+let FIJAR_PENDIENTE = false;
+new MutationObserver(() => {
+  if(FIJAR_PENDIENTE) return;
+  FIJAR_PENDIENTE = true;
+  requestAnimationFrame(() => { FIJAR_PENDIENTE = false; try{ fijarTablas(); }catch(e){} try{ marcarVencidosEnRojo(); }catch(e){} });
+}).observe(app, { childList: true, subtree: true });
 
 /* ---------------------------------------------------------------------
    utilidades
