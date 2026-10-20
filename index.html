@@ -166,6 +166,13 @@
   .btn-ahora{background:var(--accent-bg);color:var(--crust-dark);border:1px solid #e8c48f;border-radius:3px;font-size:11.5px;font-weight:700;padding:6px 7px;white-space:nowrap;}
   .btn-ahora:hover{background:#f6dcb4;}
   .btn-ahora:disabled{display:none;}
+  /* vaciar una fila cargada por error y borrar una fecha (20/10/2026) */
+  .fecha-borrable{display:flex;align-items:center;gap:3px;}
+  .btn-borrar-fecha{background:none;border:1px solid var(--line);color:var(--ink-soft);border-radius:3px;font-size:12px;line-height:1;padding:5px 6px;cursor:pointer;}
+  .btn-borrar-fecha:hover{color:var(--alert);border-color:var(--alert);}
+  .btn-borrar-fecha:disabled{display:none;}
+  .btn-vaciar-fila{background:none;border:1px solid var(--line);color:var(--ink-soft);border-radius:3px;font-size:11.5px;padding:4px 7px;cursor:pointer;margin-left:6px;}
+  .btn-vaciar-fila:hover{color:var(--alert);border-color:var(--alert);}
   /* paneles fijos automáticos (encabezado arriba + primera columna) */
   .tabla-fija.auto tbody td:first-child{min-width:0;}
   .tabla-fija table.prod{margin-top:0;}
@@ -2620,7 +2627,7 @@ function filaRegistroExtra(etiqueta, saborKey, aHacerMostrar, etiquetaExtra, emp
     <td>${celdaHora('inp-hora-inicio', g.horaInicio, 'Empezó', dis)}</td>
     <td>${celdaHora('inp-hora-fin', g.horaFin, 'Terminó', dis)}</td>
     <td><select class="inp-responsable-canasta" style="min-width:150px;" ${dis}>${opcionesEmpleadosSeleccion(empleados, g.responsable)}</select></td>
-    <td class="no-print celda-estado" style="white-space:nowrap;"></td>`;
+    <td class="no-print celda-estado" style="white-space:nowrap;">${botonVaciarFila(dis)}</td>`;
   if(guardado){ tr.dataset.guardado = '1'; ponerSello(tr, null); }
   return tr;
 }
@@ -2681,6 +2688,34 @@ function celdaHora(clase, valor, textoBoton, dis){
 function horaActualAR(){
   return new Intl.DateTimeFormat('en-GB', { timeZone: 'America/Argentina/Buenos_Aires', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
 }
+// fecha con ✕ para dejarla vacía (en la tablet el calendario no deja borrar)
+function celdaFechaBorrable(clase, valor, dis){
+  return `<div class="fecha-borrable"><input type="date" class="${clase}" value="${valor || ''}" ${dis}><button type="button" class="btn-borrar-fecha no-print" title="Dejar sin fecha" ${dis}>✕</button></div>`;
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.btn-borrar-fecha');
+  if(!b || b.disabled) return;
+  const inp = b.parentElement.querySelector('input');
+  if(!inp || !inp.value) return;
+  inp.value = '';
+  inp.dispatchEvent(new Event('input', { bubbles: true }));
+  inp.dispatchEvent(new Event('change', { bubbles: true }));
+});
+// vaciar una fila del registro de Producción cargada por error: se borran
+// todos sus datos; si ya estaba guardada, se borra de la planilla al guardar.
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.btn-vaciar-fila');
+  if(!b || b.disabled) return;
+  const tr = b.closest('tr');
+  if(!tr) return;
+  const nombre = tr.cells[0].textContent.trim();
+  if(!confirm(`¿Vaciar la fila de ${nombre}? Se borran todos sus datos${tr.dataset.guardado ? ' (y al guardar se borra de la planilla)' : ''}.`)) return;
+  [...tr.querySelectorAll('input,select')].forEach(el => { el.value = ''; });
+  const el = tr.querySelector('input,select');
+  if(el){ el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }
+  if(!tr.dataset.guardado){ const sello = tr.querySelector('.sello-guardado'); if(sello) sello.remove(); tr.classList.remove('fila-pendiente'); }
+});
+function botonVaciarFila(dis){ return dis ? '' : '<button type="button" class="btn-vaciar-fila no-print" title="Borrar todo lo cargado en esta fila">✕ Vaciar</button>'; }
 // un solo listener para toda la app: cualquier botón Empezó/Terminó
 document.addEventListener('click', (e) => {
   const b = e.target.closest('.btn-ahora');
@@ -2739,16 +2774,16 @@ function filaRegistroProduccion(etiqueta, saborKey, aHacerMostrar, etiquetaExtra
     <td class="num" style="color:var(--ink-soft);">${aHacerMostrar != null ? ent(aHacerMostrar) : '—'}</td>
     <td>${celdaMaquina}</td>
     <td><input type="text" class="inp-maq-vel" style="width:64px;" value="${g.maquinaVelocidad || ''}" ${dis}></td>
-    <td><input type="date" class="inp-disco-lote" value="${/^\d{4}-\d{2}-\d{2}$/.test(g.discosLote || '') ? g.discosLote : ''}" ${dis}></td>
+    <td>${celdaFechaBorrable('inp-disco-lote', /^\d{4}-\d{2}-\d{2}$/.test(g.discosLote || '') ? g.discosLote : '', dis)}</td>
     <td><input type="number" min="0" step="0.01" class="inp-peso-prom" style="width:80px;" value="${g.pesoPromTandaDiscos || ''}" ${dis}></td>
-    <td><input type="date" class="inp-relleno-fecha" value="${g.rellenoFecha || ''}" ${dis}></td>
+    <td>${celdaFechaBorrable('inp-relleno-fecha', g.rellenoFecha, dis)}</td>
     <td><input type="number" min="0" step="0.01" class="inp-peso-inicial" style="width:80px;" value="${g.pesoInicialRelleno || ''}" ${dis}></td>
     <td><input type="number" min="0" step="0.01" class="inp-peso-final" style="width:80px;" value="${g.pesoFinalRelleno || ''}" ${dis}></td>
     <td>${celdaHora('inp-hora-inicio', g.horaInicio, 'Empezó', dis)}</td>
     <td>${celdaHora('inp-hora-fin', g.horaFin, 'Terminó', dis)}</td>
     <td><input type="number" min="0" step="1" class="inp-total-prod" style="width:80px;" value="${g.totalProduccion || ''}" ${dis}></td>
     <td><input type="number" min="0" step="1" class="inp-discos-danados" style="width:64px;" value="${g.discosDanados || ''}" ${dis}></td>
-    <td class="no-print celda-estado" style="white-space:nowrap;"></td>
+    <td class="no-print celda-estado" style="white-space:nowrap;">${botonVaciarFila(dis)}</td>
   `;
   if(yaGuardado){
     tr.dataset.guardado = '1';
@@ -2757,6 +2792,7 @@ function filaRegistroProduccion(etiqueta, saborKey, aHacerMostrar, etiquetaExtra
   return tr;
 }
 
+let REG_PROD_ESTADO = null;
 async function pintarRegistroProduccionSector(){
   const cont = document.getElementById('contenidoRegistro');
   const fecha = document.getElementById('fechaRegistro').value;
@@ -2786,6 +2822,7 @@ async function pintarRegistroProduccionSector(){
   const guardadoPorSabor = {};
   (estado.items || []).forEach(it => { guardadoPorSabor[it.sabor] = it; });
   const bloqueadoGlobal = !!estado.finalizado;
+  REG_PROD_ESTADO = estado;
 
   // sabores normales (Empanadas Horno + Frito) sin las Canastas, que van
   // aparte en su propia sección más abajo.
@@ -2797,12 +2834,19 @@ async function pintarRegistroProduccionSector(){
   (data.produccion || []).forEach(f => { if(f.tipoCalculo === 'Calendario' || f.categoria === 'Canasta') porSabor[f.sabor] = f; });
   const canastaPorSabor = {};
   (prep.canastas || []).forEach(c => { canastaPorSabor[c.sabor] = c; });
+  // SOLO LOS SABORES DE HOY (20/10/2026, Carolina): como en Cocina, se listan
+  // los sabores que hay que armar hoy (o que ya tienen algo guardado hoy). Si
+  // excepcionalmente arman otro, se agrega abajo. Si el cálculo no cargó, van todos.
+  const hayCalculo = !!(data && Array.isArray(data.produccion) && data.produccion.length);
+  const esDeHoy = (n) => !hayCalculo || !!guardadoPorSabor[n] || !!(porSabor[n] && Number(porSabor[n].aHacerUnidades) > 0);
+  // sabor que se arma en máquina (empanada que no es canasta) -> columna Máquina
+  const vaEnMaquina = (n) => { const b = String(n).replace(/\s*\(adicional\)\s*$/i, ''); return todasEmpanadas.indexOf(b) !== -1 && categoriaPorSabor[b] !== 'Canasta'; };
 
   cont.innerHTML = '';
 
   const intro = document.createElement('p');
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
-  intro.textContent = `${data.dia}, ${fmtFecha(data.fecha)} — completá solo los sabores que se armaron este turno. "A producir (calc.)" es de referencia (en Extras de producción es lo que hace falta dejar armado HOY para mañana). Guardá con "Guardado provisorio" las veces que quieras durante el turno (todo queda editable) y al terminar tocá "Guardar y enviar final". Si se elaboró algo que no está en la lista, agregalo en "Producción adicional".`;
+  intro.textContent = `${data.dia}, ${fmtFecha(data.fecha)} — aparecen solo los sabores que hay que armar hoy. Si se armó otro, agregalo abajo con "Agregar un sabor que no estaba para hoy". Si cargaste algo por error, tocá "✕ Vaciar" en esa fila. "A producir (calc.)" es de referencia. Guardá con "Guardado provisorio" las veces que quieras durante el turno y al terminar tocá "Guardar y enviar final".`;
   cont.appendChild(intro);
 
   if(bloqueadoGlobal){
@@ -2837,7 +2881,7 @@ async function pintarRegistroProduccionSector(){
   [['Empanadas Horno', saboresHorno], ['Empanadas Frito', saboresFrito]].forEach(([titulo, lista]) => {
     if(!lista.length) return;
     filaGrupo(titulo);
-    lista.slice().sort(compararTexto).forEach(nombre => {
+    lista.filter(esDeHoy).sort(compararTexto).forEach(nombre => {
       const ref = porSabor[nombre];
       tbody.appendChild(filaRegistroProduccion(nombre, nombre, ref ? ref.aHacerUnidades : null, '', false, EMPLEADOS_REGISTRO, guardadoPorSabor[nombre], bloqueadoGlobal));
     });
@@ -2845,9 +2889,9 @@ async function pintarRegistroProduccionSector(){
 
   // Canastas completas: hoy arman la canasta entera (disco + relleno + el
   // molde que dejaron listo el día anterior). Responsable en vez de Máquina.
-  if(saboresCanasta.length){
+  if(saboresCanasta.filter(esDeHoy).length){
     filaGrupo('Canastas completas');
-    saboresCanasta.slice().sort(compararTexto).forEach(nombre => {
+    saboresCanasta.filter(esDeHoy).sort(compararTexto).forEach(nombre => {
       const ref = porSabor[nombre];
       tbody.appendChild(filaRegistroProduccion(nombre, nombre, ref ? ref.aHacerUnidades : null, '', true, EMPLEADOS_REGISTRO, guardadoPorSabor[nombre], bloqueadoGlobal));
     });
@@ -2868,10 +2912,10 @@ async function pintarRegistroProduccionSector(){
   // Producción adicional: cualquier producto que se elaboró aunque el
   // cálculo del día no lo pidiera (o que no está en las listas de arriba).
   const yaListados = new Set([...tbody.querySelectorAll('tr[data-sabor]')].map(tr => tr.dataset.sabor).concat([NOMBRE_ROLLOS_JYQ, NOMBRE_MOLDE_CANASTA]));
-  filaGrupo('Producción adicional (fuera del cálculo)');
+  filaGrupo('Agregados (no estaban para hoy)');
   const adicionalesGuardados = Object.keys(guardadoPorSabor).filter(k => !yaListados.has(k)).sort(compararTexto);
   adicionalesGuardados.forEach(k => {
-    tbody.appendChild(filaRegistroProduccion(k, k, null, '', true, EMPLEADOS_REGISTRO, guardadoPorSabor[k], bloqueadoGlobal));
+    tbody.appendChild(filaRegistroProduccion(k, k, null, '', !vaEnMaquina(k), EMPLEADOS_REGISTRO, guardadoPorSabor[k], bloqueadoGlobal));
   });
   cont.appendChild(wrap);
   const hExtras = document.createElement('h4');
@@ -2890,7 +2934,7 @@ async function pintarRegistroProduccionSector(){
     const selWrap = document.createElement('div');
     selWrap.className = 'fila-agregar no-print';
     selWrap.innerHTML = `
-      <select id="selAgregarProduccion"><option value="">— Agregar producción adicional: elegí un producto —</option>
+      <select id="selAgregarProduccion"><option value="">— Agregar un sabor que no estaba para hoy —</option>
         ${todos.map(n => `<option value="${n}">${n}</option>`).join('')}</select>
       <button type="button" class="btn secondary" id="btnAgregarProduccion">+ Agregar</button>`;
     cont.appendChild(selWrap);
@@ -2899,8 +2943,8 @@ async function pintarRegistroProduccionSector(){
       if(!n) return;
       const existentes = new Set([...tbody.querySelectorAll('tr[data-sabor]')].map(tr => tr.dataset.sabor));
       const clave = existentes.has(n) ? n + ' (adicional)' : n;
-      if(existentes.has(clave)){ avisar('Ese producto ya está agregado en "Producción adicional".', 'err'); return; }
-      const tr = filaRegistroProduccion(clave, clave, null, '', true, EMPLEADOS_REGISTRO, null, false);
+      if(existentes.has(clave)){ avisar('Ese producto ya está agregado.', 'err'); return; }
+      const tr = filaRegistroProduccion(clave, clave, null, '', !vaEnMaquina(clave), EMPLEADOS_REGISTRO, null, false);
       tbody.appendChild(tr);
       tr.scrollIntoView({ block: 'nearest' });
     };
@@ -3009,6 +3053,18 @@ async function guardarRegistroProduccion(enviar){
       return;
     }
   }
+  // FECHA DE RELLENO SIN COCINA ESE DÍA (20/10/2026, Carolina): avisar si la
+  // fecha cargada no es un día en que Cocina registró ese relleno.
+  const sinCocina = [];
+  const diasCocina = (REG_PROD_ESTADO && REG_PROD_ESTADO.cocinaRelleno) || {};
+  items.forEach(it => {
+    if(!it.rellenoFecha) return;
+    const info = diasCocina[String(it.sabor).replace(/\s*\(adicional\)\s*$/i, '')];
+    if(!info || !info.dias || !info.dias.length || info.dias.indexOf(it.rellenoFecha) !== -1) return;
+    const previos = info.dias.filter(d => d <= fecha).slice(0, 2).map(fmtFecha);
+    sinCocina.push(`• ${it.sabor}: Cocina no registró ${info.relleno} el ${fmtFecha(it.rellenoFecha)}${previos.length ? ` (sí el ${previos.join(' y el ')})` : ''}`);
+  });
+  if(sinCocina.length && !confirm(`OJO — revisá la fecha de relleno:\n\n${sinCocina.join('\n')}\n\n¿Está bien así? "Cancelar" para corregirla.`)) return;
   const horasMal = horasRaras(items);
   if(horasMal.length && !confirm(`OJO — revisá estas horas:\n\n${horasMal.join('\n')}\n\n¿Están bien así? "Cancelar" para corregirlas.`)) return;
   if(raras.length && !confirm(`OJO — estas fechas parecen mal (posteriores al armado del ${fmtFecha(fecha)} o de hace más de 7 días):\n\n${raras.join('\n')}\n\n¿Están bien así? "Cancelar" para corregirlas.`)) return;
