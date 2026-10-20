@@ -166,6 +166,8 @@
   .btn-ahora{background:var(--accent-bg);color:var(--crust-dark);border:1px solid #e8c48f;border-radius:3px;font-size:11.5px;font-weight:700;padding:6px 7px;white-space:nowrap;}
   .btn-ahora:hover{background:#f6dcb4;}
   .btn-ahora:disabled{display:none;}
+  /* sobrante de relleno: diferencia entre Cocina y Producción (20/10/2026) */
+  .aviso-dif{font-size:11px;color:#b26a00;margin-top:2px;white-space:normal;}
   /* vaciar una fila cargada por error y borrar una fecha (20/10/2026) */
   .fecha-borrable{display:flex;align-items:center;gap:3px;}
   .btn-borrar-fecha{background:none;border:1px solid var(--line);color:var(--ink-soft);border-radius:3px;font-size:12px;line-height:1;padding:5px 6px;cursor:pointer;}
@@ -1505,16 +1507,16 @@ function pintarProduccion(data){
 function bloqueRellenoCamara(data){
   const porRelleno = {};
   (data.produccion || []).filter(f => f.tipoCalculo === 'Calendario' && f.aHacerUnidades > 0 && f.kgNecesarios != null).forEach(f => {
-    const r = porRelleno[f.relleno] = porRelleno[f.relleno] || { relleno: f.relleno, sabores: [], kg: 0, lotes: f.rellenoCamara || [], mismoDia: f.diaCocina === f.diaArmado };
+    const r = porRelleno[f.relleno] = porRelleno[f.relleno] || { relleno: f.relleno, sabores: [], kg: 0, lotes: f.rellenoCamara || [], mismoDia: f.diaCocina === f.diaArmado, conteo: f.conteoCocina };
     r.sabores.push(f.sabor); r.kg += f.kgNecesarios || 0;
   });
   const lista = Object.values(porRelleno).sort((a, b) => compararTexto(a.relleno, b.relleno));
   if(!lista.length) return '';
   const fila = r => {
     const vigentes = r.lotes.filter(l => !l.vencido).reduce((a, l) => a + l.kg, 0);
-    const lotes = r.lotes.length ? r.lotes.map((l, i) => `<span class="${l.vencido ? 'mal-txt' : ''}">${i === 0 ? '<strong>1º</strong> ' : ''}${dec(l.kg)} kg · vence ${fmtFecha(l.vence).slice(0, 5)}${l.vencido ? ' (vencido)' : ''}</span>`).join('<br>') : '<span class="gris-txt">sin carga de Cocina</span>';
+    const lotes = r.lotes.length ? r.lotes.map((l, i) => `<span class="${l.vencido ? 'mal-txt' : ''}">${i === 0 ? '<strong>1º</strong> ' : ''}${dec(l.kg)} kg · vence ${fmtFecha(l.vence).slice(0, 5)}${l.vencido ? ' (vencido)' : ''}</span>`).join('<br>') : (r.conteo ? `<span class="gris-txt">nada en cámara (stock de Cocina del ${fmtFecha(r.conteo).slice(0, 5)})</span>` : '<span class="mal-txt">Cocina no cargó stock</span>');
     let estado;
-    if(r.mismoDia) estado = '<span class="gris-txt">se cocina hoy</span>';
+    if(r.mismoDia) estado = r.lotes.some(l => !l.vencido) ? '<span class="gris-txt">usar primero lo de cámara · el resto se cocina hoy</span>' : '<span class="gris-txt">se cocina hoy</span>';
     else if(!r.lotes.length) estado = '<span class="gris-txt">—</span>';
     else if(vigentes + 0.05 >= r.kg) estado = '<span class="ok-txt">✓ alcanza</span>';
     else estado = `<span class="mal-txt">faltan ${dec(r.kg - vigentes)} kg</span>`;
@@ -1607,7 +1609,7 @@ function pintarCocina(data){
           </tr>`).join('')}
       </tbody>
     </table>
-    <p style="color:var(--ink-soft);font-size:11.5px;margin:4px 0 0;">Sobrante: el relleno que quedó del último armado (peso final que carga Producción, comparado con lo que contó Cocina en su stock: se descuenta el menor). Si Producción no cargó el peso final, no se descuenta nada.</p>
+    <p style="color:var(--ink-soft);font-size:11.5px;margin:4px 0 0;">Sobrante: el relleno que quedó del último armado. Se compara el peso final que anotó Producción con lo que contó Cocina en su última carga de stock (si el relleno no figura en el conteo, es 0) y se descuenta el menor. Si no coinciden, se muestra la diferencia para revisar. Si Producción no cargó el peso final, no se descuenta nada.</p>
     <div id="gramajeOllasRellenos"></div>`;
 
   cont.className = '';
@@ -1696,12 +1698,18 @@ async function guardarPctCocina(fecha){
 }
 
 function celdaSobrante(sob){
-  if(!sob || (sob.kgProduccion == null && sob.kgCocina == null)) return '<span class="gris-txt">—</span>';
-  const det = `Producción: ${sob.kgProduccion == null ? 'sin registro' : dec(sob.kgProduccion) + ' kg'}${sob.fecha ? ' (armado del ' + fmtFecha(sob.fecha).slice(0, 5) + ')' : ''} · Cocina contó: ${sob.kgCocina == null ? 'sin carga' : dec(sob.kgCocina) + ' kg'}${sob.vence ? ' · vence ' + fmtFecha(sob.vence).slice(0, 5) : ''}`;
-  if(sob.vencido) return `<span class="gris-txt" title="${det}">vencido</span>`;
-  if(sob.sinDato) return `<span class="mal-txt" title="${det}">falta peso final</span>`;
-  if(!sob.kgDescontado) return `<span class="gris-txt" title="${det}">0</span>`;
-  return `<span class="ok-txt" title="${det}">−${dec(sob.kgDescontado)} kg</span>`;
+  // 20/10/2026 (Carolina): manda lo que contó Cocina en su stock; lo de
+  // Producción (peso final) se muestra solo si no coincide.
+  if(!sob) return '<span class="gris-txt">—</span>';
+  const det = `Cocina contó: ${sob.kgCocina == null ? 'sin conteo' : dec(sob.kgCocina) + ' kg'}${sob.fechaConteoCocina ? ' (stock del ' + fmtFecha(sob.fechaConteoCocina).slice(0, 5) + ')' : ''} · Producción anotó: ${sob.kgProduccion == null ? 'sin registro' : (sob.sinDato ? 'falta peso final' : dec(sob.kgProduccion) + ' kg')}${sob.fecha ? ' (armado del ' + fmtFecha(sob.fecha).slice(0, 5) + ')' : ''}`;
+  let txt;
+  if(sob.vencido) txt = `<span class="gris-txt" title="${det}">vencido</span>`;
+  else if(sob.sinDato && sob.kgProduccion != null) txt = `<span class="mal-txt" title="${det}">falta peso final</span>`;
+  else if(!sob.kgDescontado) txt = `<span class="gris-txt" title="${det}">0</span>`;
+  else txt = `<span class="ok-txt" title="${det}">−${dec(sob.kgDescontado)} kg</span>`;
+  if(sob.sinConteoCocina) txt += `<div class="aviso-dif" title="${det}">Cocina no cargó stock</div>`;
+  if(sob.diferencia != null) txt += `<div class="aviso-dif" title="${det}">Producción anotó ${dec(sob.kgProduccion)} kg el ${fmtFecha(sob.fecha).slice(0, 5)} (dif. ${sob.diferencia > 0 ? '+' : ''}${dec(sob.diferencia)} kg)</div>`;
+  return txt;
 }
 
 // MATERIA PRIMA DEL DÍA (16/10/2026): lo que hace falta de cada ingrediente
