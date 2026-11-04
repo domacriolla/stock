@@ -368,6 +368,34 @@
     body.print-envio .wrap{display:none !important;}
     body.print-envio #printAreaEnvio{display:block;}
   }
+  /* URGENTE PARA EL ENVÍO DE HOY (04/11/2026) */
+  .urg-card{background:#fff;border:2px solid var(--accent);border-radius:10px;padding:12px 14px;margin:6px 0 18px;}
+  .urg-card h3{font-size:16px;margin:0 0 4px;color:var(--crust-dark);}
+  .urg-estado{background:var(--herb-bg);color:var(--herb);border-radius:8px;padding:6px 10px;font-size:12.5px;margin:6px 0 8px;}
+  .urg-estado .no{color:var(--alert);font-weight:700;}
+  .urg-nota{color:var(--ink-soft);font-size:12.5px;margin:2px 0 8px;}
+  .urg-paso{display:flex;gap:8px;align-items:center;margin:14px 0 4px;}
+  .urg-paso h4{font-size:14px;margin:0;color:var(--crust);}
+  .urg-num{background:var(--crust);color:#fff;border-radius:50%;min-width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;}
+  table.urg{width:100%;border-collapse:collapse;}
+  table.urg th{background:var(--accent-bg);text-align:left;padding:5px 8px;font-size:12.5px;border-bottom:1px solid var(--line);}
+  table.urg td{padding:5px 8px;border-bottom:1px solid var(--line);font-size:13.5px;}
+  table.urg td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;}
+  table.urg tr.fuera td{background:#FFF3D6;}
+  .urg-b{font-size:11px;font-weight:700;border-radius:5px;padding:1px 6px;white-space:nowrap;}
+  .urg-b.fuera{background:var(--alert-bg);color:var(--alert);}
+  .urg-b.plan{background:var(--herb-bg);color:var(--herb);}
+  .urg-hecho{color:var(--herb);font-size:11.5px;font-weight:600;white-space:nowrap;}
+  .urg-resto{margin-top:12px;padding:7px 10px;border:1px dashed var(--line);border-radius:8px;color:var(--ink-soft);font-size:12.5px;}
+  .badge-urg{font-size:10.5px;font-weight:700;border-radius:5px;padding:1px 6px;background:var(--alert-bg);color:var(--alert);margin-left:6px;white-space:nowrap;}
+  .kg-hacer{display:inline-flex;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--crust-dark);background:var(--accent-bg);border-radius:6px;padding:3px 8px;}
+  .kg-hacer input{width:90px;}
+  .envio-plegado{border:1px solid var(--line);border-radius:8px;margin:0 0 12px;background:#fff;}
+  .envio-plegado > summary{cursor:pointer;padding:9px 12px;font-weight:600;color:var(--crust-dark);}
+  .envio-plegado > .panel-envio-local{padding:0 12px 10px;}
+  .titulo-envio{font-size:16px;margin:4px 0 6px;color:var(--crust-dark);}
+  .disp-fab{font-size:11px;color:var(--ink-soft);}
+  .panel-envio-local.solo-faltan tr[data-item].sin-falta, .panel-envio-local.solo-faltan .cat-vacia{display:none;}
 </style>
 </head>
 <body>
@@ -805,7 +833,7 @@ function renderHome(){
 // cargó y lo que falta, de ayer y de hoy. Verde = hecho; amarillo = todavía
 // está a tiempo; rojo = ya debería estar; gris = ese día no corresponde.
 // Hora límite (Argentina) a partir de la cual HOY pasa a rojo:
-const HORA_LIMITE_REGISTRO = { 'Plan del día': 8, 'Cocina': 15, 'Producción': 15, 'Discos': 15, 'Stock Producción': 16, 'Stock Cocina': 16, 'Stock Discos': 16, 'Envío': 15, 'Recepción': 19 };
+const HORA_LIMITE_REGISTRO = { 'Plan del día': 8, 'Cocina': 15, 'Postres': 15, 'Producción': 15, 'Discos': 15, 'Stock Producción': 16, 'Stock Cocina': 16, 'Stock Discos': 16, 'Envío': 15, 'Recepción': 19 };
 async function pintarControlRegistros(){
   const cont = document.getElementById('controlRegistros');
   if(!cont) return;
@@ -1224,6 +1252,7 @@ async function renderFabrica(){
     <div class="tabs" id="tabsFabrica" style="display:none;">
       <button class="tab-btn active" data-tab="produccion">Producción</button>
       <button class="tab-btn" data-tab="cocina">Cocina</button>
+      <button class="tab-btn" data-tab="postres">Postres</button>
       <button class="tab-btn" data-tab="discos">Discos</button>
       <button class="btn secondary" id="btnImprimir" style="margin-left:auto;" onclick="window.print()">🖶 Imprimir</button>
     </div>
@@ -1253,6 +1282,7 @@ async function cargarCalculo(){
     const prep = await rPrep.json();
     ULTIMO_CALCULO = data;
     PREP_ACTUAL = prep.error ? null : prep;
+    URGENTES_MEMO = null; // se vuelve a pedir con los datos nuevos
     document.getElementById('tabsFabrica').style.display = 'flex';
     pintarBarraPlan('barraPlanFabrica', fecha, data.plan, cargarCalculo, data.proyeccion);
     [...document.querySelectorAll('.tab-btn')].forEach(b => {
@@ -1273,6 +1303,7 @@ function marcarTabActiva(){
 function pintarTabActiva(){
   if(TAB_ACTIVA === 'produccion') pintarProduccion(ULTIMO_CALCULO);
   if(TAB_ACTIVA === 'cocina') pintarCocina(ULTIMO_CALCULO);
+  if(TAB_ACTIVA === 'postres') pintarPostres(ULTIMO_CALCULO);
   if(TAB_ACTIVA === 'discos') pintarDiscos(ULTIMO_CALCULO);
 }
 
@@ -1432,6 +1463,86 @@ function bloquePrepDiaAnterior(){
 }
 
 /* ---- Pestaña PRODUCCIÓN: qué armar hoy, por sabor (todos los rubros) ---- */
+// ---------------------------------------------------------------------
+// URGENTE PARA EL ENVÍO DE HOY (04/11/2026, Carolina): con el stock que
+// cargaron los locales, lo que piden hoy − empanadas armadas en fábrica −
+// relleno en cámara. Se muestra arriba de Cocina y de Producción (Qué
+// producir hoy) y lo "fuera de plan" aparece solo en Registrar producción.
+// ---------------------------------------------------------------------
+let URGENTES_MEMO = null;
+function obtenerUrgentes(fecha){
+  if(URGENTES_MEMO && URGENTES_MEMO.fecha === fecha) return URGENTES_MEMO.promesa;
+  const promesa = fetch(`${APPS_SCRIPT_URL}?action=calcularUrgentes&fecha=${encodeURIComponent(fecha)}`)
+    .then(r => r.json()).then(d => { if(d.error) throw new Error(d.error); return d; });
+  promesa.catch(() => { if(URGENTES_MEMO && URGENTES_MEMO.promesa === promesa) URGENTES_MEMO = null; });
+  URGENTES_MEMO = { fecha, promesa };
+  return promesa;
+}
+const NOMBRE_LOCAL_VISTA = { Zelarrayan: 'Zelarrayán' };
+function htmlEstadoCargasUrgentes(u){
+  const partes = (u.cargas || []).map(c => {
+    const n = NOMBRE_LOCAL_VISTA[c.local] || c.local;
+    if(c.cargo) return `${n} ✓${c.hora ? ' ' + c.hora : ' (sin enviar)'}`;
+    if(c.despuesDelPlan) return `<span class="no">${n} cargó después de confirmar el plan → tocá "Recalcular" arriba</span>`;
+    return `<span class="no">${n} sin cargar → se toma 0</span>`;
+  });
+  return `<div class="urg-estado">Calculado con el stock que cargaron los locales: ${partes.join(' · ')}</div>`;
+}
+const badgePlanUrg = plan => plan ? '<span class="urg-b plan">PLAN DE HOY</span>' : '<span class="urg-b fuera">FUERA DE PLAN</span>';
+function htmlUrgentesCocina(u){
+  const filas = u.cocina || [];
+  const titulo = `<h3>Urgente para el envío de hoy — ${String(u.dia || '').toLowerCase()} ${fmtFecha(u.fecha).slice(0, 5)}</h3>`;
+  if(!filas.length) return `<div class="urg-card">${titulo}${htmlEstadoCargasUrgentes(u)}<div class="urg-nota">No hace falta ningún relleno urgente: con lo armado en fábrica y lo que hay en cámara alcanza para lo que piden hoy los locales. Seguí con la planificación habitual.</div></div>`;
+  const tabla = lista => `<table class="urg"><thead><tr><th>Relleno</th><th style="text-align:right;">Kg</th><th>Para</th><th></th></tr></thead><tbody>${lista.map(c => `
+    <tr class="${c.plan ? '' : 'fuera'}">
+      <td><strong>${c.relleno}</strong>${c.kgCamara > 0 ? `<div style="font-size:11.5px;color:var(--ink-soft);">ya descontado lo de cámara (${dec(c.kgCamara)} kg)</div>` : ''}</td>
+      <td class="num">${dec(c.kg)}</td>
+      <td style="font-size:12.5px;">${c.sabores.map(x => `${x.sabor} ${ent(x.unidades)}`).join(' · ')}</td>
+      <td>${badgePlanUrg(c.plan)}${c.hecha ? ' <span class="urg-hecho">✓ enviada</span>' : ''}</td>
+    </tr>`).join('')}</tbody></table>`;
+  const p1 = filas.filter(c => c.paso === 1), p2 = filas.filter(c => c.paso === 2);
+  return `<div class="urg-card">${titulo}${htmlEstadoCargasUrgentes(u)}
+    <div class="urg-nota">Lo que piden hoy los locales − empanadas armadas en fábrica − relleno en cámara. <strong>Verde</strong> = ya está dentro de la planificación de hoy (no se suma). <strong>Amarillo = fuera de plan</strong>: es extra y ya aparece solo en Registrar producción → Cocina.</div>
+    ${p1.length ? `<div class="urg-paso"><div class="urg-num">1</div><h4>Primera hora — rellenos que hay que enfriar (hacerlos primero)</h4></div>${tabla(p1)}` : ''}
+    ${p2.length ? `<div class="urg-paso"><div class="urg-num">${p1.length ? 2 : 1}</div><h4>Después — rellenos que no se enfrían (se arman enseguida)</h4></div>${tabla(p2)}` : ''}
+    <div class="urg-resto"><strong>Después</strong>, el resto del día con la planificación habitual (abajo).</div></div>`;
+}
+function htmlUrgentesProduccion(u){
+  const filas = u.produccion || [];
+  const titulo = `<h3>Urgente para el envío de hoy — ${String(u.dia || '').toLowerCase()} ${fmtFecha(u.fecha).slice(0, 5)}</h3>`;
+  const franco = u.francoProduccion ? `<div class="urg-nota" style="color:var(--alert);font-weight:600;">Hoy es franco de Producción.</div>` : '';
+  if(!filas.length) return `<div class="urg-card">${titulo}${htmlEstadoCargasUrgentes(u)}${franco}<div class="urg-nota">No hay empanadas urgentes: lo armado en fábrica alcanza para lo que piden hoy los locales. Seguí con la planificación habitual.</div></div>`;
+  const tabla = lista => `<table class="urg"><thead><tr><th>Sabor</th><th style="text-align:right;">Armar</th><th>Relleno</th><th></th></tr></thead><tbody>${lista.map(p => `
+    <tr class="${p.plan ? '' : 'fuera'}">
+      <td><strong>${p.sabor}</strong></td>
+      <td class="num">${ent(p.unidades)}</td>
+      <td style="font-size:12.5px;">${p.detalle || p.relleno || ''}</td>
+      <td>${badgePlanUrg(p.plan)}${p.armadasHoy > 0 ? ` <span class="urg-hecho">✓ ${ent(p.armadasHoy)} armadas hoy</span>` : ''}</td>
+    </tr>`).join('')}</tbody></table>`;
+  const titulos = { 1: 'Arrancar — relleno frío que ya está en cámara / rollos armados', 2: 'A medida que Cocina termina los rellenos que no se enfrían', 3: 'Al final — cuando estén fríos los rellenos calientes' };
+  let n = 0;
+  const pasos = [1, 2, 3].map(k => { const l = filas.filter(p => p.paso === k); if(!l.length) return ''; n++; return `<div class="urg-paso"><div class="urg-num">${n}</div><h4>${titulos[k]}</h4></div>${tabla(l)}`; }).join('');
+  return `<div class="urg-card">${titulo}${htmlEstadoCargasUrgentes(u)}${franco}
+    <div class="urg-nota">Empanadas que tienen que estar armadas antes del reparto, en el orden de la máquina. <strong>Amarillo = fuera de plan</strong> (no se arma hoy en la planificación): ya aparece solo en Registrar producción.</div>
+    ${pasos}
+    <div class="urg-resto"><strong>Después</strong>, el resto de la tanda con la planificación habitual (abajo). Lo verde ya está incluido ahí.</div></div>`;
+}
+async function pintarUrgentes(sector, fecha){
+  const id = sector === 'cocina' ? 'urgentesCocina' : 'urgentesProduccion';
+  const cont = document.getElementById(id);
+  if(!cont) return;
+  cont.innerHTML = '<p class="loading" style="font-size:12.5px;">Calculando lo urgente para el envío de hoy…</p>';
+  try{
+    const u = await obtenerUrgentes(fecha);
+    const c = document.getElementById(id);
+    if(!c) return;
+    c.innerHTML = sector === 'cocina' ? htmlUrgentesCocina(u) : htmlUrgentesProduccion(u);
+  }catch(err){
+    const c = document.getElementById(id);
+    if(c) c.innerHTML = `<p style="color:var(--ink-soft);font-size:12px;">No se pudo calcular lo urgente: ${err.message}</p>`;
+  }
+}
+
 function pintarProduccion(data){
   const cont = document.getElementById('contenidoFabrica');
   // Dips y Postres los elabora Cocina (no Producción) — se muestran en la
@@ -1442,7 +1553,8 @@ function pintarProduccion(data){
   // bloque "para mañana" se muestra en la pestaña Cocina
   const prepHtml = data.dia === DIA_FRANCO_PRODUCCION ? '' : bloquePrepDiaAnterior();
 
-  const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Producción</h2>`;
+  const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Producción</h2><div id="urgentesProduccion"></div>`;
+  setTimeout(() => pintarUrgentes('produccion', data.fecha), 0);
 
   if(filas.length === 0){
     cont.className = '';
@@ -1540,12 +1652,9 @@ function celdasStock(f){
   if(f.stockFabricaUnidades === undefined) return `<td class="num">${ent(f.stockValidoUnidades)}</td><td class="num" style="color:var(--ink-soft);">—</td>`;
   return `<td class="num">${ent(f.stockFabricaUnidades)}</td><td class="num">${ent(f.stockLocalesUnidades)}</td>`;
 }
-function pintarCocina(data){
-  const cont = document.getElementById('contenidoFabrica');
-  const filasRelleno = data.cocina.filter(f => f.kilosDeRelleno > 0);
-  const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Cocina</h2>`;
-
-  const tablaSimple = (rubro, titulo) => {
+// tabla de un rubro simple (Dips, Postres, Salsas) para Cocina / Postres
+function tablaSimpleCocina(data, rubro, titulo){
+  {
     // 'Salsas' = productos en litros (SALSA FILETTO), que en la planilla son Toppings
     const items = (data.produccion || []).filter(f => f.aHacerUnidades > 0 && (rubro === 'Salsas' ? esDecimal(f.sabor) : (f.rubro === rubro && !esDecimal(f.sabor))));
     if(items.length === 0) return '';
@@ -1577,9 +1686,30 @@ function pintarCocina(data){
             </tr>`).join('')}
         </tbody>
       </table>`;
-  };
+  }
+}
+
+// POSTRES (04/11/2026, Carolina): pestaña aparte de Cocina, con su propia
+// materia prima. Los hace alguien de Cocina o de Producción.
+function pintarPostres(data){
+  const cont = document.getElementById('contenidoFabrica');
+  const tabla = tablaSimpleCocina(data, 'Postres', 'Postres');
+  cont.className = '';
+  cont.innerHTML = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Postres</h2>
+    <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)}</p>
+    ${tabla || `<div class="empty">No hay postres para hacer el ${data.dia.toLowerCase()} — el stock alcanza.</div>`}
+    <div id="materiaPrimaPostres"></div>`;
+  if(tabla) cargarMateriaPrima(data.fecha, 'Postres');
+}
+
+function pintarCocina(data){
+  const cont = document.getElementById('contenidoFabrica');
+  const filasRelleno = data.cocina.filter(f => f.kilosDeRelleno > 0);
+  const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Cocina</h2><div id="urgentesCocina"></div>`;
+  setTimeout(() => pintarUrgentes('cocina', data.fecha), 0);
+  const tablaSimple = (rubro, titulo) => tablaSimpleCocina(data, rubro, titulo);
   const bloqueDips = tablaSimple('Dips', 'Dips');
-  const bloquePostres = tablaSimple('Postres', 'Postres') + tablaSimple('Salsas', 'Salsas');
+  const bloquePostres = tablaSimple('Salsas', 'Salsas'); // los postres van en su propia pestaña
 
   const prepLunes = data.dia === DIA_FRANCO_PRODUCCION ? bloquePrepDiaAnterior() : '';
   if(filasRelleno.length === 0 && !bloqueDips && !bloquePostres){
@@ -1627,7 +1757,7 @@ function pintarCocina(data){
     ${bloquePostres}
     <div id="materiaPrimaCocina"></div>
   `;
-  cargarMateriaPrima(data.fecha);
+  cargarMateriaPrima(data.fecha, 'Cocina');
 
   if(filasRelleno.length > 0){
     pintarControlPctCocina(data.fecha, data.porcentajeCocina);
@@ -1714,19 +1844,20 @@ function celdaSobrante(sob){
 
 // MATERIA PRIMA DEL DÍA (16/10/2026): lo que hace falta de cada ingrediente
 // para todo lo que elabora Cocina hoy, según las fichas técnicas.
-async function cargarMateriaPrima(fecha){
-  const cont = document.getElementById('materiaPrimaCocina');
+async function cargarMateriaPrima(fecha, sector){
+  const idCont = sector === 'Postres' ? 'materiaPrimaPostres' : 'materiaPrimaCocina';
+  const cont = document.getElementById(idCont);
   if(!cont) return;
   try{
-    const r = await fetch(`${APPS_SCRIPT_URL}?action=calcularMateriaPrimaDia&fecha=${encodeURIComponent(fecha)}`);
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=calcularMateriaPrimaDia&fecha=${encodeURIComponent(fecha)}&sector=${encodeURIComponent(sector || 'Cocina')}`);
     const d = await r.json();
     if(d.error) throw new Error(d.error);
-    if(!document.getElementById('materiaPrimaCocina')) return;
+    if(!document.getElementById(idCont)) return;
     if(!(d.totales || []).length){ cont.innerHTML = ''; return; }
     const cant = (x, u) => `${cantIng(x)} ${u}`;
     cont.innerHTML = `
       <h3 style="font-size:15px;margin:24px 0 4px;">Materia prima del día (según fichas técnicas)</h3>
-      <p style="color:var(--ink-soft);font-size:12px;margin:0 0 6px;">Total de cada ingrediente para todo lo que se elabora hoy (rellenos, preparados, dips y postres), ya con el % y el sobrante descontado.</p>
+      <p style="color:var(--ink-soft);font-size:12px;margin:0 0 6px;">${sector === 'Postres' ? 'Total de cada ingrediente para los postres de hoy.' : 'Total de cada ingrediente para todo lo que elabora Cocina hoy (rellenos, preparados, dips y salsa), ya con el % y el sobrante descontado. Los postres están en su pestaña.'}</p>
       ${(d.avisos || []).length ? `<div class="msg err" style="display:block;">${d.avisos.join('<br>')}</div>` : ''}
       <table class="prod">
         <thead><tr><th>Ingrediente</th><th class="num">Cantidad</th><th>Se usa en</th></tr></thead>
@@ -1897,6 +2028,7 @@ async function renderRegistroProduccion(){
     <div class="tabs" id="tabsRegistro">
       <button class="tab-btn active" data-sector="produccion">Producción</button>
       <button class="tab-btn" data-sector="cocina">Cocina</button>
+      <button class="tab-btn" data-sector="postres">Postres</button>
       <button class="tab-btn" data-sector="discos">Discos</button>
       <button class="btn secondary" id="btnImprimirRegistro" style="margin-left:auto;" onclick="window.print()">🖶 Imprimir</button>
     </div>
@@ -1938,6 +2070,7 @@ async function cargarRegistroProduccion(){
     const prep = await rPrep.json();
     CALCULO_REGISTRO = data;
     PREP_REGISTRO = prep.error ? { rollosJyQ: 0, canastas: [] } : prep;
+    URGENTES_MEMO = null;
     CATEGORIAS_REGISTRO = categorias;
     CATEGORIA_POR_SABOR_REGISTRO = categoriaPorSabor;
     EMPLEADOS_REGISTRO = empleados;
@@ -1955,7 +2088,7 @@ function pintarSectorRegistro(sector){
     pintarRegistroProduccionSector();
     return;
   }
-  if(sector === 'cocina'){
+  if(sector === 'cocina' || sector === 'postres'){
     pintarRegistroCocinaSector();
     return;
   }
@@ -1980,19 +2113,34 @@ function pintarSectorRegistro(sector){
 async function pintarRegistroCocinaSector(){
   const cont = document.getElementById('contenidoRegistro');
   cont.innerHTML = `<p class="loading">Buscando fichas técnicas…</p>`;
+  // POSTRES (04/11/2026): misma calculadora de recetas, pero en su propia
+  // pestaña — solo postres. La pestaña Cocina ya no muestra postres.
+  const modo = SECTOR_REGISTRO_ACTIVO === 'postres' ? 'postres' : 'cocina';
 
   const fecha = document.getElementById('fechaRegistro').value;
-  const cocina = (CALCULO_REGISTRO.cocina || []).filter(f => f.kilosDeRelleno > 0);
-  const dipsPostres = (CALCULO_REGISTRO.produccion || []).filter(f => f.aHacerUnidades > 0 && (f.rubro === 'Dips' || f.rubro === 'Postres'));
+  const cocina = modo === 'postres' ? [] : (CALCULO_REGISTRO.cocina || []).filter(f => f.kilosDeRelleno > 0).map(f => Object.assign({}, f));
+  const dipsPostres = (CALCULO_REGISTRO.produccion || []).filter(f => f.aHacerUnidades > 0 && (modo === 'postres' ? f.rubro === 'Postres' : f.rubro === 'Dips'));
 
-  const [recetas, ollasResp, trazaResp, finalResp, empleadosCocina] = await Promise.all([
+  const [recetas, ollasResp, trazaResp, finalResp, empleadosCocina, urgResp] = await Promise.all([
     obtenerRecetas(),
-    fetch(`${APPS_SCRIPT_URL}?action=calcularOllas&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({})),
+    modo === 'postres' ? Promise.resolve({}) : fetch(`${APPS_SCRIPT_URL}?action=calcularOllas&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({})),
     fetch(`${APPS_SCRIPT_URL}?action=listarTrazabilidadCocinaDia&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({})),
     fetch(`${APPS_SCRIPT_URL}?action=listarRecetasFinalizadas&fecha=${encodeURIComponent(fecha)}`).then(r => r.json()).catch(() => ({})),
-    obtenerEmpleados().catch(() => [])
+    obtenerEmpleados().catch(() => []),
+    modo === 'postres' ? Promise.resolve(null) : obtenerUrgentes(fecha).catch(() => null)
   ]);
+  if((SECTOR_REGISTRO_ACTIVO === 'postres' ? 'postres' : 'cocina') !== modo) return; // cambió de pestaña mientras cargaba
   const ollasData = (ollasResp && !ollasResp.error) ? ollasResp : { preparados: [], rellenos: [] };
+  // URGENTE FUERA DE PLAN (04/11/2026): los rellenos urgentes para el envío de
+  // hoy que no están en el plan de Cocina aparecen solos, con los kg puestos.
+  // Si el relleno ya se cocina hoy (para mañana), se suman a ese bloque.
+  const urgentesFuera = ((urgResp && urgResp.cocina) || []).filter(c => !c.plan && c.kg > 0);
+  const urgentesAparte = [];
+  urgentesFuera.forEach(u => {
+    const enPlan = cocina.find(f => normalizarFicha(f.relleno) === normalizarFicha(u.relleno));
+    if(enPlan){ enPlan.kgUrgente = u.kg; enPlan.kilosDeRelleno = Math.round((enPlan.kilosDeRelleno + u.kg) * 100) / 100; }
+    else urgentesAparte.push(u);
+  });
 
   // lo ya guardado hoy por ingrediente (para repintar los inputs con el
   // valor real cargado, en vez de arrancar en blanco cada vez que se entra o
@@ -2023,9 +2171,9 @@ async function pintarRegistroCocinaSector(){
   cont.innerHTML = '';
   const intro = document.createElement('p');
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
-  intro.textContent = `${CALCULO_REGISTRO.dia}, ${fmtFecha(fecha)} — cargá el bruto real de cada insumo (y el rinde real cuando aplique) sobre el TOTAL de hoy; si no cargás nada, se toma el valor de la ficha.`;
+  intro.textContent = `${CALCULO_REGISTRO.dia}, ${fmtFecha(fecha)} — ${modo === 'postres' ? 'POSTRES: ' : ''}cargá el bruto real de cada insumo (y el rinde real cuando aplique) sobre el TOTAL de hoy; si no cargás nada, se toma el valor de la ficha.`;
   cont.appendChild(intro);
-  if(CALCULO_REGISTRO.dia === DIA_FRANCO_PRODUCCION) await bloqueMoldeLunesCocina(cont, fecha, empleadosCocina);
+  if(modo === 'cocina' && CALCULO_REGISTRO.dia === DIA_FRANCO_PRODUCCION) await bloqueMoldeLunesCocina(cont, fecha, empleadosCocina);
 
   if((ollasData.preparados || []).length){
     const hPrep = document.createElement('h4');
@@ -2060,7 +2208,10 @@ async function pintarRegistroCocinaSector(){
   // registro (Bruto real / Rinde real) es siempre sobre ese total, nunca por
   // olla. unidadHoy es 'KG' para Rellenos/Preparados y 'UN' para Dips/Postres
   // (que se miden en unidades, no en kilos).
-  function bloqueRegistroReceta(nombreReceta, cantidadHoy, unidadHoy, subtitulo, infoOllasHtml, destino){
+  // opciones.editable (04/11/2026): receta fuera del plan — arriba se pone
+  // cuántos kg (o unidades) se van a hacer y la ficha se escala a eso.
+  function bloqueRegistroReceta(nombreReceta, cantidadHoy, unidadHoy, subtitulo, infoOllasHtml, destino, opciones){
+    const op = opciones || {};
     const dest = destino || cont;
     const ingredientesReceta = recetas.detalle.filter(d => normalizarFicha(d.Receta) === normalizarFicha(nombreReceta));
     if(ingredientesReceta.length === 0) return false;
@@ -2078,7 +2229,9 @@ async function pintarRegistroCocinaSector(){
     const h = document.createElement('h4');
     h.className = 'cat-heading receta-heading';
     h.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;';
-    h.innerHTML = `
+    h.innerHTML = op.editable ? `
+      <span>${nombreReceta}${subtitulo || ''} <span class="kg-hacer no-print">¿${unidadHoy === 'UN' ? 'Cuántas unidades' : 'Cuántos kg'} vas a hacer? <input type="number" min="0" step="${unidadHoy === 'UN' ? '1' : '0.1'}" class="inp-cant-hacer" value="${Math.round(cantidadHoy * 100) / 100}" ${finalizada ? 'disabled' : ''}> ${unidadTxt}</span>${rinde > 0 ? `<span style="font-size:11.5px;font-weight:400;color:var(--ink-soft);margin-left:6px;">(1 receta de ficha = ${cantIng(rinde)} ${unidadTxt})</span>` : ''}</span>`
+      : `
       <span>${nombreReceta} — ${cantIng(cantidadHoy)} ${unidadTxt} ${subtitulo === ' — adicional' ? '(1 receta de ficha)' : 'calculados hoy'}${subtitulo || ''}</span>
       <span class="no-print">${finalizada
         ? `<span style="color:#2a7a4a;font-size:12.5px;font-weight:600;margin-right:6px;">✓ Enviada</span><button type="button" class="btn secondary btn-reabrir-receta" style="font-size:12px;padding:5px 9px;">Reabrir</button>`
@@ -2121,11 +2274,14 @@ async function pintarRegistroCocinaSector(){
       const tr = document.createElement('tr');
       tr.dataset.relleno = nombreReceta;
       tr.dataset.ingrediente = ing.Ingrediente;
+      tr.dataset.cantFicha = Number(ing.Cantidad) || 0;
+      if(tieneRinde) tr.dataset.rindeFicha = Number(ing.Rinde) || 0;
+      tr.dataset.medida = ing.Medida || '';
       tr.innerHTML = `
         <td>${ing.Ingrediente}</td>
-        <td class="num" style="color:var(--ink-soft);">${cantIng(cantidadHoyIng)} ${ing.Medida || ''}</td>
+        <td class="num celda-bruto-ficha" style="color:var(--ink-soft);">${cantIng(cantidadHoyIng)} ${ing.Medida || ''}</td>
         <td><input type="number" min="0" step="0.01" class="inp-bruto-real" style="width:90px;" placeholder="${cantIng(cantidadHoyIng)}" value="${valorBruto}" ${dis}></td>
-        <td class="num" style="color:var(--ink-soft);">${tieneRinde ? `${cantIng(rindeHoyIng)} ${ing.Medida || ''}` : `<span style="font-size:11px;">sin control de rinde</span>`}</td>
+        <td class="num celda-rinde-ficha" style="color:var(--ink-soft);">${tieneRinde ? `${cantIng(rindeHoyIng)} ${ing.Medida || ''}` : `<span style="font-size:11px;">sin control de rinde</span>`}</td>
         <td>${tieneRinde ? `<input type="number" min="0" step="0.01" class="inp-rinde-real" style="width:90px;" placeholder="${cantIng(rindeHoyIng)}" value="${valorRinde}" ${dis}>` : ''}</td>
         <td class="no-print celda-estado" style="white-space:nowrap;"></td>
       `;
@@ -2134,6 +2290,22 @@ async function pintarRegistroCocinaSector(){
     });
     wrap.appendChild(table);
     bloque.appendChild(wrap);
+    // cambiar los kg a hacer: se recalcula el bruto y el rinde de ficha de cada insumo
+    const inpHacer = h.querySelector('.inp-cant-hacer');
+    if(inpHacer) inpHacer.addEventListener('input', () => {
+      const q = Number(inpHacer.value) || 0;
+      const f = rinde > 0 ? q / rinde : 1;
+      tbody.querySelectorAll('tr[data-ingrediente]').forEach(tr => {
+        const b = Number(tr.dataset.cantFicha) * f, m = tr.dataset.medida;
+        tr.querySelector('.celda-bruto-ficha').textContent = `${cantIng(b)} ${m}`;
+        tr.querySelector('.inp-bruto-real').placeholder = cantIng(b);
+        if(tr.dataset.rindeFicha !== undefined){
+          const rr = Number(tr.dataset.rindeFicha) * f;
+          tr.querySelector('.celda-rinde-ficha').textContent = `${cantIng(rr)} ${m}`;
+          const ir = tr.querySelector('.inp-rinde-real'); if(ir) ir.placeholder = cantIng(rr);
+        }
+      });
+    });
 
     // total de relleno (o unidades) que SALIÓ de esta receta hoy
     const totalGuardado = totalesGuardados[normalizarFicha(nombreReceta)];
@@ -2180,11 +2352,26 @@ async function pintarRegistroCocinaSector(){
   cocina.forEach(f => {
     const infoOllas = (ollasData.rellenos || []).find(o => o.nombre === f.relleno);
     const infoOllasHtml = infoOllas ? `<strong>🍲 Ollas: ${infoOllas.ollas}</strong>` + bloqueGramajeOllas([infoOllas]) : '';
-    if(bloqueRegistroReceta(f.relleno, f.kilosDeRelleno, 'KG', '', infoOllasHtml)) algunBloque = true;
+    const subt = f.kgUrgente ? ` — incluye ${cantIng(f.kgUrgente)} kg URGENTES para el envío de hoy (hacerlos primero)` : '';
+    if(bloqueRegistroReceta(f.relleno, f.kilosDeRelleno, 'KG', subt, infoOllasHtml)) algunBloque = true;
   });
 
+  // URGENTES FUERA DE PLAN: bloque propio con los kg ya puestos
+  if(urgentesAparte.length){
+    const hU = document.createElement('h4');
+    hU.className = 'cat-heading';
+    hU.style.cssText = 'margin-top:22px;color:var(--alert);';
+    hU.textContent = 'Urgente para el envío de hoy — fuera de plan (hacerlo primero)';
+    cont.appendChild(hU);
+    urgentesAparte.forEach(u => {
+      const guardadoTotal = totalesGuardados[normalizarFicha(u.relleno)];
+      const kg = guardadoTotal && Number(guardadoTotal.cantidad) > 0 ? Number(guardadoTotal.cantidad) : u.kg;
+      if(bloqueRegistroReceta(u.relleno, kg, 'KG', ` — urgente: ${u.sabores.map(x => `${x.sabor} ${ent(x.unidades)}`).join(' · ')}`, '', null, { editable: true })) algunBloque = true;
+    });
+  }
+
   // Dips y Postres: se miden en UNIDADES — la ficha escala contra el rinde en UN.
-  ['Dips', 'Postres'].forEach(rubro => {
+  [modo === 'postres' ? 'Postres' : 'Dips'].forEach(rubro => {
     const items = dipsPostres.filter(f => f.rubro === rubro);
     if(items.length === 0) return;
     const hRubro = document.createElement('h4');
@@ -2200,7 +2387,7 @@ async function pintarRegistroCocinaSector(){
     const vacio = document.createElement('div');
     vacio.className = 'empty';
     vacio.style.marginTop = '14px';
-    vacio.textContent = 'El cálculo de hoy no pide ningún relleno, dip o postre (o no tienen ficha técnica). Si igual se elaboró algo, agregalo abajo.';
+    vacio.textContent = modo === 'postres' ? 'El cálculo de hoy no pide ningún postre (o no tiene ficha técnica). Si igual se hizo alguno, agregalo abajo.' : 'El cálculo de hoy no pide ningún relleno o dip (o no tienen ficha técnica). Si igual se elaboró algo, agregalo abajo.';
     cont.appendChild(vacio);
   }
 
@@ -2209,7 +2396,7 @@ async function pintarRegistroCocinaSector(){
   const hAd = document.createElement('h4');
   hAd.className = 'cat-heading';
   hAd.style.marginTop = '30px';
-  hAd.textContent = 'Elaboración adicional (fuera del cálculo del día)';
+  hAd.textContent = modo === 'postres' ? 'Postre adicional (fuera del cálculo del día)' : 'Elaboración adicional (fuera del cálculo del día)';
   cont.appendChild(hAd);
   const contAdicional = document.createElement('div');
   cont.appendChild(contAdicional);
@@ -2218,19 +2405,26 @@ async function pintarRegistroCocinaSector(){
     const u1 = normalizarFicha(cab.RindeUnidad), u2 = normalizarFicha(cab.RindeUnidad2);
     return (u1 === 'KG' || u2 === 'KG') ? 'KG' : 'UN';
   };
+  // ADICIONAL CON KILOS (04/11/2026): arriba se pone cuántos kg (o unidades)
+  // se van a hacer y la ficha se escala; arranca en lo ya guardado, o 1 receta.
   const agregarAdicional = (cab) => {
     const unidad = unidadDeFicha(cab);
     const rinde = rindeEnUnidad(cab.Receta, unidad) || 1;
-    bloqueRegistroReceta(cab.Receta, rinde, unidad, ' — adicional', '', contAdicional);
+    const guardadoTotal = totalesGuardados[normalizarFicha(cab.Receta)];
+    const cant = guardadoTotal && Number(guardadoTotal.cantidad) > 0 ? Number(guardadoTotal.cantidad) : rinde;
+    bloqueRegistroReceta(cab.Receta, cant, unidad, ' — adicional', '', contAdicional, { editable: true });
   };
+  // en Postres solo las fichas de postre; en Cocina todas menos los postres
+  const esFichaPostre = c => normalizarFicha(c.TipoFicha) === 'POSTRE';
+  const delModo = c => modo === 'postres' ? esFichaPostre(c) : !esFichaPostre(c);
   // las adicionales que ya tienen algo guardado hoy
   const conDatosHoy = new Set(Object.keys(trazaGuardada).map(k => k.split('|')[0])
     .concat(Object.keys(totalesGuardados)).concat([...recetasFinalizadasSet]));
-  recetas.cabecera.filter(c => conDatosHoy.has(normalizarFicha(c.Receta)) && !MOSTRADAS_COCINA.has(normalizarFicha(c.Receta)))
+  recetas.cabecera.filter(c => delModo(c) && conDatosHoy.has(normalizarFicha(c.Receta)) && !MOSTRADAS_COCINA.has(normalizarFicha(c.Receta)))
     .sort((a, b) => compararTexto(a.Receta, b.Receta)).forEach(agregarAdicional);
   const selWrap = document.createElement('div');
   selWrap.className = 'fila-agregar no-print';
-  const opcionesAd = () => recetas.cabecera.filter(c => !MOSTRADAS_COCINA.has(normalizarFicha(c.Receta)))
+  const opcionesAd = () => recetas.cabecera.filter(c => delModo(c) && !MOSTRADAS_COCINA.has(normalizarFicha(c.Receta)))
     .sort((a, b) => compararTexto(a.Receta, b.Receta))
     .map(c => `<option value="${c.Receta}">${c.Receta}</option>`).join('');
   selWrap.innerHTML = `<select id="selAgregarReceta"><option value="">— Elegí una receta para agregar —</option>${opcionesAd()}</select>
@@ -2812,6 +3006,8 @@ async function pintarRegistroProduccionSector(){
   const categoriaPorSabor = CATEGORIA_POR_SABOR_REGISTRO || {};
 
   let estado;
+  // URGENTE FUERA DE PLAN (04/11/2026): se pide a la vez que lo guardado
+  const promUrg = obtenerUrgentes(fecha).catch(() => null);
   try{
     if(PREPEDIDO_REGISTRO && PREPEDIDO_REGISTRO.fecha === fecha){
       const pre = PREPEDIDO_REGISTRO; PREPEDIDO_REGISTRO = null;
@@ -2825,7 +3021,13 @@ async function pintarRegistroProduccionSector(){
     cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo cargar el registro guardado: ${err.message}</div>`;
     return;
   }
+  const urg = await promUrg;
   if(SECTOR_REGISTRO_ACTIVO !== 'produccion') return; // cambió de pestaña mientras cargaba
+  // empanadas urgentes para el envío de hoy que NO se arman hoy según el plan:
+  // aparecen solas, con "A producir (calc.)" = lo urgente
+  const urgFuera = {};
+  ((urg && urg.produccion) || []).filter(p => !p.plan).forEach(p => { urgFuera[p.sabor] = (urgFuera[p.sabor] || 0) + (Number(p.unidades) || 0); });
+  const etiquetaUrg = n => urgFuera[n] ? ' <span class="badge-urg">URGENTE envío de hoy · fuera de plan</span>' : '';
 
   const guardadoPorSabor = {};
   (estado.items || []).forEach(it => { guardadoPorSabor[it.sabor] = it; });
@@ -2846,7 +3048,8 @@ async function pintarRegistroProduccionSector(){
   // los sabores que hay que armar hoy (o que ya tienen algo guardado hoy). Si
   // excepcionalmente arman otro, se agrega abajo. Si el cálculo no cargó, van todos.
   const hayCalculo = !!(data && Array.isArray(data.produccion) && data.produccion.length);
-  const esDeHoy = (n) => !hayCalculo || !!guardadoPorSabor[n] || !!(porSabor[n] && Number(porSabor[n].aHacerUnidades) > 0);
+  const esDeHoy = (n) => !hayCalculo || !!guardadoPorSabor[n] || !!(porSabor[n] && Number(porSabor[n].aHacerUnidades) > 0) || urgFuera[n] > 0;
+  const aHacerDe = (n) => { const ref = porSabor[n]; const a = ref ? Number(ref.aHacerUnidades) || 0 : 0; return urgFuera[n] ? a + urgFuera[n] : (ref ? ref.aHacerUnidades : null); };
   // sabor que se arma en máquina (empanada que no es canasta) -> columna Máquina
   const vaEnMaquina = (n) => { const b = String(n).replace(/\s*\(adicional\)\s*$/i, ''); return todasEmpanadas.indexOf(b) !== -1 && categoriaPorSabor[b] !== 'Canasta'; };
 
@@ -2890,8 +3093,7 @@ async function pintarRegistroProduccionSector(){
     if(!lista.length) return;
     filaGrupo(titulo);
     lista.filter(esDeHoy).sort(compararTexto).forEach(nombre => {
-      const ref = porSabor[nombre];
-      tbody.appendChild(filaRegistroProduccion(nombre, nombre, ref ? ref.aHacerUnidades : null, '', false, EMPLEADOS_REGISTRO, guardadoPorSabor[nombre], bloqueadoGlobal));
+      tbody.appendChild(filaRegistroProduccion(nombre, nombre, aHacerDe(nombre), etiquetaUrg(nombre), false, EMPLEADOS_REGISTRO, guardadoPorSabor[nombre], bloqueadoGlobal));
     });
   });
 
@@ -2900,8 +3102,7 @@ async function pintarRegistroProduccionSector(){
   if(saboresCanasta.filter(esDeHoy).length){
     filaGrupo('Canastas completas');
     saboresCanasta.filter(esDeHoy).sort(compararTexto).forEach(nombre => {
-      const ref = porSabor[nombre];
-      tbody.appendChild(filaRegistroProduccion(nombre, nombre, ref ? ref.aHacerUnidades : null, '', true, EMPLEADOS_REGISTRO, guardadoPorSabor[nombre], bloqueadoGlobal));
+      tbody.appendChild(filaRegistroProduccion(nombre, nombre, aHacerDe(nombre), etiquetaUrg(nombre), true, EMPLEADOS_REGISTRO, guardadoPorSabor[nombre], bloqueadoGlobal));
     });
   }
 
@@ -3311,9 +3512,19 @@ async function cargarEnvios(){
     if(document.getElementById('fechaEnvios').value !== fecha) return; // cambió la fecha mientras cargaba
     const guardadoPorLocal = rGuardado.porLocal || {};
     const traspasos = rGuardado.traspasos || {};
-    DATOS_ENVIOS = { fecha, data, categorias, traspasos };
+    // VARIOS ENVÍOS POR DÍA (04/11/2026): lista de envíos de cada local (si el
+    // Apps Script es el viejo, solo el 1º)
+    const enviosPorLocal = {};
+    LOCALES_VENTA.forEach(l => {
+      enviosPorLocal[l] = (rGuardado.enviosPorLocal && rGuardado.enviosPorLocal[l] && rGuardado.enviosPorLocal[l].length)
+        ? rGuardado.enviosPorLocal[l] : [Object.assign({ nro: 1 }, guardadoPorLocal[l] || {})];
+    });
+    DATOS_ENVIOS = { fecha, data, categorias, traspasos, enviosPorLocal, pedidoInicial: rGuardado.pedidoInicial || null, disponibleFabrica: rGuardado.disponibleFabrica || {} };
     pintarBarraPlan('barraPlanEnvios', fecha, data.plan, cargarEnvios, data.proyeccion);
-    const conDatos = LOCALES_VENTA.map(l => guardadoPorLocal[l]).concat(Object.values(traspasos)).find(g => g && g.responsable) || {};
+    // quién despacha / repartidor: los del envío abierto más nuevo (si ya tiene), si no los del primero
+    const todosEnvios = LOCALES_VENTA.flatMap(l => enviosPorLocal[l]);
+    const conDatos = todosEnvios.filter(g => g.nro > 1 && !g.cierre && g.responsable).pop()
+      || todosEnvios.concat(Object.values(traspasos)).find(g => g && g.responsable) || {};
 
     document.getElementById('inpResponsableEnvio').innerHTML = opcionesEmpleadosSeleccion(empleados, conDatos.responsable);
     document.getElementById('inpRepartidorEnvio').innerHTML = opcionesEmpleadosSeleccion(empleados, conDatos.repartidor);
@@ -3321,7 +3532,7 @@ async function cargarEnvios(){
 
     const tabs = document.getElementById('tabsEnvios');
     tabs.style.display = 'flex';
-    const pestañas = LOCALES_VENTA.map(l => ({ id: l, texto: l + (guardadoPorLocal[l] && guardadoPorLocal[l].cierre ? ' ✓' : '') }))
+    const pestañas = LOCALES_VENTA.map(l => ({ id: l, texto: l + (enviosPorLocal[l].every(g => g.cierre) ? ' ✓' : '') + (enviosPorLocal[l].length > 1 ? ` (${enviosPorLocal[l].length} envíos)` : '') }))
       .concat([{ id: 'resumen', texto: 'Total a enviar' }, { id: 'traspaso', texto: 'Traspaso entre locales' }]);
     tabs.innerHTML = pestañas.map(p => `<button class="tab-btn ${p.id===TAB_ENVIO_ACTIVO?'active':''}" data-tab="${p.id}">${p.texto}</button>`).join('');
     const mostrar = () => {
@@ -3336,7 +3547,7 @@ async function cargarEnvios(){
     LOCALES_VENTA.forEach(local => {
       const wrap = document.createElement('div');
       wrap.className = 'panel-tab'; wrap.dataset.tab = local;
-      wrap.appendChild(pintarPanelEnvio({ origen: '', destino: local, itemsCalculados: data.envios[local] || [], data, categorias, guardado: guardadoPorLocal[local] || {} }));
+      pintarEnviosLocal(wrap, local);
       cont.appendChild(wrap);
     });
     const wrapR = document.createElement('div');
@@ -3350,6 +3561,62 @@ async function cargarEnvios(){
   }catch(err){
     cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo calcular: ${err.message} <button class="btn secondary" style="font-size:12px;padding:5px 9px;margin-left:8px;" onclick="cargarEnvios()">Reintentar</button></div>`;
   }
+}
+
+// Todos los envíos del día a UN local: los ya cerrados quedan plegados (se
+// abren para ver o reabrir) y, si el último está cerrado, aparece
+// "+ Envío n" para mandar otro con lo que falta.
+function pintarEnviosLocal(wrap, local){
+  const { data, categorias, enviosPorLocal } = DATOS_ENVIOS;
+  const envs = enviosPorLocal[local];
+  wrap.innerHTML = '';
+  const varios = envs.length > 1;
+  envs.forEach((g, i) => {
+    const ultimo = i === envs.length - 1;
+    const items = g.nro === 1 ? (data.envios[local] || []) : faltantesEnvio(local, g.nro);
+    const panel = pintarPanelEnvio({ origen: '', destino: local, nro: g.nro, itemsCalculados: items, data, categorias, guardado: g });
+    if(varios && !ultimo && g.cierre){
+      const det = document.createElement('details');
+      det.className = 'envio-plegado';
+      det.innerHTML = `<summary>Envío ${g.nro} · ✓ enviado${g.cierre.hora ? ' a las ' + g.cierre.hora : ''}${g.cierre.responsable ? ' por ' + g.cierre.responsable : ''} · ${ent(g.items.length)} producto(s) — tocá para ver</summary>`;
+      det.appendChild(panel);
+      wrap.appendChild(det);
+    } else {
+      if(varios){ const h = document.createElement('h3'); h.className = 'titulo-envio'; h.textContent = `Envío ${g.nro}`; wrap.appendChild(h); }
+      wrap.appendChild(panel);
+    }
+  });
+  const ult = envs[envs.length - 1];
+  if(ult.cierre){
+    const n = ult.nro + 1;
+    const bar = document.createElement('div');
+    bar.className = 'actions no-print';
+    bar.style.marginTop = '14px';
+    bar.innerHTML = `<button type="button" class="btn">+ Envío ${n} a ${NOMBRE_LOCAL_VISTA[local] || local}</button>
+      <span style="color:var(--ink-soft);font-size:12.5px;margin-left:8px;">Para mandar en otra tanda lo que faltó: te marca lo que todavía falta del pedido del plan confirmado.</span>`;
+    bar.querySelector('button').onclick = () => {
+      envs.push({ nro: n, items: [], cierre: null });
+      pintarEnviosLocal(wrap, local);
+      const t = document.getElementById('tabsEnvios');
+      const b = t && t.querySelector(`.tab-btn[data-tab="${local}"]`);
+      if(b) b.textContent = local + ` (${envs.length} envíos)`;
+      const nuevo = wrap.querySelector(`.panel-envio-local[data-nro="${n}"]`);
+      if(nuevo) nuevo.scrollIntoView({ block: 'start' });
+    };
+    wrap.appendChild(bar);
+  }
+}
+// lo que falta mandar en el envío nro: pedido del PRIMER plan confirmado
+// (si no hay, la orden calculada) − todo lo ya cargado en los otros envíos del día
+function faltantesEnvio(local, nro){
+  const { data, enviosPorLocal, pedidoInicial, disponibleFabrica } = DATOS_ENVIOS;
+  const ini = pedidoInicial && pedidoInicial[local] && Object.keys(pedidoInicial[local]).length ? pedidoInicial[local] : null;
+  const enviado = {};
+  enviosPorLocal[local].filter(g => g.nro !== nro).forEach(g => (g.items || []).forEach(it => { enviado[it.sabor] = (enviado[it.sabor] || 0) + (Number(it.cantidad) || 0); }));
+  return (data.envios[local] || []).map(it => {
+    const pedido = ini ? (Number(ini[it.sabor]) || 0) : (Number(it.aHacerUnidades) || 0);
+    return { sabor: it.sabor, aHacerUnidades: Math.max(Math.round((pedido - (enviado[it.sabor] || 0)) * 100) / 100, 0), sugerencia: [], disponible: disponibleFabrica[it.sabor], pedidoPlan: pedido, yaEnviado: enviado[it.sabor] || 0 };
+  });
 }
 
 // solapa "Total a enviar": vista general de los 3 locales juntos (no se
@@ -3367,10 +3634,10 @@ function pintarResumenEnvios(wrap){
     if(VISTA_RESUMEN_ENVIOS === 'calculada'){
       (data.envios[local] || []).forEach(it => { valor[local][it.sabor] = ordenEnvioFabrica(it.sabor, it.aHacerUnidades); });
     } else {
-      const panel = document.querySelector(`.panel-envio-local[data-clave="${local}"]`);
-      if(panel) [...panel.querySelectorAll('tr[data-item]')].forEach(tr => {
+      // todos los envíos del día a ese local, sumados
+      document.querySelectorAll(`.panel-envio-local[data-local="${local}"]`).forEach(panel => [...panel.querySelectorAll('tr[data-item]')].forEach(tr => {
         valor[local][tr.dataset.item] = (valor[local][tr.dataset.item] || 0) + (Number(tr.querySelector('.inp-cant').value) || 0);
-      });
+      }));
     }
   });
   const totLocal = {}; LOCALES_VENTA.forEach(l => totLocal[l] = 0);
@@ -3483,9 +3750,12 @@ function htmlSugerenciaLotes(it){
   if(it.vencidosEnFabrica) h += `<div class="sug-lotes vencidos no-print">⚠ En fábrica hay ${ent(it.vencidosEnFabrica)} vencidas (no se sugieren)</div>`;
   return h;
 }
-function pintarPanelEnvio({ origen, destino, itemsCalculados, data, categorias, guardado }){
+function pintarPanelEnvio({ origen, destino, nro, itemsCalculados, data, categorias, guardado }){
+  nro = origen ? 1 : (Number(nro) || 1);
   const clave = claveDespacho(origen, destino);
-  const id = cssId(clave);
+  const claveCierre = nro > 1 ? `${clave} #${nro}` : clave; // como en Cierres
+  const id = cssId(clave) + (nro > 1 ? 'n' + nro : '');
+  const faltantes = nro > 1; // 2º envío en adelante: lo que falta del pedido del plan
   const conOrden = !origen; // la orden calculada es solo para lo que manda fábrica
   const porSabor = {};
   (itemsCalculados || []).forEach(it => { porSabor[it.sabor] = it; });
@@ -3498,16 +3768,29 @@ function pintarPanelEnvio({ origen, destino, itemsCalculados, data, categorias, 
   const panelEstado = { borrados: [] };
 
   const div = document.createElement('div');
-  div.className = 'panel-envio-local';
+  div.className = 'panel-envio-local' + (faltantes ? ' solo-faltan' : '');
   div.dataset.clave = clave;
+  div.dataset.nro = nro;
+  div.dataset.idp = id;
+  if(!origen) div.dataset.local = destino;
   div._estado = panelEstado;
 
   const intro = document.createElement('p');
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
   intro.textContent = origen
     ? `${data.dia}, ${fmtFecha(data.fecha)} — mercadería que sale de ${origen} y va a ${destino}`
-    : `${data.dia}, ${fmtFecha(data.fecha)} — orden calculada para ${destino}`;
+    : faltantes
+      ? `${data.dia}, ${fmtFecha(data.fecha)} — envío ${nro} a ${destino}: "Falta mandar" = lo que pidió el plan confirmado a la mañana menos todo lo que ya se mandó hoy. "Fábrica ≈" es el stock aproximado (stock de la mañana + lo armado hoy − lo ya despachado).`
+      : `${data.dia}, ${fmtFecha(data.fecha)} — orden calculada para ${destino}`;
   div.appendChild(intro);
+  if(faltantes){
+    const tog = document.createElement('label');
+    tog.className = 'no-print';
+    tog.style.cssText = 'display:flex;align-items:center;gap:6px;font-size:13px;margin:0 0 8px;';
+    tog.innerHTML = '<input type="checkbox" checked> Mostrar solo lo que falta (sacá el tilde para agregar otros productos)';
+    tog.querySelector('input').onchange = (e) => div.classList.toggle('solo-faltan', e.target.checked);
+    div.appendChild(tog);
+  }
 
   const nav = document.createElement('div');
   nav.className = 'cat-nav';
@@ -3525,7 +3808,7 @@ function pintarPanelEnvio({ origen, destino, itemsCalculados, data, categorias, 
     table.innerHTML = `
       <thead><tr>
         <th>Sabor / ítem</th>
-        ${conOrden ? '<th class="col-cant">Orden calculada</th>' : ''}
+        ${conOrden ? `<th class="col-cant">${faltantes ? 'Falta mandar' : 'Orden calculada'}</th>` : ''}
         <th class="col-cant">${origen ? 'Cantidad' : 'Enviado (real)'}</th>
         <th class="col-venc">Vencimiento</th>
         <th class="col-add"></th><th class="col-del"></th><th></th>
@@ -3545,6 +3828,10 @@ function pintarPanelEnvio({ origen, destino, itemsCalculados, data, categorias, 
       // MANDAR PRIMERO LO QUE VENCE ANTES (16/10/2026)
       const it = porSabor[nombre];
       if(conOrden && it) filas[0].cells[0].insertAdjacentHTML('beforeend', htmlSugerenciaLotes(it));
+      if(faltantes){
+        if(!(orden > 0) && !gs.length) filas.forEach(tr => tr.classList.add('sin-falta'));
+        if(it && it.disponible != null && !ENVIO_EN_KILOS[nombre]) filas[0].cells[0].insertAdjacentHTML('beforeend', `<div class="disp-fab">Fábrica ≈ ${ent(it.disponible)}${it.yaEnviado ? ` · ya mandado hoy ${ent(it.yaEnviado)}` : ''}</div>`);
+      }
     });
     // subtotal de la clasificación: orden calculada y enviado (real), se
     // actualiza mientras cargan (pedido por Carolina 30/09/2026)
@@ -3563,17 +3850,21 @@ function pintarPanelEnvio({ origen, destino, itemsCalculados, data, categorias, 
     const a = document.createElement('a');
     a.href = `#${catId}`; a.textContent = cat;
     nav.appendChild(a);
+    // 2º envío: la categoría en la que no falta nada se oculta con "solo lo que falta"
+    if(faltantes && ![...tbody.querySelectorAll('tr[data-item]')].some(tr => !tr.classList.contains('sin-falta'))){
+      [h, table, a].forEach(el => el.classList.add('cat-vacia'));
+    }
   });
   div.appendChild(tablas);
 
-  const titulo = origen ? `traspaso de ${origen} a ${destino}` : `despacho a ${destino}`;
+  const titulo = origen ? `traspaso de ${origen} a ${destino}` : `despacho a ${destino}${nro > 1 ? ` (envío ${nro})` : ''}`;
   const actions = document.createElement('div');
   if(cierre){
     bloquearFilasEnviadas(div);
-    div.insertBefore(cartelEnviado(cierre, origen ? `Traspaso ${origen} → ${destino}` : `Despacho a ${destino}`, cierre.puedeReabrir === false ? null : async () => {
-      if(!confirm(`¿Reabrir el ${titulo}? Lo que ${destino} todavía no confirmó deja de aparecerle hasta que se vuelva a enviar.`)) return;
+    div.insertBefore(cartelEnviado(cierre, origen ? `Traspaso ${origen} → ${destino}` : `Despacho a ${destino}${nro > 1 ? ` — envío ${nro}` : ''}`, cierre.puedeReabrir === false ? null : async () => {
+      if(!confirm(`¿Reabrir el ${titulo}? (Solo para corregir un error.) Lo que ${destino} todavía no confirmó de este envío deja de aparecerle hasta que se vuelva a enviar.`)) return;
       try{
-        await postJSON({ action: 'reabrirCarga', pantalla: 'Envios', fecha: data.fecha, clave });
+        await postJSON({ action: 'reabrirCarga', pantalla: 'Envios', fecha: data.fecha, clave: claveCierre });
         avisar(`${origen ? 'Traspaso' : 'Despacho'} reabierto — ya se puede editar.`);
         cargarEnvios();
       }catch(err){ avisar('✗ No se pudo reabrir: ' + err.message, 'err'); }
@@ -3598,7 +3889,7 @@ function pintarPanelEnvio({ origen, destino, itemsCalculados, data, categorias, 
     const bImp = document.getElementById(`btnImprimirEnvio-${id}`);
     if(bProv) bProv.onclick = () => guardarEnvio(div, origen, destino, data.fecha, false);
     if(bEnv) bEnv.onclick = () => guardarEnvio(div, origen, destino, data.fecha, true);
-    if(bImp) bImp.onclick = () => imprimirOrdenEnvio(div, destino, data.fecha);
+    if(bImp) bImp.onclick = () => imprimirOrdenEnvio(div, destino + (nro > 1 ? ` — envío ${nro}` : ''), data.fecha);
   }, 0);
   return div;
 }
@@ -3619,7 +3910,8 @@ async function guardarEnvio(panel, origen, destino, fecha, enviar){
   const { responsable, repartidor, acompanante } = datosComunesEnvio();
   const msg = document.getElementById('msgEnvios');
   msg.className = 'msg'; msg.textContent = '';
-  const titulo = origen ? `traspaso de ${origen} a ${destino}` : `despacho a ${destino}`;
+  const nro = origen ? 1 : (Number(panel.dataset.nro) || 1);
+  const titulo = origen ? `traspaso de ${origen} a ${destino}` : `despacho a ${destino}${nro > 1 ? ` (envío ${nro})` : ''}`;
   if(!responsable){
     msg.className = 'msg err'; msg.textContent = 'Indicá quién está despachando (arriba de todo).';
     avisar('✗ Falta indicar quién despacha.', 'err');
@@ -3659,12 +3951,12 @@ async function guardarEnvio(panel, origen, destino, fecha, enviar){
   if(enviar && !confirm(`¿Guardar y enviar final el ${titulo}? ${origen ? `Recién ahí ${origen} y ${destino} lo ven para confirmar.` : `Recién ahí le aparece a ${destino} para confirmar la recepción.`}`)) return;
   const borrar = vaciadas.map(tr => ({ sabor: tr.dataset.item, vencimiento: tr.dataset.vencGuardado })).concat(panel._estado.borrados);
 
-  const id = cssId(claveDespacho(origen, destino));
+  const id = panel.dataset.idp || cssId(claveDespacho(origen, destino));
   const btn = document.getElementById(enviar ? `btnGuardarEnvio-${id}` : `btnProvisorioEnvio-${id}`);
   const textoOriginal = btn.textContent;
   btn.disabled = true; btn.textContent = 'Guardando...';
   try{
-    const resp = await postJSON({ action: 'registrarEnvio', origen, local: destino, fecha, responsable, repartidor, acompanante, items, borrar, enviar: !!enviar });
+    const resp = await postJSON({ action: 'registrarEnvio', origen, local: destino, nro, fecha, responsable, repartidor, acompanante, items, borrar, enviar: !!enviar });
     completas.forEach(marcarFilaGuardada);
     vaciadas.forEach(marcarFilaBorrada);
     panel._estado.borrados = [];
@@ -3828,7 +4120,7 @@ async function cargarPendientesRecepcion(){
                 if(kg) return `
                 <tr data-id="${p.ID}" data-kg-porcion="${kg}" data-enviado="${aKg(p.Cantidad_Enviada)}">
                   <td>${nombreFabrica(p.Sabor)}${etiquetaUnidad(p.Sabor, 'kg')}</td>
-                  <td><span style="color:var(--ink-soft);">Fábrica</span></td>
+                  <td><span style="color:var(--ink-soft);">Fábrica${Number(p.NroEnvio) > 1 ? ` · <strong>envío ${p.NroEnvio}</strong>` : ''}</span></td>
                   <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Fecha_envio)}</td>
                   <td class="num" style="color:var(--ink-soft);">${dec(aKg(p.Cantidad_Enviada))}</td>
                   <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Vencimiento)}</td>
@@ -3839,7 +4131,7 @@ async function cargarPendientesRecepcion(){
                 return `
                 <tr data-id="${p.ID}" data-enviado="${Number(p.Cantidad_Enviada) || 0}">
                   <td>${p.Sabor}${etiquetaUnidad(p.Sabor, 'porciones')}</td>
-                  <td>${p.Origen ? `<strong class="origen-traspaso">Ingresa desde ${p.Origen}</strong>` : '<span style="color:var(--ink-soft);">Fábrica</span>'}</td>
+                  <td>${p.Origen ? `<strong class="origen-traspaso">Ingresa desde ${p.Origen}</strong>` : `<span style="color:var(--ink-soft);">Fábrica${Number(p.NroEnvio) > 1 ? ` · <strong>envío ${p.NroEnvio}</strong>` : ''}</span>`}</td>
                   <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Fecha_envio)}</td>
                   <td class="num" style="color:var(--ink-soft);">${cantProd(p.Sabor, p.Cantidad_Enviada)}</td>
                   <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Vencimiento)}</td>
