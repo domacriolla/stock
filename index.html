@@ -163,6 +163,10 @@
   .ok-txt{color:var(--herb);font-weight:600;} .mal-txt{color:var(--alert);font-weight:700;} .gris-txt{color:var(--ink-soft);}
   /* botones Empezó / Terminó (hora automática) */
   .hora-auto{display:flex;align-items:center;gap:4px;}
+  /* dividir preparación (Cocina) */
+  .linea-division{display:flex;align-items:center;gap:8px;flex-wrap:wrap;background:var(--accent-bg);border:1px solid #ecd3a8;border-radius:8px;padding:8px 12px;margin:22px 0 4px;font-size:13.5px;}
+  .bloque-receta .linea-division{margin:4px 0 8px;}
+  .solo-print{display:none;} @media print{ .solo-print{display:inline;} }
   /* registro de Discos: cantidades de la receta (tilde "Receta") en gris */
   #tablaMasasDiscos input.inp-ing-masa:disabled, #tablaEmpasteDiscos input.inp-emp-ing:disabled{background:#f1ece3;color:var(--ink-soft);}
   .hora-auto input{width:96px;}
@@ -2213,6 +2217,9 @@ async function pintarRegistroCocinaSector(){
   );
   const totalesGuardados = {};
   ((trazaResp && !trazaResp.error && trazaResp.totales) || []).forEach(t => { totalesGuardados[normalizarFicha(t.receta)] = t; });
+  // DIVIDIR PREPARACIÓN (05/11/2026): rellenos que hoy se hacen en 2 partes
+  const divisiones = {};
+  ((trazaResp && !trazaResp.error && trazaResp.divisiones) || []).forEach(d => { divisiones[normalizarFicha(d.receta)] = Number(d.kgPrimero) || 0; });
   const MOSTRADAS_COCINA = new Set();
 
   if(cocina.length === 0 && dipsPostres.length === 0){
@@ -2268,14 +2275,18 @@ async function pintarRegistroCocinaSector(){
   // (que se miden en unidades, no en kilos).
   // opciones.editable (04/11/2026): receta fuera del plan — arriba se pone
   // cuántos kg (o unidades) se van a hacer y la ficha se escala a eso.
+  // opciones.ficha: la 2ª parte de una preparación dividida usa la ficha de la
+  // receta. opciones.titulo: título propio. opciones.dividir = { total,
+  // sugerido }: muestra el botón "Dividir preparación".
   function bloqueRegistroReceta(nombreReceta, cantidadHoy, unidadHoy, subtitulo, infoOllasHtml, destino, opciones){
     const op = opciones || {};
     const dest = destino || cont;
-    const ingredientesReceta = recetas.detalle.filter(d => normalizarFicha(d.Receta) === normalizarFicha(nombreReceta));
+    const fichaNombre = op.ficha || nombreReceta;
+    const ingredientesReceta = recetas.detalle.filter(d => normalizarFicha(d.Receta) === normalizarFicha(fichaNombre));
     if(ingredientesReceta.length === 0) return false;
     MOSTRADAS_COCINA.add(normalizarFicha(nombreReceta));
 
-    const rinde = rindeEnUnidad(nombreReceta, unidadHoy);
+    const rinde = rindeEnUnidad(fichaNombre, unidadHoy);
     const factor = rinde > 0 ? (cantidadHoy / rinde) : 1;
     const finalizada = recetasFinalizadasSet.has(normalizarFicha(nombreReceta));
     const unidadTxt = unidadHoy === 'UN' ? 'un.' : 'kg';
@@ -2290,12 +2301,37 @@ async function pintarRegistroCocinaSector(){
     h.innerHTML = op.editable ? `
       <span>${nombreReceta}${subtitulo || ''} <span class="kg-hacer no-print">¿${unidadHoy === 'UN' ? 'Cuántas unidades' : 'Cuántos kg'} vas a hacer? <input type="number" min="0" step="${unidadHoy === 'UN' ? '1' : '0.1'}" class="inp-cant-hacer" value="${Math.round(cantidadHoy * 100) / 100}" ${finalizada ? 'disabled' : ''}> ${unidadTxt}</span>${rinde > 0 ? `<span style="font-size:11.5px;font-weight:400;color:var(--ink-soft);margin-left:6px;">(1 receta de ficha = ${cantIng(rinde)} ${unidadTxt})</span>` : ''}</span>`
       : `
-      <span>${nombreReceta} — ${cantIng(cantidadHoy)} ${unidadTxt} ${subtitulo === ' — adicional' ? '(1 receta de ficha)' : 'calculados hoy'}${subtitulo || ''}</span>
+      <span>${op.titulo ? op.titulo : `${nombreReceta} — ${cantIng(cantidadHoy)} ${unidadTxt} ${subtitulo === ' — adicional' ? '(1 receta de ficha)' : 'calculados hoy'}`}${subtitulo || ''}</span>
       <span class="no-print">${finalizada
         ? `<span style="color:#2a7a4a;font-size:12.5px;font-weight:600;margin-right:6px;">✓ Enviada</span><button type="button" class="btn secondary btn-reabrir-receta" style="font-size:12px;padding:5px 9px;">Reabrir</button>`
-        : ''}</span>
+        : (op.dividir ? `<button type="button" class="btn secondary btn-dividir" style="font-size:12px;padding:5px 9px;">Dividir preparación</button>` : '')}</span>
     `;
     bloque.appendChild(h);
+    // DIVIDIR PREPARACIÓN: una línea "Primero [ ] kg → después X kg"
+    const btnDividir = h.querySelector('.btn-dividir');
+    if(btnDividir) btnDividir.onclick = () => {
+      if(bloque.querySelector('.linea-division')) return;
+      const total = Number(op.dividir.total) || 0;
+      const linea = document.createElement('div');
+      linea.className = 'linea-division no-print';
+      linea.innerHTML = `Primero <input type="number" min="0" step="0.1" class="inp-kg-primero" style="width:80px;" value="${op.dividir.sugerido ? Math.round(op.dividir.sugerido * 10) / 10 : ''}"> kg → después <strong class="kg-despues"></strong> kg
+        <button type="button" class="btn btn-ok-dividir" style="font-size:12px;padding:5px 9px;">Aceptar</button>
+        <button type="button" class="btn secondary btn-cancelar-dividir" style="font-size:12px;padding:5px 9px;">Cancelar</button>`;
+      h.insertAdjacentElement('afterend', linea);
+      const inp = linea.querySelector('.inp-kg-primero');
+      const resto = () => { linea.querySelector('.kg-despues').textContent = cantIng(Math.max(total - (Number(inp.value) || 0), 0)); };
+      inp.addEventListener('input', resto); resto(); inp.focus();
+      linea.querySelector('.btn-cancelar-dividir').onclick = () => linea.remove();
+      linea.querySelector('.btn-ok-dividir').onclick = async () => {
+        const kg = Number(inp.value) || 0;
+        if(!(kg > 0 && kg < total)){ avisar(`✗ Poné cuántos kg hacés primero (más de 0 y menos de ${cantIng(total)}).`, 'err'); return; }
+        try{
+          await postJSON({ action: 'guardarDivisionCocina', fecha, receta: nombreReceta, kgPrimero: kg });
+          avisar(`✓ ${nombreReceta}: primero ${cantIng(kg)} kg y después ${cantIng(total - kg)} kg.`);
+          pintarRegistroCocinaSector();
+        }catch(err){ avisar('✗ No se pudo dividir: ' + err.message, 'err'); }
+      };
+    };
     const btnReabrir = h.querySelector('.btn-reabrir-receta');
     if(btnReabrir) btnReabrir.onclick = () => reabrirReceta(nombreReceta, fecha);
 
@@ -2411,7 +2447,41 @@ async function pintarRegistroCocinaSector(){
     const infoOllas = (ollasData.rellenos || []).find(o => o.nombre === f.relleno);
     const infoOllasHtml = infoOllas ? `<strong>🍲 Ollas: ${infoOllas.ollas}</strong>` + bloqueGramajeOllas([infoOllas]) : '';
     const subt = f.kgUrgente ? ` — incluye ${cantIng(f.kgUrgente)} kg URGENTES para el envío de hoy (hacerlos primero)` : '';
-    if(bloqueRegistroReceta(f.relleno, f.kilosDeRelleno, 'KG', subt, infoOllasHtml)) algunBloque = true;
+    const kg1 = divisiones[normalizarFicha(f.relleno)];
+    if(!(kg1 > 0)){
+      if(bloqueRegistroReceta(f.relleno, f.kilosDeRelleno, 'KG', subt, infoOllasHtml, null, { dividir: { total: f.kilosDeRelleno, sugerido: f.kgUrgente } })) algunBloque = true;
+      return;
+    }
+    // preparación dividida: una línea con la división y las 2 recetas
+    const parte2 = f.relleno + SUFIJO_PARTE2;
+    const k1 = Math.min(kg1, f.kilosDeRelleno), k2 = Math.max(f.kilosDeRelleno - k1, 0);
+    const fin1 = recetasFinalizadasSet.has(normalizarFicha(f.relleno)), fin2 = recetasFinalizadasSet.has(normalizarFicha(parte2));
+    const linea = document.createElement('div');
+    linea.className = 'linea-division';
+    linea.innerHTML = `<strong>${f.relleno} — ${cantIng(f.kilosDeRelleno)} kg</strong> en dos partes: primero
+      <input type="number" min="0" step="0.1" class="inp-kg-primero no-print" style="width:80px;" value="${Math.round(k1 * 10) / 10}" ${fin1 || fin2 ? 'disabled' : ''}><span class="solo-print">${cantIng(k1)}</span> kg → después <strong class="kg-despues">${cantIng(k2)}</strong> kg
+      ${fin1 || fin2 ? '' : `<button type="button" class="btn secondary btn-cambiar-division no-print" style="font-size:12px;padding:5px 9px;">Guardar cambio</button>
+      <button type="button" class="btn secondary btn-volver-una no-print" style="font-size:12px;padding:5px 9px;">Volver a una</button>`}`;
+    cont.appendChild(linea);
+    const inpK = linea.querySelector('.inp-kg-primero');
+    inpK.addEventListener('input', () => { linea.querySelector('.kg-despues').textContent = cantIng(Math.max(f.kilosDeRelleno - (Number(inpK.value) || 0), 0)); });
+    const enviarDivision = async (kg) => {
+      try{
+        await postJSON({ action: 'guardarDivisionCocina', fecha, receta: f.relleno, kgPrimero: kg });
+        avisar(kg > 0 ? `✓ ${f.relleno}: primero ${cantIng(kg)} kg y después ${cantIng(f.kilosDeRelleno - kg)} kg.` : `✓ ${f.relleno}: vuelve a ser una sola preparación.`);
+        pintarRegistroCocinaSector();
+      }catch(err){ avisar('✗ ' + err.message, 'err'); }
+    };
+    const bC = linea.querySelector('.btn-cambiar-division');
+    if(bC) bC.onclick = () => {
+      const kg = Number(inpK.value) || 0;
+      if(!(kg > 0 && kg < f.kilosDeRelleno)){ avisar(`✗ Poné cuántos kg hacés primero (más de 0 y menos de ${cantIng(f.kilosDeRelleno)}).`, 'err'); return; }
+      enviarDivision(kg);
+    };
+    const bV = linea.querySelector('.btn-volver-una');
+    if(bV) bV.onclick = () => { if(confirm(`¿Volver a hacer ${f.relleno} en una sola preparación de ${cantIng(f.kilosDeRelleno)} kg?`)) enviarDivision(0); };
+    if(bloqueRegistroReceta(f.relleno, k1, 'KG', subt, infoOllasHtml, null, { titulo: `${f.relleno} — 1ª parte: ${cantIng(k1)} kg` })) algunBloque = true;
+    bloqueRegistroReceta(parte2, k2, 'KG', '', '', null, { titulo: `${f.relleno} — 2ª parte: ${cantIng(k2)} kg`, ficha: f.relleno });
   });
 
   // URGENTES FUERA DE PLAN: bloque propio con los kg ya puestos
@@ -3391,6 +3461,8 @@ async function reabrirTurnoProduccion(fecha){
    Los pastones de Frito se cortan el mismo día; los de Horno, al día
    siguiente (el lunes, los del sábado).
    --------------------------------------------------------------------- */
+// DIVIDIR PREPARACIÓN (05/11/2026): la 2ª parte se registra como "Receta (2ª parte)"
+const SUFIJO_PARTE2 = ' (2ª parte)';
 const MASAS_DISCOS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]; // hasta 15 masas por día
 const MASAS_INICIALES = 6; // se ven 6 y con "+ Masa" se agregan más
 let REGISTRO_DISCOS = null; // lo leído del servidor para la fecha en pantalla
@@ -4984,6 +5056,8 @@ function htmlTrazabilidad(d){
   if(!rel.fecha) hRel = dl([['Receta', rel.receta || '—'], ['Fecha del relleno', v('', 'Producción no cargó la fecha del relleno')]]);
   else {
     hRel = htmlCocina(rel, false);
+    // preparación dividida (05/11/2026): la 2ª parte del mismo día
+    if(rel.parte2) hRel += `<div style="border-left:3px solid var(--line);margin:12px 0 0 6px;padding:2px 0 2px 12px;"><div style="font-size:12.5px;color:var(--ink-soft);margin-bottom:4px;">↳ Ese día la preparación se hizo en 2 partes — <strong>2ª parte</strong></div>${htmlCocina(rel.parte2, false)}</div>`;
     if(rel.usadoEn && rel.usadoEn.length > 1){
       hRel += `<p class="traza-nota">Con este mismo relleno también se armó: ${rel.usadoEn.filter(u => !(u.sabor === d.sabor && u.fecha === d.fecha)).map(u => `${u.sabor} (${fmtFecha(u.fecha)}, ${u.total} un.)`).join(' · ')}</p>`;
     }
