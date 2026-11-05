@@ -158,11 +158,13 @@
   .sug-lotes{font-size:11.5px;color:var(--herb);margin-top:3px;line-height:1.3;}
   .sug-lotes.vencidos{color:var(--alert);}
   input.venc-rojo{border-color:var(--alert) !important;background:var(--alert-bg) !important;color:var(--alert) !important;font-weight:700;}
-  td.dif-rec{font-weight:700;font-variant-numeric:tabular-nums;text-align:right;}
+  td.dif-rec{font-weight:700;font-variant-numeric:tabular-nums;text-align:center;}
   td.dif-rec.ok{color:var(--herb);} td.dif-rec.mal{color:var(--alert);background:var(--alert-bg);}
   .ok-txt{color:var(--herb);font-weight:600;} .mal-txt{color:var(--alert);font-weight:700;} .gris-txt{color:var(--ink-soft);}
   /* botones Empezó / Terminó (hora automática) */
   .hora-auto{display:flex;align-items:center;gap:4px;}
+  /* registro de Discos: cantidades de la receta (tilde "Receta") en gris */
+  #tablaMasasDiscos input.inp-ing-masa:disabled, #tablaEmpasteDiscos input.inp-emp-ing:disabled{background:#f1ece3;color:var(--ink-soft);}
   .hora-auto input{width:96px;}
   .btn-ahora{background:var(--accent-bg);color:var(--crust-dark);border:1px solid #e8c48f;border-radius:3px;font-size:11.5px;font-weight:700;padding:6px 7px;white-space:nowrap;}
   .btn-ahora:hover{background:#f6dcb4;}
@@ -208,7 +210,7 @@
   table.inf th.finde, table.inf td.finde{background-color:#fbf6ec;}
   table.inf th.hoy div{color:var(--accent);}
   table.inf th.sin-plan small::after{content:" ·";color:var(--ink-soft);}
-  table.inf td{padding:3px 6px;border-bottom:1px solid #f1e9dc;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  table.inf td{padding:3px 6px;border-bottom:1px solid #f1e9dc;text-align:center;font-variant-numeric:tabular-nums;white-space:nowrap;}
   table.inf td:first-child{text-align:left;min-width:190px;max-width:240px;white-space:normal;}
   table.inf td.col-total, table.inf th.col-total{border-left:2px solid var(--line);font-weight:700;background-color:#faf7f0;}
   table.inf tr.primera td{border-top:1px solid var(--line);}
@@ -260,7 +262,7 @@
   .print-tabla tr.fila-subtotal-print td{font-weight:700;border-top:2px solid #000;}
   .tabla-resumen-envios tr.fila-grupo-resumen td{background:#efe6d3;font-weight:700;font-size:12px;text-transform:uppercase;letter-spacing:.03em;color:var(--crust-dark);}
   .tabla-resumen-envios tfoot td{border-top:2px solid var(--ink-soft);background:var(--panel);}
-  .tabla-resumen-envios td.num, .tabla-resumen-envios th.num{min-width:90px;text-align:right;}
+  .tabla-resumen-envios td.num, .tabla-resumen-envios th.num{min-width:90px;text-align:center;}
   .origen-traspaso{color:#7a3fa0;font-size:12.5px;}
   .bloque-salidas{margin-top:28px;padding:14px;border:1px dashed #b98bd3;border-radius:4px;background:#faf5fd;}
   .cartel-enviado{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
@@ -307,7 +309,9 @@
   }
   table.prod td{padding:7px 8px;border-bottom:1px solid var(--line);}
   table.prod tr:hover td{background:rgba(0,0,0,.02);}
-  .num{text-align:right;font-variant-numeric:tabular-nums;}
+  /* números centrados en toda la app (05/11/2026, Carolina) */
+  .num{text-align:center;font-variant-numeric:tabular-nums;}
+  table.prod th.num, table.lotes th.num, table.prod td.num, table.lotes td.num{text-align:center;}
   .badge{font-size:11px;padding:2px 7px;border-radius:10px;background:var(--herb-bg);color:var(--herb);}
   .badge.reposo{background:var(--accent-bg);color:var(--crust-dark);}
 
@@ -364,7 +368,7 @@
   table.print-tabla{width:100%;border-collapse:collapse;margin-bottom:6px;}
   table.print-tabla th{text-align:left;font-size:11px;color:var(--ink-soft);border-bottom:1px solid var(--ink-soft);padding:6px 8px;}
   table.print-tabla td{padding:6px 8px;border-bottom:1px solid var(--line);}
-  table.print-tabla .num{text-align:right;}
+  table.print-tabla .num{text-align:center;}
   @media print{
     body.print-envio .wrap{display:none !important;}
     body.print-envio #printAreaEnvio{display:block;}
@@ -381,7 +385,7 @@
   table.urg{width:100%;border-collapse:collapse;}
   table.urg th{background:var(--accent-bg);text-align:left;padding:5px 8px;font-size:12.5px;border-bottom:1px solid var(--line);}
   table.urg td{padding:5px 8px;border-bottom:1px solid var(--line);font-size:13.5px;}
-  table.urg td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;}
+  table.urg td.num{text-align:center;font-variant-numeric:tabular-nums;font-weight:700;}
   table.urg tr.fuera td{background:#FFF3D6;}
   .urg-b{font-size:11px;font-weight:700;border-radius:5px;padding:1px 6px;white-space:nowrap;}
   .urg-b.fuera{background:var(--alert-bg);color:var(--alert);}
@@ -1497,7 +1501,7 @@ function htmlUrgentesCocina(u){
   const filas = u.cocina || [];
   const titulo = `<h3>Urgente para el envío de hoy — ${String(u.dia || '').toLowerCase()} ${fmtFecha(u.fecha).slice(0, 5)}</h3>`;
   if(!filas.length) return `<div class="urg-card">${titulo}${htmlEstadoCargasUrgentes(u)}<div class="urg-nota">No hace falta ningún relleno urgente: con lo armado en fábrica y lo que hay en cámara alcanza para lo que piden hoy los locales. Seguí con la planificación habitual.</div></div>`;
-  const tabla = lista => `<table class="urg"><thead><tr><th>Relleno</th><th style="text-align:right;">Kg</th><th>Para</th><th></th></tr></thead><tbody>${lista.map(c => `
+  const tabla = lista => `<table class="urg"><thead><tr><th>Relleno</th><th style="text-align:center;">Kg</th><th>Para</th><th></th></tr></thead><tbody>${lista.map(c => `
     <tr class="${c.plan ? '' : 'fuera'}">
       <td><strong>${c.relleno}</strong>${c.kgCamara > 0 ? `<div style="font-size:11.5px;color:var(--ink-soft);">ya descontado lo de cámara (${dec(c.kgCamara)} kg)</div>` : ''}</td>
       <td class="num">${dec(c.kg)}</td>
@@ -1516,7 +1520,7 @@ function htmlUrgentesProduccion(u){
   const titulo = `<h3>Urgente para el envío de hoy — ${String(u.dia || '').toLowerCase()} ${fmtFecha(u.fecha).slice(0, 5)}</h3>`;
   const franco = u.francoProduccion ? `<div class="urg-nota" style="color:var(--alert);font-weight:600;">Hoy es franco de Producción.</div>` : '';
   if(!filas.length) return `<div class="urg-card">${titulo}${htmlEstadoCargasUrgentes(u)}${franco}<div class="urg-nota">No hay empanadas urgentes: lo armado en fábrica alcanza para lo que piden hoy los locales. Seguí con la planificación habitual.</div></div>`;
-  const tabla = lista => `<table class="urg"><thead><tr><th>Sabor</th><th style="text-align:right;">Armar</th><th>Relleno</th><th></th></tr></thead><tbody>${lista.map(p => `
+  const tabla = lista => `<table class="urg"><thead><tr><th>Sabor</th><th style="text-align:center;">Armar</th><th>Relleno</th><th></th></tr></thead><tbody>${lista.map(p => `
     <tr class="${p.plan ? '' : 'fuera'}">
       <td><strong>${p.sabor}</strong></td>
       <td class="num">${ent(p.unidades)}</td>
@@ -3401,7 +3405,8 @@ async function reabrirTurnoProduccion(fecha){
    Los pastones de Frito se cortan el mismo día; los de Horno, al día
    siguiente (el lunes, los del sábado).
    --------------------------------------------------------------------- */
-const MASAS_DISCOS = [1, 2, 3, 4, 5, 6];
+const MASAS_DISCOS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]; // hasta 15 masas por día
+const MASAS_INICIALES = 6; // se ven 6 y con "+ Masa" se agregan más
 let REGISTRO_DISCOS = null; // lo leído del servidor para la fecha en pantalla
 
 async function pintarRegistroDiscosSector(){
@@ -3428,7 +3433,7 @@ async function pintarRegistroDiscosSector(){
   cont.innerHTML = '';
   const intro = document.createElement('p');
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
-  intro.innerHTML = 'Registro de Discos del día. Los insumos de cada masa aparecen en <strong>gris con la receta</strong>: si se usó eso, no hace falta tocarlos; si se usó otra cantidad, escribí la real. Guardá con "Guardado provisorio" las veces que quieras y al terminar "Guardar y enviar final".';
+  intro.innerHTML = 'Registro de Discos del día. Cada masa tiene el tilde <strong>Receta</strong>: tildado = se usaron las cantidades de la receta; si se usó otra cantidad, sacale el tilde y escribí la real. Guardá con "Guardado provisorio" las veces que quieras y al terminar "Guardar y enviar final".';
   cont.appendChild(intro);
 
   // registro con el formato anterior (antes del 05/11/2026)
@@ -3458,37 +3463,52 @@ async function pintarRegistroDiscosSector(){
         <td><input type="date" class="inp-venc-ins" value="${val(g.vencimiento)}"></td></tr>`; }).join('')}
     </tbody></table></div>`;
 
-  // 2) MASAS (amasijo), una columna por masa como en la planilla
+  // 2) MASAS (amasijo), una columna por masa como en la planilla. Se ven 6
+  // y con "+ Masa" se suman hasta 15. Cada masa tiene el tilde "Receta":
+  // tildado = se usaron las cantidades de la receta (no se pueden tocar);
+  // destildado = se escriben las cantidades reales.
   const masaGuardada = {};
   (estado.masas || []).forEach(m => { masaGuardada[m.masa] = m; });
-  const celdaMasa = (n, clase, tipo, valor, extra) => `<td><input type="${tipo}" class="${clase}" data-masa="${n}" value="${val(valor)}" ${extra || ''} style="min-width:70px;"></td>`;
+  const usaReceta = g => !g || receta.masa.every(r => g.ingredientes[r.ingrediente] === '' || Number(g.ingredientes[r.ingrediente]) === Number(r.cantidad));
+  const visibles = Math.max(MASAS_INICIALES, ...Object.keys(masaGuardada).map(Number).filter(n => n > 0));
+  const oculto = n => n > visibles ? ' style="display:none;"' : '';
+  const celdaMasa = (n, clase, tipo, valor, extra) => `<td data-col="${n}"${oculto(n)}><input type="${tipo}" class="${clase}" data-masa="${n}" value="${val(valor)}" ${extra || ''} style="min-width:70px;"></td>`;
+  const celdaHoraMasa = (n, clase, valor, texto) => `<td data-col="${n}"${oculto(n)}><div class="hora-auto"><input type="time" class="${clase}" data-masa="${n}" value="${val(valor)}"><button type="button" class="btn-ahora no-print" data-para="${clase}">${texto}</button></div></td>`;
   const filaMasa = (titulo, fn) => `<tr><td style="white-space:nowrap;"><strong>${titulo}</strong></td>${MASAS_DISCOS.map(fn).join('')}</tr>`;
   h += `<h4 class="cat-heading">2 · Masas (amasijo)</h4>
     <div style="overflow-x:auto;"><table class="lotes traza" id="tablaMasasDiscos">
-      <thead><tr><th></th>${MASAS_DISCOS.map(n => `<th>Masa ${n}</th>`).join('')}</tr></thead><tbody>
+      <thead><tr><th></th>${MASAS_DISCOS.map(n => `<th data-col="${n}"${oculto(n)}>Masa ${n}</th>`).join('')}</tr></thead><tbody>
+      ${filaMasa('Receta <span class="gris-txt">(✓ = cantidades de la receta)</span>', n => `<td data-col="${n}"${oculto(n)}><label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" class="inp-receta-masa" data-masa="${n}" style="width:auto;" ${usaReceta(masaGuardada[n]) ? 'checked' : ''}> Receta</label></td>`)}
       ${receta.masa.map(r => filaMasa(`${esc(r.ingrediente)} <span class="gris-txt">(${esc(r.unidad)})</span>`, n => {
         const g = masaGuardada[n];
-        return celdaMasa(n, 'inp-ing-masa', 'number', g ? g.ingredientes[r.ingrediente] : '', `min="0" step="any" data-ing="${esc(r.ingrediente)}" placeholder="${val(r.cantidad)}"`);
+        const ok = usaReceta(g);
+        const valor = ok ? r.cantidad : (g.ingredientes[r.ingrediente] !== '' ? g.ingredientes[r.ingrediente] : r.cantidad);
+        return celdaMasa(n, 'inp-ing-masa', 'number', valor, `min="0" step="any" data-ing="${esc(r.ingrediente)}" data-receta="${val(r.cantidad)}" ${ok ? 'disabled' : ''}`);
       })).join('')}
-      ${filaMasa('Responsable', n => `<td><select class="inp-resp-masa" data-masa="${n}" style="min-width:110px;">${opcionesEmpleadosSeleccion(emp, masaGuardada[n] ? masaGuardada[n].responsable : '')}</select></td>`)}
+      ${filaMasa('Responsable', n => `<td data-col="${n}"${oculto(n)}><select class="inp-resp-masa" data-masa="${n}" style="min-width:110px;">${opcionesEmpleadosSeleccion(emp, masaGuardada[n] ? masaGuardada[n].responsable : '')}</select></td>`)}
       ${filaMasa('Temp. ambiente (°C)', n => celdaMasa(n, 'inp-tamb', 'number', masaGuardada[n] && masaGuardada[n].tempAmbiente, 'step="any"'))}
       ${filaMasa('Temp. agua (°C)', n => celdaMasa(n, 'inp-tagua', 'number', masaGuardada[n] && masaGuardada[n].tempAgua, 'step="any"'))}
-      ${filaMasa('Hora inicio amasado', n => celdaMasa(n, 'inp-hini', 'time', masaGuardada[n] && masaGuardada[n].horaInicio))}
-      ${filaMasa('Hora fin amasado', n => celdaMasa(n, 'inp-hfin', 'time', masaGuardada[n] && masaGuardada[n].horaFin))}
+      ${filaMasa('Hora inicio amasado', n => celdaHoraMasa(n, 'inp-hini', masaGuardada[n] && masaGuardada[n].horaInicio, 'Empezó'))}
+      ${filaMasa('Hora fin amasado', n => celdaHoraMasa(n, 'inp-hfin', masaGuardada[n] && masaGuardada[n].horaFin, 'Terminó'))}
       ${filaMasa('Peso final masa (kg)', n => celdaMasa(n, 'inp-peso-masa', 'number', masaGuardada[n] && masaGuardada[n].pesoFinal, 'min="0" step="any"'))}
       ${filaMasa('Pastones de Horno que salieron', n => celdaMasa(n, 'inp-pas-h', 'number', masaGuardada[n] && masaGuardada[n].pastonesHorno, 'min="0" step="1"'))}
       ${filaMasa('Pastones de Frito que salieron', n => celdaMasa(n, 'inp-pas-f', 'number', masaGuardada[n] && masaGuardada[n].pastonesFrito, 'min="0" step="1"'))}
     </tbody></table></div>
-    <p class="traza-nota">Se guardan solo las masas que tengan algún dato. Insumo vacío = se usó la cantidad de la receta (en gris).</p>`;
+    <div class="fila-agregar no-print" id="agregarMasaDiscos" style="margin-top:6px;${visibles >= MASAS_DISCOS.length ? 'display:none;' : ''}">
+      <button type="button" class="btn secondary">+ Masa</button> <span class="gris-txt" style="font-size:12px;">(hasta ${MASAS_DISCOS.length})</span>
+    </div>
+    <p class="traza-nota">Se guardan solo las masas que tengan algún dato. Si en una masa se usaron otras cantidades, sacale el tilde "Receta" y escribí las reales. Las horas se ponen con "Empezó" y "Terminó".</p>`;
 
   // 3) EMPASTE (solo pastones de Horno)
   const dia = estado.dia || {};
   const e = dia.empaste || {};
   const eIng = e.ingredientes || {};
+  const empOk = receta.empaste.every(r => eIng[r.ingrediente] === '' || eIng[r.ingrediente] == null || Number(eIng[r.ingrediente]) === Number(r.cantidad));
   h += `<h4 class="cat-heading">3 · Empaste (solo pastones de Horno)</h4>
     <div style="overflow-x:auto;"><table class="lotes traza" id="tablaEmpasteDiscos"><tbody>
       <tr><td style="width:45%;"><strong>Responsable</strong></td><td><select class="inp-emp-resp">${opcionesEmpleadosSeleccion(emp, e.responsable || '')}</select></td></tr>
-      ${receta.empaste.map(r => `<tr><td><strong>${esc(r.ingrediente)}</strong> <span class="gris-txt">(${esc(r.unidad)})</span></td><td><input type="number" min="0" step="any" class="inp-emp-ing" data-ing="${esc(r.ingrediente)}" value="${val(eIng[r.ingrediente])}" placeholder="${val(r.cantidad)}"></td></tr>`).join('')}
+      <tr><td><strong>Receta</strong> <span class="gris-txt">(✓ = cantidades de la receta)</span></td><td><label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="checkbox" class="inp-receta-emp" style="width:auto;" ${empOk ? 'checked' : ''}> Receta</label></td></tr>
+      ${receta.empaste.map(r => `<tr><td><strong>${esc(r.ingrediente)}</strong> <span class="gris-txt">(${esc(r.unidad)})</span></td><td><input type="number" min="0" step="any" class="inp-emp-ing" data-ing="${esc(r.ingrediente)}" data-receta="${val(r.cantidad)}" value="${val(empOk || eIng[r.ingrediente] === '' || eIng[r.ingrediente] == null ? r.cantidad : eIng[r.ingrediente])}" ${empOk ? 'disabled' : ''}></td></tr>`).join('')}
       <tr><td><strong>Tiempo de amasado</strong> <span class="gris-txt">(min)</span></td><td><input type="text" class="inp-emp-tiempo" value="${val(e.tiempo)}"></td></tr>
       <tr><td><strong>Temperatura</strong> <span class="gris-txt">(°C)</span></td><td><input type="number" step="any" class="inp-emp-temp" value="${val(e.temperatura)}"></td></tr>
       <tr><td><strong>Peso total empaste</strong> <span class="gris-txt">(kg)</span></td><td><input type="number" min="0" step="any" class="inp-emp-peso" value="${val(e.pesoTotal)}"></td></tr>
@@ -3513,6 +3533,29 @@ async function pintarRegistroDiscosSector(){
     <textarea id="obsDiscos" rows="3" style="width:100%;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px;">${esc(dia.observaciones || '')}</textarea>`;
   form.innerHTML = h;
 
+  // tilde "Receta": tildado = cantidades de la receta (bloqueadas); destildado = se editan
+  form.querySelectorAll('.inp-receta-masa').forEach(cb => {
+    cb.onchange = () => {
+      form.querySelectorAll(`#tablaMasasDiscos .inp-ing-masa[data-masa="${cb.dataset.masa}"]`).forEach(inp => {
+        inp.disabled = cb.checked;
+        if(cb.checked) inp.value = inp.dataset.receta;
+      });
+    };
+  });
+  const cbEmp = form.querySelector('.inp-receta-emp');
+  if(cbEmp) cbEmp.onchange = () => {
+    form.querySelectorAll('#tablaEmpasteDiscos .inp-emp-ing').forEach(inp => { inp.disabled = cbEmp.checked; if(cbEmp.checked) inp.value = inp.dataset.receta; });
+  };
+  // + Masa: muestra la siguiente columna (hasta 15)
+  const btnMasa = form.querySelector('#agregarMasaDiscos button');
+  if(btnMasa) btnMasa.onclick = () => {
+    const ocultas = [...form.querySelectorAll('#tablaMasasDiscos th[data-col]')].filter(th => th.style.display === 'none');
+    if(!ocultas.length) return;
+    const n = ocultas[0].dataset.col;
+    form.querySelectorAll(`#tablaMasasDiscos [data-col="${n}"]`).forEach(el => { el.style.display = ''; });
+    if(ocultas.length === 1) form.querySelector('#agregarMasaDiscos').style.display = 'none';
+  };
+
   const tbodyCorte = form.querySelector('#tablaCorteDiscos tbody');
   (estado.cortes || []).forEach(c => tbodyCorte.appendChild(filaCorteDiscos(c, fecha, estado.fechaPastonHorno)));
   if(!(estado.cortes || []).length && !estado.cierre){
@@ -3531,7 +3574,7 @@ async function pintarRegistroDiscosSector(){
   // ya enviado: todo bloqueado + Reabrir; si no, los 2 botones finales
   if(estado.cierre){
     form.querySelectorAll('input,select,textarea').forEach(el => el.disabled = true);
-    form.querySelectorAll('#agregarCorteDiscos, .btn-quitar-corte').forEach(el => el.style.display = 'none');
+    form.querySelectorAll('#agregarCorteDiscos, #agregarMasaDiscos, .btn-quitar-corte').forEach(el => el.style.display = 'none');
     cont.insertBefore(cartelEnviado(estado.cierre, 'Registro de discos', estado.cierre.puedeReabrir === false ? null : async () => {
       if(!confirm('¿Reabrir el registro de discos de este día? Se va a destrabar para corregir.')) return;
       try{
@@ -3609,23 +3652,27 @@ function datosRegistroDiscos(){
   const q = (clase, n) => v(form.querySelector(`#tablaMasasDiscos .${clase}[data-masa="${n}"]`));
   const masas = [];
   MASAS_DISCOS.forEach(n => {
-    const ingTocados = {};
-    let tocoIng = false;
-    form.querySelectorAll(`#tablaMasasDiscos .inp-ing-masa[data-masa="${n}"]`).forEach(inp => { if(inp.value !== ''){ ingTocados[inp.dataset.ing] = inp.value; tocoIng = true; } });
+    const cb = form.querySelector(`#tablaMasasDiscos .inp-receta-masa[data-masa="${n}"]`);
+    const conReceta = !cb || cb.checked;
+    const ing = {};
+    let distintoReceta = false;
+    receta.masa.forEach(r => {
+      const inp = [...form.querySelectorAll(`#tablaMasasDiscos .inp-ing-masa[data-masa="${n}"]`)].find(x => x.dataset.ing === r.ingrediente);
+      const valor = conReceta || !inp ? r.cantidad : inp.value;
+      if(String(valor) !== String(r.cantidad)) distintoReceta = true;
+      ing[r.ingrediente] = valor;
+    });
     const m = { masa: n, responsable: q('inp-resp-masa', n), tempAmbiente: q('inp-tamb', n), tempAgua: q('inp-tagua', n), horaInicio: q('inp-hini', n), horaFin: q('inp-hfin', n),
-      pesoFinal: q('inp-peso-masa', n), pastonesHorno: q('inp-pas-h', n), pastonesFrito: q('inp-pas-f', n) };
-    const tieneDatos = tocoIng || ['responsable', 'tempAmbiente', 'tempAgua', 'horaInicio', 'horaFin', 'pesoFinal', 'pastonesHorno', 'pastonesFrito'].some(k => m[k] !== '');
-    if(!tieneDatos) return;
-    // insumo sin tocar = la cantidad de la receta
-    m.ingredientes = {};
-    receta.masa.forEach(r => { m.ingredientes[r.ingrediente] = (r.ingrediente in ingTocados) ? ingTocados[r.ingrediente] : r.cantidad; });
-    masas.push(m);
+      pesoFinal: q('inp-peso-masa', n), pastonesHorno: q('inp-pas-h', n), pastonesFrito: q('inp-pas-f', n), ingredientes: ing };
+    const tieneDatos = distintoReceta || ['responsable', 'tempAmbiente', 'tempAgua', 'horaInicio', 'horaFin', 'pesoFinal', 'pastonesHorno', 'pastonesFrito'].some(k => m[k] !== '');
+    if(tieneDatos) masas.push(m);
   });
   const empIng = {};
-  receta.empaste.forEach(r => { const inp = [...form.querySelectorAll('#tablaEmpasteDiscos .inp-emp-ing')].find(x => x.dataset.ing === r.ingrediente); empIng[r.ingrediente] = inp && inp.value !== '' ? inp.value : r.cantidad; });
+  const empConReceta = !form.querySelector('.inp-receta-emp') || form.querySelector('.inp-receta-emp').checked;
+  receta.empaste.forEach(r => { const inp = [...form.querySelectorAll('#tablaEmpasteDiscos .inp-emp-ing')].find(x => x.dataset.ing === r.ingrediente); empIng[r.ingrediente] = empConReceta || !inp ? r.cantidad : inp.value; });
   const empaste = { responsable: v(form.querySelector('.inp-emp-resp')), tiempo: v(form.querySelector('.inp-emp-tiempo')), temperatura: v(form.querySelector('.inp-emp-temp')),
     pesoTotal: v(form.querySelector('.inp-emp-peso')), sobrante: v(form.querySelector('.inp-emp-sobra')), ingredientes: empIng,
-    tocado: [...form.querySelectorAll('#tablaEmpasteDiscos .inp-emp-ing')].some(x => x.value !== '') };
+    tocado: !empConReceta };
   const cortes = [...form.querySelectorAll('#tablaCorteDiscos tr.fila-corte')].map(tr => ({
     tipo: tr.querySelector('.inp-c-tipo').value, fechaPaston: v(tr.querySelector('.inp-c-fecha')), masa: v(tr.querySelector('.inp-c-masa')),
     responsable: v(tr.querySelector('.inp-c-resp')), pastones: v(tr.querySelector('.inp-c-pastones')), conRecorte: tr.querySelector('.inp-c-recorte').value === 'Sí',
@@ -3647,6 +3694,9 @@ async function guardarTodoDiscos(fecha, enviar){
     if(c.conRecorte && c.recorteKg === '') avisos.push(`${n}: dice "con recorte" pero no tiene los kg de recorte`);
   });
   d.masas.forEach(m => { if(m.pastonesHorno === '' && m.pastonesFrito === '') avisos.push(`Masa ${m.masa}: faltan los pastones que salieron`); });
+  // horas que casi seguro están mal (igual que en Producción)
+  const horasMal = horasRaras(d.masas.map(m => ({ sabor: 'Masa ' + m.masa, horaInicio: m.horaInicio, horaFin: m.horaFin })));
+  if(horasMal.length && !confirm(`OJO — revisá estas horas:\n\n${horasMal.join('\n')}\n\n¿Guardar igual? (Cancelar para corregir)`)) return;
   if(enviar){
     if(!d.cortes.some(c => Number(c.docenas) > 0) && !confirm('No hay ninguna tanda de corte con docenas. ¿Enviar igual?')) return;
     if(avisos.length && !confirm(`Hay datos a medio cargar:\n\n${avisos.map(a => '• ' + a).join('\n')}\n\n¿Enviar igual?`)) return;
