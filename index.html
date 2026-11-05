@@ -4914,7 +4914,13 @@ async function renderFichasTecnicas(){
 // no se validan porque no aparecen sueltos en ningún lado — solo se usan
 // como ingrediente adentro de otras fichas.
 async function referenciaParaTipo(tipoFicha){
-  if(tipoFicha === 'Relleno' || tipoFicha === 'EdicionLimitada') return await obtenerRellenos();
+  // también las canastas que se calculan aparte (ej. CANASTA DE ÑOQUIS): su
+  // ficha es de relleno aunque no tengan "Relleno" en Ref_Sabores (04/11/2026)
+  if(tipoFicha === 'Relleno' || tipoFicha === 'EdicionLimitada'){
+    const rellenos = await obtenerRellenos();
+    const cat = await obtenerCategoriaPorSabor().catch(() => ({}));
+    return rellenos.concat(Object.keys(cat).filter(n => cat[n] === 'Canasta'));
+  }
   if(tipoFicha === 'Postre' || tipoFicha === 'Dip') return Object.values(await obtenerCategorias()).flat();
   return null;
 }
