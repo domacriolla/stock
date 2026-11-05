@@ -2011,61 +2011,47 @@ async function pintarDiscos(data){
 }
 
 function htmlPlanDiscos(p){
-  const titulo = `<h2 style="font-size:18px;margin:0 0 6px;">Discos a cortar hoy</h2>`;
-  if(p.franco){
-    return titulo + `<p style="font-size:14px;">${p.dia} ${fmtFecha(p.fecha)}: <strong>franco de Discos</strong>. Lo que usa Producción hoy (y los moldes del lunes) lo cubrió el corte del sábado. Próximo corte: ${fmtFecha(p.proximoDia)}.</p>`;
-  }
+  const titulo = `<h2 style="font-size:18px;margin:0 0 6px;">Discos — ${p.dia} ${fmtFecha(p.fecha)}</h2>`;
+  if(p.franco) return titulo + `<p style="font-size:14px;"><strong>Franco de Discos.</strong> Próximo corte: ${fmtFecha(p.proximoDia)}.</p>`;
+  const TIPOS = [['horno', 'Horno'], ['recorte', 'Horno con recorte'], ['frito', 'Frito']];
   const corto = f => fmtFecha(f).slice(0, 5);
-  const cubre = p.dias.map(d => `${d.dia} ${corto(d.fecha)}`).join(' y ');
-  const num = x => x == null ? '<span class="gris-txt">—</span>' : ent(x);
-  const fila = (nombre, o) => `<tr>
-      <td><strong>${nombre}</strong></td>
-      <td class="num" style="font-size:16px;"><strong>${ent(o.docenas)}</strong></td>
-      <td class="num">${num(o.pastones)}</td>
-      <td class="num">${ent(o.cortado)}</td>
-      <td class="num">${o.falta > 0 ? `<span class="mal-txt">${ent(o.falta)}</span>` : '<span class="ok-txt">✓</span>'}</td>
-    </tr>`;
-  let h = titulo + `<p style="color:var(--ink-soft);font-size:13px;margin:0 0 4px;">${p.dia} ${fmtFecha(p.fecha)} — para lo que usa Producción el <strong>${cubre}</strong> (empanadas + moldes de canasta + dañados), menos los discos que hay en cámara.</p>`;
-  (p.alertas || []).forEach(a => { h += `<div class="msg err" style="display:block;margin:8px 0;">⚠ ${a}</div>`; });
-  h += `<table class="prod">
-      <thead><tr><th>Disco</th><th class="num">Docenas a cortar</th><th class="num">Pastones (aprox.)</th><th class="num">Ya cortado hoy</th><th class="num">Falta</th></tr></thead>
-      <tbody>${fila('Horno', p.horno)}${fila('Frito', p.frito)}</tbody>
-    </table>`;
-  if(p.horno.recorte > 0) h += `<p class="traza-nota">De lo de Horno, unas <strong>${ent(p.horno.recorte)} docenas</strong> son para sabores con recorte (es un dato: el recorte depende del sobrante de masa).</p>`;
+  const ayuda = (lbl, txt) => conAyuda(lbl, txt);
+  const signo = n => n < 0 ? `<span class="mal-txt">${ent(n)}</span>` : n > 0 ? `<span class="ok-txt">+${ent(n)}</span>` : '0';
+  const camTxt = p.camara.fechaCarga ? `stock de Discos cargado el ${fmtFecha(p.camara.fechaCarga)}` : 'Discos no cargó stock ayer: se toma 0';
 
-  // masas a hacer hoy
-  const rend = p.rendimiento || {};
-  if(p.masas){
-    h += `<div class="resumen-carga" style="margin-top:12px;">
-      <strong>Masas a hacer hoy: ${ent(p.masas.cantidad)}</strong> <span class="gris-txt">(${String(p.masas.exacto).replace('.', ',')} masas · ${ent(p.masas.pastones)} pastones)</span>
-      <div style="font-size:12.5px;margin-top:4px;">Pastones de Frito para cortar hoy (${num(p.frito.pastones)}) + pastones de Horno para cortar el ${p.semana[0].dia.toLowerCase()} (${num(p.pastones.hornoManana)})${p.pastones.paraManana ? ` − ${ent(p.pastones.paraManana)} que ya quedan en cámara` : ''}.</div>
-    </div>`;
-  } else {
-    h += `<div class="resumen-carga dato-viejo" style="margin-top:12px;font-size:13px;">Todavía no hay registros suficientes de <strong>pastones por masa</strong> y <strong>docenas por pastón</strong> para calcular pastones y masas: por ahora el plan va solo en docenas. Se calcula solo cuando Discos empiece a registrar en el registro nuevo.</div>`;
-  }
-  if(p.pastones.faltanHoy > 0) h += `<div class="msg err" style="display:block;margin:8px 0;">⚠ En cámara quedaron ${ent(p.camara.pastones)} pastones de Horno y para cortar hoy hacen falta ${ent(p.horno.pastones)}: faltan ${ent(p.pastones.faltanHoy)}.</div>`;
+  // 1 · HOY
+  let h = titulo + `<h4 class="cat-heading">1 · Hoy — lo que usa Producción hoy</h4>
+    <table class="prod"><thead><tr><th>Disco</th>
+      <th class="num">${ayuda('Necesita hoy', 'Empanadas que arma Producción hoy + moldes de canasta + % de dañados (en docenas).')}</th>
+      <th class="num">${ayuda('En cámara', 'Discos en cámara al empezar el día (' + camTxt + ').')}</th>
+      <th class="num">${ayuda('Diferencia', 'En cámara − Necesita hoy. En rojo: falta para hoy, hay que cortarlo ya.')}</th></tr></thead>
+    <tbody>${TIPOS.map(([k, n]) => { const t = p.hoy.tabla[k]; return `<tr><td><strong>${n}</strong></td><td class="num">${ent(t.necesita)}</td><td class="num">${ent(t.camara)}</td><td class="num" style="font-size:15px;"><strong>${signo(t.diferencia)}</strong></td></tr>`; }).join('')}</tbody></table>`;
+  if(p.hoy.recorteConHorno > 0) h += `<p class="traza-nota">${ent(p.hoy.recorteConHorno)} docenas de recorte se cubren con el Horno que sobra.</p>`;
 
-  // de dónde sale el número
-  h += `<h4 class="cat-heading">De dónde sale (docenas)</h4>
-    <table class="prod"><thead><tr><th>Día que se usan</th><th class="num">Empanadas Horno</th><th class="num">Empanadas Frito</th><th class="num">Moldes de canasta</th><th class="num">Dañados (H / F)</th><th class="num">Necesita Horno</th><th class="num">Necesita Frito</th></tr></thead>
-    <tbody>${p.dias.map(d => `<tr><td>${d.dia} ${corto(d.fecha)}</td><td class="num">${ent(d.empanadasHorno)}</td><td class="num">${ent(d.empanadasFrito)}</td><td class="num">${ent(d.moldes)}</td><td class="num">${ent(d.danadosHorno)} / ${ent(d.danadosFrito)}</td><td class="num"><strong>${ent(d.necesitaHorno)}</strong></td><td class="num"><strong>${ent(d.necesitaFrito)}</strong></td></tr>`).join('')}</tbody></table>`;
-  const cam = p.camara || {};
-  const camTxt = cam.fechaCarga
-    ? `Discos en cámara (carga del ${fmtFecha(cam.fechaCarga)}${cam.esDeHoy ? ', fin del turno de hoy' : ''}): Horno ${ent(cam.docenasHorno)} · Frito ${ent(cam.docenasFrito)} docenas${cam.cargoPastones ? ` · ${ent(cam.pastones)} pastones de Horno` : ' · pastones de Horno sin cargar'}.${cam.esDeHoy ? '' : ' Primero se descuenta lo que usa Producción hoy.'}`
-    : 'Sin carga de stock de Discos de ayer ni de hoy.';
-  h += `<p class="traza-nota">${camTxt}</p>`;
-  h += `<p class="traza-nota">Dañados: ${String(p.danados.horno).replace('.', ',')}% Horno · ${String(p.danados.frito).replace('.', ',')}% Frito (lo que registró Producción las últimas 4 semanas).
-    ${rend.docPorPastonHorno || rend.docPorPastonFrito || rend.pastonesPorMasa ? ` Rendimiento real: ${rend.docPorPastonHorno ? String(rend.docPorPastonHorno).replace('.', ',') + ' doc/pastón Horno · ' : ''}${rend.docPorPastonFrito ? String(rend.docPorPastonFrito).replace('.', ',') + ' doc/pastón Frito · ' : ''}${rend.pastonesPorMasa ? String(rend.pastonesPorMasa).replace('.', ',') + ' pastones/masa' : ''} (últimas 4 semanas).` : ''}
-    Lo de mañana en adelante es estimado: el número firme de cada día lo da el plan de ese día.</p>`;
+  // 2 · PARA MAÑANA
+  const cubre = p.manana.cubre.map(d => `${d.dia} ${corto(d.fecha)}`).join(' y ');
+  h += `<h4 class="cat-heading">2 · Para mañana — cortar hoy (${cubre})</h4>
+    <table class="prod"><thead><tr><th>Disco</th>
+      <th class="num">${ayuda('Necesita', 'Lo que usa Producción ' + cubre + ': empanadas + moldes de canasta + % de dañados (en docenas).')}</th>
+      <th class="num">${ayuda('Queda en cámara', 'Lo que queda en cámara después de lo de hoy y sigue vigente.')}</th>
+      <th class="num">${ayuda('A cortar', 'Necesita − Queda en cámara. Es lo que Discos tiene que cortar hoy.')}</th></tr></thead>
+    <tbody>${TIPOS.map(([k, n]) => { const t = p.manana.tabla[k]; return `<tr><td><strong>${n}</strong></td><td class="num">${ent(t.necesita)}</td><td class="num">${ent(t.camara)}</td><td class="num" style="font-size:16px;"><strong>${ent(t.aCortar)}</strong></td></tr>`; }).join('')}</tbody></table>`;
+  if(p.manana.recorteConHorno > 0) h += `<p class="traza-nota">${ent(p.manana.recorteConHorno)} docenas de recorte se cubren con el Horno que sobra.</p>`;
 
-  // resto de la semana
-  const semana = (p.semana || []).filter(s => s.dentroSemana);
-  if(semana.length){
-    h += `<h4 class="cat-heading">Resto de la semana (por si adelantan — aprox.)</h4>
-      <table class="prod"><thead><tr><th>Corte del</th><th>Para lo que se usa el</th><th class="num">Horno</th><th class="num">Frito</th></tr></thead>
-      <tbody>${semana.map(s => `<tr><td>${s.dia} ${corto(s.fecha)}</td><td>${s.cubre.join(' y ')}</td><td class="num">${ent(s.horno)}</td><td class="num">${ent(s.frito)}</td></tr>`).join('')}
-      <tr><td colspan="2"><strong>Total resto de la semana</strong></td><td class="num"><strong>${ent(semana.reduce((a, s) => a + s.horno, 0))}</strong></td><td class="num"><strong>${ent(semana.reduce((a, s) => a + s.frito, 0))}</strong></td></tr></tbody></table>
-      <p class="traza-nota">El disco dura 7 días: lo que adelanten hoy se descuenta solo de esos días.</p>`;
+  // 3 · DE DÓNDE SALE
+  const bloque = d => `<table class="prod" style="margin-bottom:10px;"><thead><tr><th>${d.dia} ${corto(d.fecha)}</th>
+      <th class="num">Empanadas</th><th class="num">Moldes de canasta</th>
+      <th class="num">${ayuda('Dañados', `% de discos dañados que registró Producción las últimas 4 semanas: ${String(p.danados.horno).replace('.', ',')}% Horno · ${String(p.danados.frito).replace('.', ',')}% Frito.`)}</th>
+      <th class="num">Total</th></tr></thead>
+    <tbody>${TIPOS.map(([k, n]) => `<tr><td>${n}</td><td class="num">${ent(d.empanadas[k])}</td><td class="num">${ent(d.moldes[k])}</td><td class="num">${ent(d.danados[k])}</td><td class="num"><strong>${ent(d.total[k])}</strong></td></tr>`).join('')}</tbody></table>`;
+  h += `<h4 class="cat-heading">${ayuda('3 · De dónde sale (docenas)', 'Hoy sale del plan del día. Los días que vienen son estimados con la proyección de ventas y el stock de hoy.')}</h4>`
+    + bloque(p.hoy.detalle) + p.manana.detalle.map(bloque).join('');
+
+  // RESTO DE LA SEMANA
+  if((p.semana || []).length){
+    h += `<h4 class="cat-heading">${ayuda('Resto de la semana — a cortar (aprox.)', 'Por si adelantan: el disco dura 7 días. Es estimado; el número firme de cada día sale ese día.')}</h4>
+      <table class="prod"><thead><tr><th>Corte del</th><th>Para</th>${TIPOS.map(([, n]) => `<th class="num">${n}</th>`).join('')}</tr></thead>
+      <tbody>${p.semana.map(s => `<tr><td>${s.dia} ${corto(s.fecha)}</td><td>${s.cubre.join(' y ')}</td>${TIPOS.map(([k]) => `<td class="num">${ent(s.aCortar[k])}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
   }
   return h;
 }
@@ -3518,15 +3504,16 @@ async function pintarRegistroDiscosSector(){
   // 4) PRODUCCIÓN DE DISCOS (corte)
   h += `<h4 class="cat-heading">4 · Producción de discos (corte)</h4>
     <div style="overflow-x:auto;"><table class="lotes traza" id="tablaCorteDiscos">
-      <thead><tr><th>Disco</th><th>Fecha del pastón</th><th>Masa</th><th>Responsable</th><th class="num">Pastones</th><th>¿Con recorte?</th><th class="num">Peso del pastón (kg)</th><th class="num">Recorte agregado (kg)</th><th class="num">Peso prom. disco (g)</th><th class="num">Docenas</th><th class="num">Doc./pastón</th><th class="no-print"></th></tr></thead>
+      <thead><tr><th>Disco</th><th>Fecha del pastón</th><th>Masa</th><th>Responsable</th><th class="num">Pastones</th><th class="num">Peso del pastón (kg)</th><th class="num">Recorte agregado (kg)</th><th class="num">Peso prom. disco (g)</th><th class="num">Docenas</th><th class="num">Doc./pastón</th><th class="no-print"></th></tr></thead>
       <tbody></tbody>
-      <tfoot><tr><td colspan="12" id="totalCorteDiscos" style="font-weight:600;"></td></tr></tfoot>
+      <tfoot><tr><td colspan="11" id="totalCorteDiscos" style="font-weight:600;"></td></tr></tfoot>
     </table></div>
     <div class="fila-agregar no-print" id="agregarCorteDiscos" style="margin-top:6px;">
-      <button type="button" class="btn secondary" data-tipo="Horno">+ Tanda de Horno</button>
-      <button type="button" class="btn secondary" data-tipo="Frito">+ Tanda de Frito</button>
+      <button type="button" class="btn secondary" data-tipo="Horno">+ Horno</button>
+      <button type="button" class="btn secondary" data-tipo="Horno con recorte">+ Horno con recorte</button>
+      <button type="button" class="btn secondary" data-tipo="Frito">+ Frito</button>
     </div>
-    <p class="traza-nota">Frito: pastones del mismo día. Horno: pastones del día anterior (${fmtFecha(estado.fechaPastonHorno)}). La fecha se propone sola y se puede corregir.</p>`;
+    <p class="traza-nota">Frito: pastones del mismo día. Horno y Horno con recorte: pastones del día anterior (${fmtFecha(estado.fechaPastonHorno)}). La fecha se propone sola y se puede corregir. "Recorte agregado" va solo en Horno con recorte.</p>`;
 
   // 5) OBSERVACIONES
   h += `<h4 class="cat-heading">5 · Observaciones</h4>
@@ -3559,8 +3546,7 @@ async function pintarRegistroDiscosSector(){
   const tbodyCorte = form.querySelector('#tablaCorteDiscos tbody');
   (estado.cortes || []).forEach(c => tbodyCorte.appendChild(filaCorteDiscos(c, fecha, estado.fechaPastonHorno)));
   if(!(estado.cortes || []).length && !estado.cierre){
-    tbodyCorte.appendChild(filaCorteDiscos({ tipo: 'Horno' }, fecha, estado.fechaPastonHorno));
-    tbodyCorte.appendChild(filaCorteDiscos({ tipo: 'Frito' }, fecha, estado.fechaPastonHorno));
+    ['Horno', 'Horno con recorte', 'Frito'].forEach(t => tbodyCorte.appendChild(filaCorteDiscos({ tipo: t }, fecha, estado.fechaPastonHorno)));
   }
   form.querySelectorAll('#agregarCorteDiscos button').forEach(b => {
     b.onclick = () => { const tr = filaCorteDiscos({ tipo: b.dataset.tipo }, fecha, estado.fechaPastonHorno); tbodyCorte.appendChild(tr); tr.scrollIntoView({ block: 'nearest' }); totalCorteDiscos(); };
@@ -3596,17 +3582,17 @@ async function pintarRegistroDiscosSector(){
 function filaCorteDiscos(c, fecha, fechaPastonHorno){
   const esc = escHtml;
   const val = v => (v === '' || v == null) ? '' : esc(v);
-  const tipo = c.tipo === 'Frito' ? 'Frito' : 'Horno';
+  const TIPOS_CORTE = ['Horno', 'Horno con recorte', 'Frito'];
+  const tipo = TIPOS_CORTE.indexOf(c.tipo) !== -1 ? c.tipo : (c.conRecorte ? 'Horno con recorte' : 'Horno');
   const fechaDef = tipo === 'Frito' ? fecha : fechaPastonHorno;
   const tr = document.createElement('tr');
   tr.className = 'fila-corte';
   tr.innerHTML = `
-    <td><select class="inp-c-tipo" style="min-width:85px;"><option value="Horno" ${tipo === 'Horno' ? 'selected' : ''}>Horno</option><option value="Frito" ${tipo === 'Frito' ? 'selected' : ''}>Frito</option></select></td>
+    <td><select class="inp-c-tipo" style="min-width:150px;">${TIPOS_CORTE.map(t => `<option value="${t}" ${tipo === t ? 'selected' : ''}>${t}</option>`).join('')}</select></td>
     <td><input type="date" class="inp-c-fecha" value="${val(c.fechaPaston || fechaDef)}" style="min-width:140px;"></td>
     <td><select class="inp-c-masa" style="min-width:60px;"><option value="">—</option>${MASAS_DISCOS.map(n => `<option value="${n}" ${String(c.masa) === String(n) ? 'selected' : ''}>${n}</option>`).join('')}</select></td>
     <td><select class="inp-c-resp" style="min-width:110px;">${opcionesEmpleadosSeleccion(EMPLEADOS_REGISTRO, c.responsable || '')}</select></td>
     <td><input type="number" min="0" step="1" class="inp-c-pastones" value="${val(c.pastones)}" style="width:70px;"></td>
-    <td><select class="inp-c-recorte" style="min-width:65px;"><option value="No" ${c.conRecorte ? '' : 'selected'}>No</option><option value="Sí" ${c.conRecorte ? 'selected' : ''}>Sí</option></select></td>
     <td><input type="number" min="0" step="any" class="inp-c-peso" value="${val(c.pesoPaston)}" style="width:80px;"></td>
     <td><input type="number" min="0" step="any" class="inp-c-recorte-kg" value="${val(c.recorteKg)}" style="width:80px;"></td>
     <td><input type="number" min="0" step="any" class="inp-c-peso-disco" value="${val(c.pesoPromDisco)}" style="width:70px;"></td>
@@ -3634,11 +3620,11 @@ function totalCorteDiscos(){
     const pas = Number(tr.querySelector('.inp-c-pastones').value) || 0;
     const cel = tr.querySelector('.celda-dxp');
     if(cel) cel.textContent = doc && pas ? (doc / pas).toFixed(1).replace('.', ',') : '';
-    if(tr.querySelector('.inp-c-tipo').value === 'Frito') f += doc;
-    else { h += doc; if(tr.querySelector('.inp-c-recorte').value === 'Sí') r += doc; }
+    const t = tr.querySelector('.inp-c-tipo').value;
+    if(t === 'Frito') f += doc; else if(t === 'Horno con recorte') r += doc; else h += doc;
   });
   const el = document.getElementById('totalCorteDiscos');
-  if(el) el.textContent = `Total cortado: Horno ${ent(h)} docenas${r ? ` (${ent(r)} con recorte)` : ''} · Frito ${ent(f)} docenas · Total ${ent(h + f)} docenas`;
+  if(el) el.textContent = `Total cortado: Horno ${ent(h)} · Horno con recorte ${ent(r)} · Frito ${ent(f)} · Total ${ent(h + r + f)} docenas`;
 }
 
 // lo que está en pantalla, listo para guardar
@@ -3675,7 +3661,7 @@ function datosRegistroDiscos(){
     tocado: !empConReceta };
   const cortes = [...form.querySelectorAll('#tablaCorteDiscos tr.fila-corte')].map(tr => ({
     tipo: tr.querySelector('.inp-c-tipo').value, fechaPaston: v(tr.querySelector('.inp-c-fecha')), masa: v(tr.querySelector('.inp-c-masa')),
-    responsable: v(tr.querySelector('.inp-c-resp')), pastones: v(tr.querySelector('.inp-c-pastones')), conRecorte: tr.querySelector('.inp-c-recorte').value === 'Sí',
+    responsable: v(tr.querySelector('.inp-c-resp')), pastones: v(tr.querySelector('.inp-c-pastones')), conRecorte: tr.querySelector('.inp-c-tipo').value === 'Horno con recorte',
     pesoPaston: v(tr.querySelector('.inp-c-peso')), recorteKg: v(tr.querySelector('.inp-c-recorte-kg')), pesoPromDisco: v(tr.querySelector('.inp-c-peso-disco')), docenas: v(tr.querySelector('.inp-c-docenas'))
   })).filter(c => c.pastones !== '' || c.docenas !== '' || c.responsable || c.pesoPaston !== '' || c.recorteKg !== '' || c.pesoPromDisco !== '');
   return { insumos, masas, dia: { observaciones: v(document.getElementById('obsDiscos')), empaste }, cortes };
@@ -3691,7 +3677,7 @@ async function guardarTodoDiscos(fecha, enviar){
     const n = `Corte ${i + 1} (${c.tipo})`;
     if(c.docenas === '') avisos.push(`${n}: faltan las docenas`);
     if(c.pastones === '') avisos.push(`${n}: faltan los pastones`);
-    if(c.conRecorte && c.recorteKg === '') avisos.push(`${n}: dice "con recorte" pero no tiene los kg de recorte`);
+    if(c.conRecorte && c.recorteKg === '') avisos.push(`${n}: falta el recorte agregado (kg)`);
   });
   d.masas.forEach(m => { if(m.pastonesHorno === '' && m.pastonesFrito === '') avisos.push(`Masa ${m.masa}: faltan los pastones que salieron`); });
   // horas que casi seguro están mal (igual que en Producción)
@@ -5421,6 +5407,11 @@ function theadDias(titulo, dias, opts){
   return `<thead><tr><th>${titulo}</th>${dias.map(d => `<th class="col-dia${esFinde(d) ? ' finde' : ''}${d.fecha === hoy ? ' hoy' : ''}${o.marcarSinPlan && !d.conPlan ? ' sin-plan' : ''}" title="${fmtFecha(d.fecha)}${o.marcarSinPlan && !d.conPlan ? ' — sin plan guardado' : ''}"><div>${Number(d.fecha.slice(8))}</div><small>${DIA_CORTO[d.dia] || ''}</small></th>`).join('')}<th class="num col-total">${o.tituloTotal || 'Mes'}</th></tr></thead>`;
 }
 function tdDia(d, contenido, clase, title){ return `<td class="${clase || ''}${esFinde(d) ? ' finde' : ''}"${title ? ` title="${escHtml(title)}"` : ''}>${contenido}</td>`; }
+// en la tablet no hay "mouse encima": tocar una ayuda (i) muestra el texto abajo
+document.addEventListener('click', (e) => {
+  const a = e.target.closest('.con-ayuda');
+  if(a && a.title) avisar('ⓘ ' + a.title);
+});
 function conAyuda(lbl, ayuda){ return ayuda ? `<span class="con-ayuda" title="${escHtml(ayuda)}">${lbl}<i class="ayuda-i">i</i></span>` : lbl; }
 function filaSector(titulo, dias){ return `<tr class="fila-sector"><td>${titulo}</td><td colspan="${dias.length + 1}"></td></tr>`; }
 
