@@ -159,6 +159,8 @@
   .sug-lotes.vencidos{color:var(--alert);}
   input.venc-rojo{border-color:var(--alert) !important;background:var(--alert-bg) !important;color:var(--alert) !important;font-weight:700;}
   td.dif-rec{font-weight:700;font-variant-numeric:tabular-nums;text-align:center;}
+  .bloque-extra{margin-top:22px;padding-top:14px;border-top:1px dashed var(--line);}
+  .form-extra{margin-top:10px;padding:12px;border:1px solid var(--line);border-radius:8px;max-width:460px;}
   td.dif-rec.ok{color:var(--herb);} td.dif-rec.mal{color:var(--alert);background:var(--alert-bg);}
   .ok-txt{color:var(--herb);font-weight:600;} .mal-txt{color:var(--alert);font-weight:700;} .gris-txt{color:var(--ink-soft);}
   /* botones Empezó / Terminó (hora automática) */
@@ -4087,6 +4089,8 @@ function filaEnvio(nombre, ordenCalculada, esExtra, guardado, conOrden, panelEst
     tr.classList.add('fila-guardada');
     ponerSello(tr, g.recibido ? null : null);
     if(g.recibido){ const s = tr.querySelector('.sello-guardado'); if(s) s.textContent = '✓ Recibido'; }
+    // no estaba en el despacho: lo cargó el local al recibir (06/11/2026)
+    if(g.agregadoLocal){ const s = tr.querySelector('.sello-guardado'); if(s){ s.textContent = `⚠ Lo agregó el local: llegaron ${cantProd(nombre, g.cantidadRecibida)}`; s.title = 'No estaba cargado en el despacho. Si fue con este envío, poné la cantidad y guardá.'; } }
   }
   return tr;
 }
@@ -4416,6 +4420,7 @@ async function renderRecepcion(){
     </div>
     <div id="contenidoRecepcion" class="loading">Buscando envíos pendientes…</div>
     <div class="msg" id="msgRecepcion"></div>
+    <div id="extraRecepcion"></div>
   `;
   document.getElementById('selLocalRecepcion').onchange = cargarPendientesRecepcion;
   cargarPendientesRecepcion();
@@ -4427,6 +4432,8 @@ async function cargarPendientesRecepcion(){
   cont.className = 'loading'; cont.textContent = 'Buscando envíos pendientes…';
   const msg = document.getElementById('msgRecepcion');
   msg.className = 'msg'; msg.textContent = '';
+  const extraDiv = document.getElementById('extraRecepcion');
+  if(extraDiv) extraDiv.innerHTML = '';
 
   try{
     const [r, categorias] = await Promise.all([
@@ -4536,9 +4543,99 @@ async function cargarPendientesRecepcion(){
     if(bC) bC.onclick = () => guardarRecepcion(true);
     const bE = document.getElementById('btnConfirmarEntrega');
     if(bE) bE.onclick = confirmarEntregaSalidas;
+    pintarExtraRecepcion(local, data, categorias);
   }catch(err){
     cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo buscar: ${err.message}</div>`;
   }
+}
+
+/* "LLEGÓ ALGO QUE NO ESTÁ EN LA LISTA" (06/11/2026, Carolina): el local
+   registra lo que vino de fábrica y no estaba cargado en el despacho. Queda
+   como recibido (enviado 0 → diferencia +N, Fábrica lo ve en el Historial y
+   en el informe de Envíos). Va aparte de la lista de arriba: agregarlo no
+   pisa lo que se está cargando en la lista. */
+function pintarExtraRecepcion(local, data, categorias){
+  const div = document.getElementById('extraRecepcion');
+  if(!div || document.getElementById('selLocalRecepcion').value !== local) return;
+  const envios = (data.enviosRecientes && data.enviosRecientes.length) ? data.enviosRecientes : [{ fecha: hoyISO(), nro: 1 }];
+  const extras = data.extras || [];
+  const txtEnvio = e => `${fmtFecha(e.fecha).slice(0, 5)}${Number(e.nro) > 1 ? ` · envío ${e.nro}` : ''}`;
+  const opcProd = Object.keys(categorias).map(c => `<optgroup label="${escHtml(c)}">${categorias[c].slice().sort(compararTexto).map(n => `<option value="${escHtml(n)}">${escHtml(ENVIO_EN_KILOS[n] ? nombreFabrica(n) : n)}</option>`).join('')}</optgroup>`).join('');
+  div.innerHTML = `
+    <div class="bloque-extra">
+      ${extras.length ? `<h3 style="font-size:16px;margin:0 0 4px;">${conAyuda('Agregado — no estaba en la lista', 'Ya quedó como recibido. Fábrica lo ve como diferencia en el Historial de envíos. ✕ si se cargó por error.')}</h3>
+        <table class="lotes">
+          <thead><tr><th>Producto</th><th>Llegó con</th><th class="num">Recibido</th><th>Vencimiento</th><th></th></tr></thead>
+          <tbody>${extras.map(x => { const kg = ENVIO_EN_KILOS[x.sabor]; return `
+            <tr data-extra="${escHtml(x.id)}">
+              <td>${escHtml(kg ? nombreFabrica(x.sabor) : x.sabor)}${kg ? etiquetaUnidad(x.sabor, 'kg') : ''}</td>
+              <td style="color:var(--ink-soft);font-size:12.5px;">${txtEnvio({ fecha: x.fechaEnvio, nro: x.nro })}</td>
+              <td class="num"><strong>${kg ? dec(Math.round(x.recibida * kg * 100) / 100) : cantProd(x.sabor, x.recibida)}</strong></td>
+              <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(x.vencimiento)}</td>
+              <td>${x.enviada > 0 ? '<span class="sello-guardado">✓ Fábrica lo cargó</span>' : '<button type="button" class="del-btn btn-quitar-extra" title="Quitar (cargado por error)">✕</button>'}</td>
+            </tr>`; }).join('')}</tbody>
+        </table>` : ''}
+      <button type="button" class="btn secondary" id="btnAbrirExtra">+ Llegó algo que no está en la lista</button>
+      <div id="formExtra" class="form-extra" style="display:none;">
+        <div class="field-row"><label>Producto</label><select id="selExtraProd"><option value="">— Elegí —</option>${opcProd}</select></div>
+        <div class="field-row"><label>${conAyuda('Llegó con el envío del', 'El envío de fábrica en el que vino.')}</label><select id="selExtraEnvio">${envios.map((e, i) => `<option value="${i}">${txtEnvio(e)}</option>`).join('')}</select></div>
+        <div class="field-row"><label id="lblExtraCant">Cantidad que llegó</label><input type="number" min="0" step="1" id="inpExtraCant" style="max-width:110px;"></div>
+        <div class="field-row"><label>Vencimiento</label><input type="date" id="inpExtraVenc"></div>
+        <div class="actions"><button type="button" class="btn" id="btnGuardarExtra">Guardar como recibido</button><button type="button" class="btn secondary" id="btnCancelarExtra">Cancelar</button></div>
+      </div>
+    </div>`;
+  const form = div.querySelector('#formExtra'), bAbrir = div.querySelector('#btnAbrirExtra');
+  bAbrir.onclick = () => { form.style.display = ''; bAbrir.style.display = 'none'; };
+  div.querySelector('#btnCancelarExtra').onclick = () => { form.style.display = 'none'; bAbrir.style.display = ''; };
+  div.querySelector('#selExtraProd').onchange = (e) => {
+    const n = e.target.value, kg = ENVIO_EN_KILOS[n];
+    div.querySelector('#lblExtraCant').textContent = kg ? 'Kilos que llegaron' : 'Cantidad que llegó';
+    div.querySelector('#inpExtraCant').step = kg ? '0.25' : pasoProd(n);
+  };
+  div.querySelector('#btnGuardarExtra').onclick = async () => {
+    const responsable = document.getElementById('inpResponsableRecepcion').value.trim();
+    const sabor = div.querySelector('#selExtraProd').value;
+    const cantTxt = div.querySelector('#inpExtraCant').value;
+    const venc = div.querySelector('#inpExtraVenc').value;
+    const env = envios[Number(div.querySelector('#selExtraEnvio').value)] || envios[0];
+    if(!responsable){ avisar('✗ Falta indicar quién recibe (arriba de todo).', 'err'); document.getElementById('inpResponsableRecepcion').focus(); return; }
+    if(!sabor){ avisar('✗ Elegí el producto.', 'err'); return; }
+    if(cantTxt === '' || Number(cantTxt) < 0){ avisar('✗ Poné la cantidad que llegó.', 'err'); return; }
+    if(!venc && !confirm('No pusiste vencimiento. ¿Guardar igual?')) return;
+    const kg = ENVIO_EN_KILOS[sabor];
+    const cantidad = kg ? Math.round(Number(cantTxt) / kg * 100) / 100 : Number(cantTxt); // kilos -> porciones
+    const nombre = kg ? nombreFabrica(sabor) : sabor;
+    if(!confirm(`¿Guardar ${cantTxt}${kg ? ' kg' : ''} de ${nombre} como recibido (llegó con el envío del ${txtEnvio(env)})?`)) return;
+    const btn = div.querySelector('#btnGuardarExtra');
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    try{
+      await postJSON({ action: 'agregarRecepcionExtra', local, responsable, fechaEnvio: env.fecha, nro: env.nro, sabor, cantidad, vencimiento: venc });
+      await recargarExtraRecepcion(local);
+      avisar(`✓ Guardado · ${horaCorta()} — ${nombre}: ${cantTxt}${kg ? ' kg' : ''} recibido.`);
+    }catch(err){
+      btn.disabled = false; btn.textContent = 'Guardar como recibido';
+      avisar('✗ NO se guardó — ' + err.message, 'err');
+    }
+  };
+  div.querySelectorAll('.btn-quitar-extra').forEach(b => b.onclick = async () => {
+    const tr = b.closest('tr');
+    if(!confirm(`¿Quitar ${tr.cells[0].textContent.trim()}? (Se cargó por error.)`)) return;
+    b.disabled = true;
+    try{
+      await postJSON({ action: 'quitarRecepcionExtra', local, id: tr.dataset.extra });
+      await recargarExtraRecepcion(local);
+      avisar('✓ Quitado.');
+    }catch(err){ b.disabled = false; avisar('✗ NO se quitó — ' + err.message, 'err'); }
+  });
+}
+// vuelve a pintar SOLO el bloque de agregados (la lista de arriba no se toca)
+async function recargarExtraRecepcion(local){
+  const [data, categorias] = await Promise.all([
+    fetch(`${APPS_SCRIPT_URL}?action=listarEnviosPendientes&local=${encodeURIComponent(local)}`).then(x => x.json()),
+    obtenerCategorias()
+  ]);
+  if(data.error) throw new Error(data.error);
+  pintarExtraRecepcion(local, data, categorias);
 }
 
 async function confirmarEntregaSalidas(){
@@ -4668,7 +4765,7 @@ async function cargarHistorialEnvios(){
               <td>${fmtFecha(f.Fecha_envio)}</td>
               <td>${f.Origen ? `<span class="origen-traspaso">${f.Origen}</span>` : 'Fábrica'}</td>
               <td>${f.Local}</td>
-              <td>${f.Sabor}</td>
+              <td>${f.Sabor}${f.AgregadoPorLocal === 'Sí' ? ` <span class="item-extra" title="No estaba en el despacho: lo agregó el local al recibir">· lo agregó el local</span>` : ''}</td>
               <td class="num">${cantProd(f.Sabor, f.Cantidad_Enviada)}</td>
               <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(f.Vencimiento)}</td>
               <td style="color:var(--ink-soft);font-size:12.5px;">${f.Fecha_recepcion ? fmtFecha(f.Fecha_recepcion) : (f.Estado === 'Preparando' ? '— en preparación (sin enviar) —' : '— sin confirmar —')}</td>
