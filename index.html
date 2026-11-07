@@ -1339,6 +1339,11 @@ const UNIDAD_PRODUCTO = { 'SALSA FILETTO': 'litros' };
 // valor = kilos por porción. La orden de envío se redondea para arriba al
 // kilo entero; en la planilla se guarda siempre en porciones del local.
 const ENVIO_EN_KILOS = { 'TOPPING MUZZARELLA': 0.25 };
+// Productos en otra unidad pero SIN decimales (06/11/2026, Carolina): los
+// maples de huevo van en MAPLES ENTEROS en el stock del local, el envío y la
+// recepción. No se producen en fábrica: no aparecen en "Qué producir hoy".
+const UNIDAD_ENTERA = { 'MAPLES DE HUEVO': 'maples enteros' };
+const NO_SE_PRODUCE = { 'MAPLES DE HUEVO': true };
 // cantidades de insumos (kg, litros): con decimales cuando son chicas, para
 // que 0,3 kg de sal no se muestre como "0". Corregido 07/10/2026.
 function cantIng(n){
@@ -1354,6 +1359,7 @@ function pasoProd(nombre){ return esDecimal(nombre) ? '0.01' : '1'; }
 function etiquetaUnidad(nombre, dondeMuzza){
   if(nombre === 'Pastones horno') return ' <span class="unidad-prod">(en pastones, no docenas)</span>';
   if(UNIDAD_PRODUCTO[nombre]) return ` <span class="unidad-prod">(${UNIDAD_PRODUCTO[nombre]})</span>`;
+  if(UNIDAD_ENTERA[nombre]) return ` <span class="unidad-prod">(${UNIDAD_ENTERA[nombre]})</span>`;
   if(ENVIO_EN_KILOS[nombre] && dondeMuzza === 'kg') return ' <span class="unidad-prod">(kg)</span>';
   if(ENVIO_EN_KILOS[nombre] && dondeMuzza === 'porciones') return ` <span class="unidad-prod">(porciones de ${ENVIO_EN_KILOS[nombre] * 1000} g)</span>`;
   return '';
@@ -1562,7 +1568,7 @@ function pintarProduccion(data){
   // Dips y Postres los elabora Cocina (no Producción) — se muestran en la
   // pestaña Cocina, junto con Preparados y Rellenos.
   // La salsa (litros) también la elabora Cocina.
-  const filas = data.produccion.filter(f => f.aHacerUnidades > 0 && f.rubro !== 'Dips' && f.rubro !== 'Postres' && !esDecimal(f.sabor));
+  const filas = data.produccion.filter(f => f.aHacerUnidades > 0 && f.rubro !== 'Dips' && f.rubro !== 'Postres' && !esDecimal(f.sabor) && !NO_SE_PRODUCE[f.sabor]);
   // el lunes (franco de Producción) el molde de canasta lo hace Cocina: el
   // bloque "para mañana" se muestra en la pestaña Cocina
   const prepHtml = data.dia === DIA_FRANCO_PRODUCCION ? '' : bloquePrepDiaAnterior();
@@ -4052,7 +4058,7 @@ function pintarTraspaso(wrap){
 
 // una fila por producto (todos, siempre visibles y editables); "+" agrega
 // otra fila del MISMO producto para otro vencimiento.
-function filaEnvio(nombre, ordenCalculada, esExtra, guardado, conOrden, panelEstado){
+function filaEnvio(nombre, ordenCalculada, esExtra, guardado, conOrden, panelEstado, stockLocal){
   const g = guardado || {};
   const tr = document.createElement('tr');
   tr.dataset.item = nombre;
@@ -4063,9 +4069,11 @@ function filaEnvio(nombre, ordenCalculada, esExtra, guardado, conOrden, panelEst
   const ordenVista = conOrden ? ordenEnvioFabrica(nombre, ordenCalculada) : (ordenCalculada || 0);
   if(kgPorcion) tr.dataset.kgPorcion = kgPorcion;
   tr.dataset.orden = esExtra ? 0 : (ordenVista || 0);
+  tr.dataset.stock = esExtra ? 0 : stockLocalNum(nombre, stockLocal);
   const cantVista = g.cantidad ? (kgPorcion ? Math.round(Number(g.cantidad) * kgPorcion * 100) / 100 : g.cantidad) : '';
   tr.innerHTML = `
     <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : (conOrden ? nombreFabrica(nombre) : nombre) + etiquetaUnidad(nombre, conOrden ? 'kg' : 'porciones')}</td>
+    ${conOrden ? `<td class="num col-stock-local">${esExtra ? '' : stockLocalVista(nombre, stockLocal)}</td>` : ''}
     ${conOrden ? `<td class="num" style="color:var(--ink-soft);">${esExtra ? '' : cantProd(nombre, ordenVista)}</td>` : ''}
     <td><input type="number" min="0" step="${kgPorcion ? '0.25' : pasoProd(nombre)}" class="inp-cant" placeholder="0" value="${cantVista}"></td>
     <td><input type="date" class="inp-venc" value="${g.vencimiento || ''}"></td>
@@ -4080,7 +4088,7 @@ function filaEnvio(nombre, ordenCalculada, esExtra, guardado, conOrden, panelEst
     };
   } else {
     tr.querySelector('.add-lote-btn').onclick = () => {
-      tr.insertAdjacentElement('afterend', filaEnvio(nombre, ordenCalculada, true, null, conOrden, panelEstado));
+      tr.insertAdjacentElement('afterend', filaEnvio(nombre, ordenCalculada, true, null, conOrden, panelEstado, null));
     };
   }
   if(guardado){
@@ -4094,6 +4102,18 @@ function filaEnvio(nombre, ordenCalculada, esExtra, guardado, conOrden, panelEst
   }
   return tr;
 }
+
+// STOCK LOCAL en Despachar envíos (06/11/2026, Carolina): lo que cargó el
+// local y la app ya descontó de la orden. Muzzarella en kg, como la orden.
+function stockLocalNum(nombre, n){
+  const v = Number(n) || 0;
+  const kg = ENVIO_EN_KILOS[nombre];
+  return kg ? Math.round(v * kg * 100) / 100 : v;
+}
+function stockLocalVista(nombre, n){
+  return ENVIO_EN_KILOS[nombre] ? dec(stockLocalNum(nombre, n)) : cantProd(nombre, stockLocalNum(nombre, n));
+}
+const AYUDA_STOCK_LOCAL = 'Lo que cargó el local en su último stock (sin lo vencido). La orden calculada ya lo descuenta. Si el local no cargó, es 0.';
 
 function htmlSugerenciaLotes(it){
   let h = '';
@@ -4160,6 +4180,7 @@ function pintarPanelEnvio({ origen, destino, nro, itemsCalculados, data, categor
     table.innerHTML = `
       <thead><tr>
         <th>Sabor / ítem</th>
+        ${conOrden ? `<th class="col-cant">${conAyuda('Stock local', AYUDA_STOCK_LOCAL)}</th>` : ''}
         ${conOrden ? `<th class="col-cant">${faltantes ? 'Falta mandar' : 'Orden calculada'}</th>` : ''}
         <th class="col-cant">${origen ? 'Cantidad' : 'Enviado (real)'}</th>
         <th class="col-venc">Vencimiento</th>
@@ -4167,6 +4188,7 @@ function pintarPanelEnvio({ origen, destino, nro, itemsCalculados, data, categor
       </tr></thead><tbody></tbody>
       <tfoot><tr class="fila-subtotal-cat">
         <td>Total ${cat}</td>
+        ${conOrden ? '<td class="num sub-stock"></td>' : ''}
         ${conOrden ? '<td class="num sub-orden"></td>' : ''}
         <td class="num sub-enviado" style="padding-left:14px;"></td>
         <td colspan="4"></td>
@@ -4174,8 +4196,9 @@ function pintarPanelEnvio({ origen, destino, nro, itemsCalculados, data, categor
     const tbody = table.querySelector('tbody');
     categorias[cat].forEach(nombre => {
       const orden = (porSabor[nombre] && porSabor[nombre].aHacerUnidades) || 0;
+      const stockLocal = porSabor[nombre] ? porSabor[nombre].stockValidoUnidades : 0;
       const gs = guardadosPorItem[nombre] || [];
-      const filas = gs.length === 0 ? [filaEnvio(nombre, orden, false, null, conOrden, panelEstado)] : gs.map((g, k) => filaEnvio(nombre, orden, k > 0, g, conOrden, panelEstado));
+      const filas = gs.length === 0 ? [filaEnvio(nombre, orden, false, null, conOrden, panelEstado, stockLocal)] : gs.map((g, k) => filaEnvio(nombre, orden, k > 0, g, conOrden, panelEstado, stockLocal));
       filas.forEach(tr => tbody.appendChild(tr));
       // MANDAR PRIMERO LO QUE VENCE ANTES (16/10/2026)
       const it = porSabor[nombre];
@@ -4193,6 +4216,8 @@ function pintarPanelEnvio({ origen, destino, nro, itemsCalculados, data, categor
       const sumEnv = filas.reduce((a, tr) => a + (Number(tr.querySelector('.inp-cant').value) || 0), 0);
       const conDec = categorias[cat].some(esDecimal); // la categoría tiene algo en litros
       const so = table.querySelector('.sub-orden'); if(so) so.textContent = conDec ? dec(sumOrden) : ent(sumOrden);
+      const sumStock = filas.reduce((a, tr) => a + (Number(tr.dataset.stock) || 0), 0);
+      const ss = table.querySelector('.sub-stock'); if(ss) ss.textContent = conDec ? dec(sumStock) : ent(sumStock);
       table.querySelector('.sub-enviado').textContent = conDec ? dec(sumEnv) : ent(sumEnv);
     };
     tbody.addEventListener('input', actualizarSubtotal);
