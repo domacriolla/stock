@@ -296,6 +296,24 @@
   h4.receta-heading{font-size:17px;text-transform:none;letter-spacing:0;margin-top:28px;}
   table.lotes.traza td{font-size:13.5px;}
   .cat-nav{display:flex;flex-wrap:wrap;gap:6px;margin:16px 0 0;}
+  /* Despachar envíos (14/11/2026): el local queda fijo arriba al bajar */
+  .aviso-especial{border-radius:10px;padding:10px 14px;margin:8px 0 12px;font-size:13.5px;}
+  .aviso-especial.hoy{background:var(--pink-bg);border:2px solid var(--pink);}
+  .aviso-especial.semana{background:#e9f1f7;border:1px solid #9fbfd6;}
+  .aviso-especial .ae-tit{font-weight:700;font-size:15px;margin-bottom:4px;}
+  .aviso-especial.hoy .ae-tit{color:var(--pink);font-size:17px;}
+  .aviso-especial .ae-linea{margin:3px 0;}
+  .ae-nota{font-size:11.5px;color:var(--ink-soft);margin-top:4px;}
+  .badge-especial{display:inline-block;background:var(--pink-bg);color:var(--pink);border:1px solid var(--pink);border-radius:10px;font-size:11px;font-weight:600;padding:1px 7px;margin-left:4px;white-space:nowrap;}
+  .sem-card{background:#eef5fa;border:1px solid #9fbfd6;border-radius:10px;padding:10px 14px;margin:10px 0 14px;}
+  .sem-card h3{margin:0 0 6px;font-size:16px;color:#2e5d7a;}
+  .sem-card tr.sem-cero td{color:var(--ink-soft);}
+  tr.pe-cancelado td{color:var(--ink-soft);text-decoration:line-through;}
+  .btn-mas-resp{font-size:11px;padding:2px 7px;border:1px dashed var(--line);background:#fff;border-radius:6px;cursor:pointer;color:var(--crust);}
+  .cong-titulo{margin:30px 0 4px;font-size:17px;color:#2e5d7a;border-top:2px dashed #b9d3e3;padding-top:14px;}
+  .tabla-congelados td.cong-ultima{font-size:12.5px;min-width:130px;}
+  .local-fijo{position:sticky;top:0;z-index:20;background:var(--crust);color:#fff;font-weight:700;font-size:17px;letter-spacing:.5px;padding:9px 14px;border-radius:8px;margin:6px 0 10px;box-shadow:0 2px 6px rgba(0,0,0,.18);text-align:center;}
+  @media print{ .local-fijo{position:static;box-shadow:none;} }
   .cat-nav a{font-size:11.5px;color:var(--ink-soft);border:1px solid var(--line);
     padding:4px 9px;border-radius:12px;text-decoration:none;}
   .cat-nav a:hover{border-color:var(--crust);color:var(--crust-dark);}
@@ -453,7 +471,7 @@ const LOCALES = ['Centro', 'Patagonia', 'Zelarrayan', 'Fábrica - Producción', 
 const DIA_FRANCO_PRODUCCION = 'Lunes';
 // 'Pastones horno' (05/11/2026): los pastones de horno que quedan al final del
 // turno para cortar al día siguiente (se cargan en pastones, no en docenas)
-const TIPOS_DISCO = ['Horno', 'Frito', 'Recorte', 'Pastones horno'];
+const TIPOS_DISCO = ['Horno', 'Frito', 'Recorte', 'Pastones horno', 'Copetín horno', 'Copetín frito'];
 let SABORES_CACHE = null;
 let RELLENOS_CACHE = null;
 let RECETAS_CACHE = null;
@@ -471,7 +489,7 @@ const MEMORIA_MAX_HORAS = 24;
 const MEMORIA_VERSION = 'v2';
 // categorías en orden fijo y productos de la A a la Z (también lo hace el
 // servidor; acá por si la tablet tiene guardada una lista vieja)
-const ORDEN_RUBROS = ['Empanadas Horno', 'Empanadas Frito', 'Dips', 'Postres', 'Toppings', 'Cajita Criolla'];
+const ORDEN_RUBROS = ['Empanadas Horno', 'Empanadas Frito', 'Dips', 'Postres', 'Toppings', 'Huevos', 'Cajita Criolla', 'Copetín'];
 // BALCARCE y CANASTA DE ÑOQUIS van al final de su categoría (pedido por Carolina 13/10/2026)
 const AL_FINAL = ['BALCARCE', 'CANASTA DE ÑOQUIS'];
 function compararTexto(a, b){
@@ -551,6 +569,7 @@ function irA(pantalla){
   if(pantalla === 'envios') renderEnvios();
   if(pantalla === 'recepcion') renderRecepcion();
   if(pantalla === 'historial') renderHistorialEnvios();
+  if(pantalla === 'pedidosEspeciales') renderPedidosEspeciales();
   if(pantalla === 'registro') renderRegistroProduccion();
   if(pantalla === 'fichas') renderFichasTecnicas();
   if(pantalla === 'trazabilidad') renderTrazabilidad();
@@ -801,6 +820,7 @@ function renderHome(){
       ${tarjetaHome('stockLocales', 'Cargar stock del local', 'Registrar cuánto queda de cada sabor, con su fecha de vencimiento.')}
       ${tarjetaHome('recepcion', 'Confirmar recepción', 'Registrar cuánto llegó realmente de lo que fábrica despachó hoy.')}
       ${tarjetaHome('historial', 'Historial de envíos', 'Comparar lo enviado contra lo recibido, por local y sabor.')}
+      ${tarjetaHome('pedidosEspeciales', 'Pedidos especiales', 'Pedir empanadas, copetín o postres para un día y hora (mínimo de un día para el otro).', true)}
       ${tarjetaHome('informeStock', 'Informe: Stock por local', 'Última carga de stock de cada local, con semáforo de vencimientos.')}
     </div>
 
@@ -927,10 +947,100 @@ function opcionesEmpleadosSeleccion(empleados, seleccionado){
   return '<option value="">— Seleccionar —</option>' + empleados.map(n => `<option value="${n}" ${n === seleccionado ? 'selected' : ''}>${n}</option>`).join('');
 }
 
+/* ---------------------------------------------------------------------
+   STOCK CONGELADO POR SECTOR (14/11/2026, Carolina)
+   Cocina: rellenos congelados (kilos) · Producción: copetín, cajitas y
+   toppings · Postres: masa de cookies. Todo con vencimiento. Si un producto
+   no se vuelve a cargar, se CONSERVA su última carga (con fecha y quién).
+   --------------------------------------------------------------------- */
+const SECTOR_POSTRES_STOCK = 'Fábrica - Postres';
+const SECTOR_CONGELADO_DE = { 'Fábrica - Cocina': 'Cocina', 'Fábrica - Producción': 'Producción', [SECTOR_POSTRES_STOCK]: 'Postres' };
+function filaCongelado(it, esExtra, onSoloQuitar){
+  const tr = document.createElement('tr');
+  tr.dataset.prod = it.producto;
+  if(esExtra) tr.classList.add('cong-extra');
+  const conElab = it.unidad === 'kg' || it.grupo === 'Rellenos';
+  tr.innerHTML = `
+    <td>${esExtra ? '<span class="item-extra">↳ otro lote</span>' : `<strong>${it.producto}</strong> <span class="unidad-prod">(${it.unidad})</span>`}</td>
+    <td class="cong-ultima">${esExtra ? '' : htmlUltimaCongelado(it)}</td>
+    <td><input type="number" min="0" step="${it.unidad === 'kg' ? '0.01' : '1'}" class="inp-cong-cant" placeholder="—" style="width:80px;"></td>
+    <td><input type="date" class="inp-cong-venc"></td>
+    <td>${conElab ? '<input type="date" class="inp-cong-elab" title="Fecha de elaboración">' : ''}</td>
+    <td class="col-add">${esExtra ? '<button type="button" class="del-btn" title="Quitar">✕</button>' : '<button type="button" class="add-lote-btn" title="Otro vencimiento">+</button>'}</td>
+    <td class="no-print celda-estado" style="white-space:nowrap;">${esExtra ? '' : '<button type="button" class="btn secondary btn-guardar-cong" style="font-size:12px;padding:5px 10px;">Guardar</button>'}</td>`;
+  if(esExtra) tr.querySelector('.del-btn').onclick = () => { tr.remove(); if(onSoloQuitar) onSoloQuitar(); };
+  return tr;
+}
+function htmlUltimaCongelado(it){
+  if(!it.cargado) return '<span class="gris-txt">sin cargar</span>';
+  const lotes = it.lotes.length ? it.lotes.map(l => `${it.unidad === 'kg' ? dec(l.cantidad) : ent(l.cantidad)}${l.vencimiento ? ` · vence ${fmtFecha(l.vencimiento).slice(0, 5)}` : ''}${l.vencimiento && l.vencimiento < hoyISO() ? ' <span class="mal-txt">(vencido)</span>' : ''}`).join('<br>') : '0 (no hay)';
+  return `<div><strong>${lotes}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${fmtFecha(it.fecha).slice(0, 5)}${it.hora ? ' ' + it.hora : ''} · ${it.responsable || '—'}</div>`;
+}
+async function pintarCongelados(cont, sector, fecha, obtenerResponsable){
+  cont.innerHTML = `<h3 class="cong-titulo">❄ Congelados — ${sector}</h3><p class="loading" style="font-size:12.5px;">Cargando congelados…</p>`;
+  let data;
+  try{
+    const r = await fetch(`${APPS_SCRIPT_URL}?action=obtenerCongelados&sector=${encodeURIComponent(sector)}&fecha=${fecha}`);
+    data = await r.json();
+    if(data.error) throw new Error(data.error);
+  }catch(err){
+    cont.innerHTML = `<h3 class="cong-titulo">❄ Congelados — ${sector}</h3><div class="msg err" style="display:block;">No se pudieron leer los congelados: ${err.message}</div>`;
+    return;
+  }
+  cont.innerHTML = `<h3 class="cong-titulo">❄ Congelados — ${sector}</h3>
+    <p style="color:var(--ink-soft);font-size:12.5px;max-width:620px;margin:0 0 8px;">${conAyuda('Se guarda la última carga de cada producto', 'Si un producto no se vuelve a cargar, queda lo último que se cargó (con la fecha y quién). Cargá solo lo que cambió y tocá Guardar en esa fila. Si ya no hay, poné 0.')}</p>`;
+  const grupos = [...new Set(data.items.map(i => i.grupo))];
+  grupos.forEach(g => {
+    const h = document.createElement('h4'); h.className = 'cat-heading'; h.textContent = g; cont.appendChild(h);
+    const conElab = data.items.some(i => i.grupo === g && (i.unidad === 'kg' || i.grupo === 'Rellenos'));
+    const table = document.createElement('table');
+    table.className = 'lotes tabla-congelados';
+    table.innerHTML = `<thead><tr><th>Producto</th><th>Última carga</th><th class="col-cant">Cantidad</th><th class="col-venc">Vencimiento</th><th>${conElab ? 'Elaboración' : ''}</th><th class="col-add"></th><th class="no-print"></th></tr></thead><tbody></tbody>`;
+    const tbody = table.querySelector('tbody');
+    data.items.filter(i => i.grupo === g).forEach(it => {
+      const tr = filaCongelado(it, false);
+      tbody.appendChild(tr);
+      tr.querySelector('.add-lote-btn').onclick = () => {
+        let ult = tr; while(ult.nextElementSibling && ult.nextElementSibling.classList.contains('cong-extra')) ult = ult.nextElementSibling;
+        ult.insertAdjacentElement('afterend', filaCongelado(it, true));
+      };
+      tr.querySelector('.btn-guardar-cong').onclick = async (ev) => {
+        const btn = ev.target;
+        const responsable = obtenerResponsable();
+        if(!responsable){ avisar('✗ Elegí arriba quién está cargando.', 'err'); return; }
+        const filas = [tr]; let x = tr.nextElementSibling; while(x && x.classList.contains('cong-extra')){ filas.push(x); x = x.nextElementSibling; }
+        const lotes = [], faltan = [];
+        filas.forEach(f => {
+          const c = f.querySelector('.inp-cong-cant').value.trim(), v = f.querySelector('.inp-cong-venc').value;
+          const el = f.querySelector('.inp-cong-elab');
+          if(c === '' && !v) return;
+          if(c === ''){ faltan.push('cantidad'); return; }
+          if(Number(c) > 0 && !v){ faltan.push('vencimiento'); return; }
+          lotes.push({ cantidad: Number(c), vencimiento: Number(c) > 0 ? v : '', elaboracion: el ? el.value : '' });
+        });
+        if(faltan.length){ avisar(`✗ ${it.producto}: falta ${[...new Set(faltan)].join(' y ')}.`, 'err'); return; }
+        if(!lotes.length){ avisar(`✗ ${it.producto}: cargá la cantidad (0 si no hay).`, 'err'); return; }
+        if(!confirmarVencimientos(lotes.filter(l => l.cantidad > 0).map(l => ({ sabor: it.producto, vencimiento: l.vencimiento })), fecha)) return;
+        btn.disabled = true; btn.textContent = 'Guardando...';
+        try{
+          const resp = await postJSON({ action: 'guardarCongelado', sector, producto: it.producto, fecha, responsable, lotes });
+          Object.assign(it, { cargado: true, fecha, hora: resp.hora, responsable, lotes: lotes.filter(l => l.cantidad > 0) });
+          tr.querySelector('.cong-ultima').innerHTML = htmlUltimaCongelado(it);
+          filas.forEach(f => { f.querySelectorAll('input').forEach(i => { i.value = ''; }); if(f !== tr) f.remove(); });
+          avisar(`✓ Congelado guardado · ${resp.hora} — ${it.producto}: ${it.unidad === 'kg' ? dec(resp.total) : ent(resp.total)} ${it.unidad}`);
+        }catch(err){ avisar('✗ NO se guardó — ' + err.message, 'err'); }
+        finally{ btn.disabled = false; btn.textContent = 'Guardar'; }
+      };
+    });
+    cont.appendChild(table);
+  });
+}
+
 async function renderLocal(bloque){
   // bloque = 'locales' (Centro/Patagonia/Zelarrayan) o 'fabrica' (sectores de Fábrica)
   const esBloqueFabrica = bloque === 'fabrica';
-  const opcionesSector = LOCALES.filter(l => l.startsWith('Fábrica') === esBloqueFabrica);
+  // 14/11/2026: "Fábrica - Postres" solo tiene congelados (masa de cookies)
+  const opcionesSector = LOCALES.filter(l => l.startsWith('Fábrica') === esBloqueFabrica).concat(esBloqueFabrica ? [SECTOR_POSTRES_STOCK] : []);
   app.innerHTML = `
     <button class="back" onclick="irA('home')">← Volver</button>
     <header class="top"><h1>${esBloqueFabrica ? 'Cargar stock de fábrica' : 'Cargar stock del local'}</h1></header>
@@ -961,6 +1071,7 @@ async function renderLocal(bloque){
     <div id="catNav" class="cat-nav"></div>
     <div id="cartelStock"></div>
     <div id="tablaLotesContainer" class="loading">Cargando…</div>
+    <div id="congeladosContainer"></div>
 
     <div id="barraStock">${htmlBarraFinal('btnProvisorioStock', 'btnGuardar', 'Guardar y enviar final')}</div>
     <div class="msg" id="msg"></div>
@@ -1069,6 +1180,22 @@ async function renderLocal(bloque){
   async function pintarTabla(){
     const local = document.getElementById('selLocal').value;
     const fecha = document.getElementById('fechaCarga').value;
+    // CONGELADOS (14/11/2026): bloque aparte, con su propio Guardar por producto
+    const contCong = document.getElementById('congeladosContainer');
+    const sectorCong = SECTOR_CONGELADO_DE[local];
+    if(contCong){
+      contCong.innerHTML = '';
+      if(sectorCong) pintarCongelados(contCong, sectorCong, fecha, () => (document.getElementById('inpResponsable') || {}).value || '');
+    }
+    if(local === SECTOR_POSTRES_STOCK){
+      // Postres: solo congelados (los postres terminados se cargan en Fábrica - Producción)
+      cont.className = ''; cont.innerHTML = '';
+      document.getElementById('catNav').innerHTML = '';
+      document.getElementById('cartelStock').innerHTML = '';
+      document.getElementById('barraStock').style.display = 'none';
+      return;
+    }
+    document.getElementById('barraStock').style.display = '';
     const modo = modoDeLocal(local);
     const labelCantidad = modo === 'relleno' ? 'Kilos' : modo === 'disco' ? 'Docenas' : 'Cantidad';
     const nav = document.getElementById('catNav');
@@ -1573,7 +1700,7 @@ function pintarProduccion(data){
   // bloque "para mañana" se muestra en la pestaña Cocina
   const prepHtml = data.dia === DIA_FRANCO_PRODUCCION ? '' : bloquePrepDiaAnterior();
 
-  const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Producción</h2><div id="urgentesProduccion"></div>`;
+  const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Producción</h2>${htmlAvisosEspeciales(data, 'produccion')}<div id="urgentesProduccion"></div>${htmlProduccionSemanal(data, 'Producción')}`;
   setTimeout(() => pintarUrgentes('produccion', data.fecha), 0);
 
   if(filas.length === 0){
@@ -1613,7 +1740,7 @@ function pintarProduccion(data){
               <td class="num"><strong>${dec(f.aHacerUnidades * ENVIO_EN_KILOS[f.sabor])}</strong></td>
             </tr>` : `
             <tr>
-              <td>${f.sabor}</td>
+              <td>${f.sabor}${badgeEspecial(f)}</td>
               ${esEmpanada ? `<td>${f.diaCocina}${f.diaCocina !== f.diaArmado ? ` <span class="badge reposo">reposo</span>` : ''}</td>` : ''}
               <td class="num"${f.colchonUnidades ? ` title="Venta normal de los días que cubre + colchón una vez (${ent(f.colchonUnidades)})"` : ''}>${ent(f.objetivoUnidades)}</td>
               ${esEmpanada ? `<td style="color:var(--ink-soft);font-size:12.5px;">${f.diasQueCubre}</td>` : ''}
@@ -1630,6 +1757,101 @@ function pintarProduccion(data){
     <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)} — ${filas.length} ítem(s) con faltante</p>
     ${bloques}
   `;
+}
+
+// PEDIDOS ESPECIALES Y PRODUCCIÓN SEMANAL en Qué producir hoy (14/11/2026)
+function badgeEspecial(f){
+  return f && f.especial > 0 ? ` <span class="badge-especial" title="Pedido especial de un local, ya sumado">★ incluye pedido especial ${ent(f.especial)}</span>` : '';
+}
+function diaCorto(iso){ const d = new Date(iso + 'T12:00:00'); return ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'][d.getDay()] + ' ' + fmtFecha(iso).slice(0, 5); }
+// sector: 'produccion' | 'cocina' | 'discos' | 'postres'
+function htmlAvisosEspeciales(data, sector){
+  const e = data && data.especiales && data.especiales[sector];
+  if(!e || (!e.hoy.length && !e.semana.length)) return '';
+  const porPedido = lista => {
+    const g = {};
+    lista.forEach(p => { const k = p.id; (g[k] = g[k] || { local: p.local, fecha: p.fechaEntrega, hora: p.horaEntrega, obs: p.observaciones, items: [] }).items.push(p); });
+    return Object.values(g).sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
+  };
+  const linea = p => p.items.map(x => {
+    let t = `<strong>${x.producto}</strong> ${ent(x.cantidad)}`;
+    if(sector === 'cocina' && x.relleno) t += ` <span class="gris-txt">(relleno ${x.relleno}${x.gramaje ? ` ≈ ${dec(x.cantidad * x.gramaje / 1000)} kg` : ''})</span>`;
+    if(sector === 'discos') t += ` <span class="gris-txt">(≈ ${dec(x.cantidad / 12)} doc.${/COPETIN$/i.test(x.producto) ? (/ F COPETIN$/i.test(x.producto) ? ' copetín frito' : ' copetín horno') : ''})</span>`;
+    return t;
+  }).join(' · ');
+  const local = l => NOMBRE_LOCAL_VISTA[l] || l;
+  const paraCuando = (sector === 'cocina' || sector === 'discos') ? 'para mañana' : 'hoy';
+  let h = '';
+  if(e.hoy.length){
+    h += `<div class="aviso-especial hoy"><div class="ae-tit">🔔 HOY hay pedido especial${(sector === 'cocina' || sector === 'discos') ? ' (se entrega mañana)' : ''}</div>${porPedido(e.hoy).map(p =>
+      `<div class="ae-linea">Local <strong>${local(p.local)}</strong> — ${diaCorto(p.fecha)} ${p.hora} hs: ${linea(p)}${p.obs ? ` <span class="gris-txt">· ${escHtml(p.obs)}</span>` : ''}</div>`).join('')}
+      <div class="ae-nota">${sector === 'produccion' || sector === 'postres' ? 'Ya está sumado a lo de abajo y a la orden de envío de ese local.' : sector === 'cocina' ? 'Además de la planificación: el relleno tiene que estar frío para mañana.' : 'Cortar de más para mañana (además del plan).'}</div></div>`;
+  }
+  if(e.semana.length){
+    h += `<div class="aviso-especial semana"><div class="ae-tit">📅 Tenés un pedido especial esta semana</div>${porPedido(e.semana).map(p =>
+      `<div class="ae-linea">${diaCorto(p.items[0].fechaSector)}${p.items[0].fechaSector !== p.fecha ? ` (entrega ${diaCorto(p.fecha)})` : ''} — Local <strong>${local(p.local)}</strong>, ${p.hora} hs: ${linea(p)}</div>`).join('')}</div>`;
+  }
+  return h;
+}
+function tabsEnviosAntes(){ return document.getElementById('tabsEnvios'); }
+// CARTEL DE ENVÍO ESPECIAL (14/11/2026, Carolina): en Despachar envíos y en
+// Confirmar recepción, cuando ese día va un pedido especial a un local.
+// pedidos: lista de listarPedidosEspeciales (una fila por producto)
+function htmlAvisoEnvioEspecial(pedidos, local, modo){
+  const lista = (pedidos || []).filter(p => p.estado !== 'Cancelado' && (!local || p.local === local));
+  if(!lista.length) return '';
+  const g = {};
+  lista.forEach(p => { (g[p.id] = g[p.id] || { local: p.local, hora: p.horaEntrega, obs: p.observaciones, quien: p.responsable, items: [] }).items.push(p); });
+  const peds = Object.values(g).sort((a, b) => (a.hora + a.local).localeCompare(b.hora + b.local));
+  const nombre = l => NOMBRE_LOCAL_VISTA[l] || l;
+  const tit = modo === 'recepcion' ? '🔔 HOY llega tu pedido especial' : '🔔 ENVÍO ESPECIAL HOY';
+  const nota = modo === 'recepcion' ? 'Viene en el envío de hoy, sumado a lo normal. Controlalo al recibir.'
+    : 'Ya está sumado a la orden de envío (marcado "pedido especial"). Que llegue antes de la hora pedida.';
+  return `<div class="aviso-especial hoy"><div class="ae-tit">${tit}</div>${peds.map(p =>
+    `<div class="ae-linea">${modo === 'recepcion' ? '' : `Local <strong>${nombre(p.local)}</strong> — `}para las <strong>${escHtml(p.hora)} hs</strong>: ${p.items.map(x => `<strong>${escHtml(x.producto)}</strong> ${ent(x.cantidad)}`).join(' · ')}${p.obs ? ` <span class="gris-txt">· ${escHtml(p.obs)}</span>` : ''}${p.quien ? ` <span class="gris-txt">(pidió ${escHtml(p.quien)})</span>` : ''}</div>`).join('')}
+    <div class="ae-nota">${nota}</div></div>`;
+}
+// sectorNombre: 'Producción' | 'Postres'
+function htmlProduccionSemanal(data, sectorNombre){
+  const items = ((data && data.semanal) || []).filter(it => it.sector === sectorNombre);
+  if(!items.length) return '';
+  const unidad = it => it.producto === 'MASA DE COOKIES' ? 'bollitos' : 'un.';
+  const filas = items.map(it => `<tr class="${it.hacer > 0 ? '' : 'sem-cero'}">
+      <td><strong>${it.producto}</strong><div style="font-size:11px;color:var(--ink-soft);">${escHtml(it.regla || '')}</div></td>
+      <td class="num">${ent(it.congelado)}</td>
+      <td class="num">${it.stockLocales != null ? ent(it.stockLocales) : '—'}</td>
+      <td class="num">${ent(it.objetivo)}</td>
+      <td class="num"><strong>${it.hacer > 0 ? ent(it.hacer) + ' ' + unidad(it) : 'no hace falta'}</strong></td></tr>`).join('');
+  return `<div class="sem-card"><h3>❄ Producción semanal — ${String(data.dia || '').toLowerCase()} ${fmtFecha(data.fecha).slice(0, 5)}</h3>
+    <table class="prod"><thead><tr><th>Producto</th><th class="num">${conAyuda('Congelado', 'Lo último que se cargó en Congelados de este sector (sin lo vencido).')}</th><th class="num">En locales</th><th class="num">${conAyuda('Objetivo', 'Lo que piden los locales en la semana (proyección) + colchón, o el número fijo de la regla.')}</th><th class="num">Hacer hoy</th></tr></thead><tbody>${filas}</tbody></table>
+    <div class="ae-nota">Lo que se hace se congela: cargalo después en Cargar stock de fábrica → Congelados.</div></div>`;
+}
+// Discos: el día ANTES de la producción semanal, discos de copetín (14/11/2026):
+// cajitas y copetín H → Copetín horno; copetín F → Copetín frito
+function htmlSemanalMananaDiscos(data){
+  const items = ((data && data.semanalManana) || []).filter(it => it.sector === 'Producción' && it.hacer > 0);
+  if(!items.length) return '';
+  let h = 0, f = 0; const lh = [], lf = [];
+  // las cajitas se cuentan en empanadas (planilla de Carolina: cajitas × empanadas por sabor)
+  items.forEach(it => {
+    const txt = `${it.producto} ${ent(it.hacer)}`;
+    if(/ F COPETIN$/i.test(it.producto)){ f += it.hacer; lf.push(txt); } else { h += it.hacer; lh.push(txt); }
+  });
+  return `<div class="aviso-especial semana"><div class="ae-tit">❄ Mañana: producción semanal de Producción (cajitas / copetín)</div>
+    ${h ? `<div class="ae-linea">Cortar <strong>Copetín horno ≈ ${dec(h / 12)} docenas</strong> — ${lh.join(' · ')}</div>` : ''}
+    ${f ? `<div class="ae-linea">Cortar <strong>Copetín frito ≈ ${dec(f / 12)} docenas</strong> — ${lf.join(' · ')}</div>` : ''}
+    <div class="ae-nota">Además del plan de abajo. Sumá un poco por los dañados.</div></div>`;
+}
+// Cocina: el día ANTES de la producción semanal de Producción, sus rellenos
+function htmlSemanalMananaCocina(data){
+  const items = ((data && data.semanalManana) || []).filter(it => it.sector === 'Producción' && it.hacer > 0);
+  if(!items.length) return '';
+  const porRelleno = {};
+  items.forEach(it => { const k = it.relleno || '(sin relleno en Ref_Sabores)'; const r = porRelleno[k] = porRelleno[k] || { kg: 0, sinGramaje: false, lista: [] }; r.lista.push(`${it.producto} ${ent(it.hacer)}`); if(it.gramaje) r.kg += it.hacer * it.gramaje / 1000; else r.sinGramaje = true; });
+  return `<div class="aviso-especial semana"><div class="ae-tit">❄ Mañana Producción hace la producción semanal (cajitas / copetín)</div>${Object.keys(porRelleno).sort(compararTexto).map(k => {
+    const r = porRelleno[k];
+    return `<div class="ae-linea">Relleno <strong>${k}</strong>${r.kg > 0 ? `: <strong>≈ ${dec(r.kg)} kg</strong>` : ''}${r.sinGramaje ? ' <span class="gris-txt">(falta gramaje en Ref_Sabores)</span>' : ''} — para ${r.lista.join(' · ')}</div>`;
+  }).join('')}<div class="ae-nota">Además de la planificación de hoy. Jamón y queso va en rollos.</div></div>`;
 }
 
 // RELLENO EN CÁMARA (16/10/2026, Carolina): para cada relleno que se usa hoy,
@@ -1699,7 +1921,7 @@ function tablaSimpleCocina(data, rubro, titulo){
         <tbody>
           ${items.map(f => `
             <tr>
-              <td>${f.sabor}</td>
+              <td>${f.sabor}${badgeEspecial(f)}</td>
               <td class="num">${ent(f.objetivoUnidades)}</td>
               ${celdasStock(f)}
               <td class="num"><strong>${ent(f.aHacerUnidades)}</strong></td>
@@ -1716,6 +1938,7 @@ function pintarPostres(data){
   const tabla = tablaSimpleCocina(data, 'Postres', 'Postres');
   cont.className = '';
   cont.innerHTML = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Postres</h2>
+    ${htmlAvisosEspeciales(data, 'postres')}${htmlProduccionSemanal(data, 'Postres')}
     <p style="color:var(--ink-soft);font-size:13px;">${data.dia}, ${fmtFecha(data.fecha)}</p>
     ${tabla || `<div class="empty">No hay postres para hacer el ${data.dia.toLowerCase()} — el stock alcanza.</div>`}
     <div id="materiaPrimaPostres"></div>`;
@@ -1725,7 +1948,7 @@ function pintarPostres(data){
 function pintarCocina(data){
   const cont = document.getElementById('contenidoFabrica');
   const filasRelleno = data.cocina.filter(f => f.kilosDeRelleno > 0);
-  const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Cocina</h2><div id="urgentesCocina"></div>`;
+  const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Cocina</h2>${htmlAvisosEspeciales(data, 'cocina')}${htmlSemanalMananaCocina(data)}<div id="urgentesCocina"></div>`;
   setTimeout(() => pintarUrgentes('cocina', data.fecha), 0);
   const tablaSimple = (rubro, titulo) => tablaSimpleCocina(data, rubro, titulo);
   const bloqueDips = tablaSimple('Dips', 'Dips');
@@ -2019,7 +2242,7 @@ async function pintarDiscos(data){
   }
   if(TAB_ACTIVA !== 'discos') return; // cambió de pestaña mientras calculaba
   cont.className = '';
-  cont.innerHTML = htmlPlanDiscos(p);
+  cont.innerHTML = htmlAvisosEspeciales(data, 'discos') + htmlSemanalMananaDiscos(data) + htmlPlanDiscos(p);
 }
 
 function htmlPlanDiscos(p){
@@ -2964,11 +3187,29 @@ function filaRegistroExtra(etiqueta, saborKey, aHacerMostrar, etiquetaExtra, emp
     <td><input type="number" min="0" step="1" class="inp-total-prod" style="width:90px;" value="${g.totalProduccion || ''}" ${dis}></td>
     <td>${celdaHora('inp-hora-inicio', g.horaInicio, 'Empezó', dis)}</td>
     <td>${celdaHora('inp-hora-fin', g.horaFin, 'Terminó', dis)}</td>
-    <td><select class="inp-responsable-canasta" style="min-width:150px;" ${dis}>${opcionesEmpleadosSeleccion(empleados, g.responsable)}</select></td>
+    <td>${celdaResponsablesMulti(empleados, g.responsable, dis)}</td>
     <td class="no-print celda-estado" style="white-space:nowrap;">${botonVaciarFila(dis)}</td>`;
   if(guardado){ tr.dataset.guardado = '1'; ponerSello(tr, null); }
   return tr;
 }
+// VARIOS RESPONSABLES (14/11/2026, Carolina): en rollos de JyQ y molde de
+// canasta trabajan varios a la vez. Se guarda "A / B / C" en Responsable.
+const SEP_RESPONSABLES = ' / ';
+function celdaResponsablesMulti(empleados, guardado, dis){
+  const lista = String(guardado || '').split(SEP_RESPONSABLES).map(x => x.trim()).filter(Boolean);
+  const sel = v => `<select class="inp-resp-multi" style="min-width:150px;display:block;margin-bottom:3px;" ${dis}>${opcionesEmpleadosSeleccion(empleados, v)}</select>`;
+  return `<div class="resp-multi">${(lista.length ? lista : ['']).map(sel).join('')}${dis ? '' : '<button type="button" class="btn-mas-resp no-print" title="Agregar otra persona">+ persona</button>'}</div>`;
+}
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('.btn-mas-resp');
+  if(!b || b.disabled) return;
+  const primero = b.parentElement.querySelector('.inp-resp-multi');
+  if(!primero) return;
+  const nuevo = primero.cloneNode(true);
+  nuevo.value = '';
+  b.insertAdjacentElement('beforebegin', nuevo);
+  nuevo.dispatchEvent(new Event('change', { bubbles: true }));
+});
 function crearTablaExtras(){
   const table = document.createElement('table');
   table.className = 'lotes traza';
@@ -3242,6 +3483,20 @@ async function pintarRegistroProduccionSector(){
     });
   }
 
+  // PRODUCCIÓN SEMANAL Y PEDIDOS ESPECIALES (14/11/2026): cajitas y copetín
+  // que tocan hoy aparecen solos (con Responsable, se arman a mano)
+  const semHoy = {};
+  ((data.semanal || []).filter(it => it.sector === 'Producción' && it.hacer > 0)).forEach(it => { semHoy[it.producto] = { n: it.hacer, txt: 'producción semanal' }; });
+  (data.produccion || []).filter(f => f.tipoCalculo === 'Simple' && f.especial > 0 && f.rubro !== 'Postres' && f.rubro !== 'Dips').forEach(f => {
+    const prev = semHoy[f.sabor];
+    semHoy[f.sabor] = { n: (prev ? prev.n : 0) + f.especial, txt: prev ? prev.txt + ' + pedido especial' : 'pedido especial' };
+  });
+  const listaSem = Object.keys(semHoy).filter(n => !tbody.querySelector(`tr[data-sabor="${CSS.escape(n)}"]`)).sort(compararTexto);
+  if(listaSem.length){
+    filaGrupo('Cajitas y copetín de hoy', '<span style="font-weight:400;font-size:12px;">producción semanal y pedidos especiales — se congela lo que no sale hoy</span>');
+    listaSem.forEach(n => tbody.appendChild(filaRegistroProduccion(n, n, semHoy[n].n, ` <span class="badge-especial">${semHoy[n].txt}</span>`, true, EMPLEADOS_REGISTRO, guardadoPorSabor[n], bloqueadoGlobal)));
+  }
+
   // Extras para mañana: Rollos de Jamón y Queso y UN solo "Molde de canasta"
   // (es el mismo molde para todas las canastas — se suma lo de todas).
   const notaPct = (prep.porcentajeProduccion != null && Number(prep.porcentajeProduccion) !== 100)
@@ -3325,7 +3580,9 @@ function leerFilaSabor(tr){
   return {
     sabor: tr.dataset.sabor,
     maquinaNumero: v('.inp-maq-num'),
-    responsable: v('.inp-responsable-canasta'),
+    responsable: tr.querySelector('.inp-resp-multi')
+      ? [...new Set([...tr.querySelectorAll('.inp-resp-multi')].map(x => x.value).filter(Boolean))].join(SEP_RESPONSABLES)
+      : v('.inp-responsable-canasta'),
     maquinaVelocidad: v('.inp-maq-vel'),
     discosLote: v('.inp-disco-lote'),
     pesoPromTandaDiscos: v('.inp-peso-prom'),
@@ -3592,6 +3849,8 @@ async function pintarRegistroDiscosSector(){
       <button type="button" class="btn secondary" data-tipo="Horno">+ Horno</button>
       <button type="button" class="btn secondary" data-tipo="Horno con recorte">+ Horno con recorte</button>
       <button type="button" class="btn secondary" data-tipo="Frito">+ Frito</button>
+      <button type="button" class="btn secondary" data-tipo="Copetín horno">+ Copetín horno</button>
+      <button type="button" class="btn secondary" data-tipo="Copetín frito">+ Copetín frito</button>
     </div>
     <p class="traza-nota">Frito: pastones del mismo día. Horno y Horno con recorte: pastones del día anterior (${fmtFecha(estado.fechaPastonHorno)}). La fecha se propone sola y se puede corregir. "Recorte agregado" va solo en Horno con recorte.</p>`;
 
@@ -3662,9 +3921,10 @@ async function pintarRegistroDiscosSector(){
 function filaCorteDiscos(c, fecha, fechaPastonHorno){
   const esc = escHtml;
   const val = v => (v === '' || v == null) ? '' : esc(v);
-  const TIPOS_CORTE = ['Horno', 'Horno con recorte', 'Frito'];
+  const TIPOS_CORTE = ['Horno', 'Horno con recorte', 'Frito', 'Copetín horno', 'Copetín frito'];
   const tipo = TIPOS_CORTE.indexOf(c.tipo) !== -1 ? c.tipo : (c.conRecorte ? 'Horno con recorte' : 'Horno');
-  const fechaDef = tipo === 'Frito' ? fecha : fechaPastonHorno;
+  const esFritoT = t => t === 'Frito' || t === 'Copetín frito';
+  const fechaDef = esFritoT(tipo) ? fecha : fechaPastonHorno;
   const tr = document.createElement('tr');
   tr.className = 'fila-corte';
   tr.innerHTML = `
@@ -3682,7 +3942,7 @@ function filaCorteDiscos(c, fecha, fechaPastonHorno){
   // si se cambia Horno/Frito y la fecha era la propuesta, se propone la otra
   tr.querySelector('.inp-c-tipo').onchange = ev => {
     const f = tr.querySelector('.inp-c-fecha');
-    if(f.value === fecha || f.value === fechaPastonHorno || !f.value) f.value = ev.target.value === 'Frito' ? fecha : fechaPastonHorno;
+    if(f.value === fecha || f.value === fechaPastonHorno || !f.value) f.value = esFritoT(ev.target.value) ? fecha : fechaPastonHorno;
   };
   tr.querySelector('.btn-quitar-corte').onclick = () => {
     if(filaTieneDatos(tr) && tr.querySelector('.inp-c-docenas').value && !confirm('¿Quitar esta tanda de corte? Se borra al guardar.')) return;
@@ -3694,17 +3954,17 @@ function filaCorteDiscos(c, fecha, fechaPastonHorno){
 // totales del corte y docenas por pastón de cada renglón
 function totalCorteDiscos(){
   const filas = [...document.querySelectorAll('#tablaCorteDiscos tr.fila-corte')];
-  let h = 0, f = 0, r = 0;
+  let h = 0, f = 0, r = 0, ch = 0, cf = 0;
   filas.forEach(tr => {
     const doc = Number(tr.querySelector('.inp-c-docenas').value) || 0;
     const pas = Number(tr.querySelector('.inp-c-pastones').value) || 0;
     const cel = tr.querySelector('.celda-dxp');
     if(cel) cel.textContent = doc && pas ? (doc / pas).toFixed(1).replace('.', ',') : '';
     const t = tr.querySelector('.inp-c-tipo').value;
-    if(t === 'Frito') f += doc; else if(t === 'Horno con recorte') r += doc; else h += doc;
+    if(t === 'Frito') f += doc; else if(t === 'Horno con recorte') r += doc; else if(t === 'Copetín horno') ch += doc; else if(t === 'Copetín frito') cf += doc; else h += doc;
   });
   const el = document.getElementById('totalCorteDiscos');
-  if(el) el.textContent = `Total cortado: Horno ${ent(h)} · Horno con recorte ${ent(r)} · Frito ${ent(f)} · Total ${ent(h + r + f)} docenas`;
+  if(el) el.textContent = `Total cortado: Horno ${ent(h)} · Horno con recorte ${ent(r)} · Frito ${ent(f)}${ch || cf ? ` · Copetín horno ${ent(ch)} · Copetín frito ${ent(cf)}` : ''} · Total ${ent(h + r + f + ch + cf)} docenas`;
 }
 
 // lo que está en pantalla, listo para guardar
@@ -3856,11 +4116,12 @@ async function cargarEnvios(){
   msg.className = 'msg'; msg.textContent = '';
 
   try{
-    const [r, categorias, empleados, rGuardado] = await Promise.all([
+    const [r, categorias, empleados, rGuardado, rEspeciales] = await Promise.all([
       fetch(`${APPS_SCRIPT_URL}?action=calcularEnvios&fecha=${fecha}`),
       obtenerCategorias(),
       obtenerEmpleados(),
-      fetch(`${APPS_SCRIPT_URL}?action=obtenerEnviosDia&fecha=${fecha}`).then(x => x.json())
+      fetch(`${APPS_SCRIPT_URL}?action=obtenerEnviosDia&fecha=${fecha}`).then(x => x.json()),
+      fetch(`${APPS_SCRIPT_URL}?action=listarPedidosEspeciales&desde=${fecha}&hasta=${fecha}`).then(x => x.json()).catch(() => ({}))
     ]);
     const data = await r.json();
     if(data.error) throw new Error(data.error);
@@ -3875,7 +4136,11 @@ async function cargarEnvios(){
       enviosPorLocal[l] = (rGuardado.enviosPorLocal && rGuardado.enviosPorLocal[l] && rGuardado.enviosPorLocal[l].length)
         ? rGuardado.enviosPorLocal[l] : [Object.assign({ nro: 1 }, guardadoPorLocal[l] || {})];
     });
-    DATOS_ENVIOS = { fecha, data, categorias, traspasos, enviosPorLocal, pedidoInicial: rGuardado.pedidoInicial || null, disponibleFabrica: rGuardado.disponibleFabrica || {} };
+    const especialesHoy = ((rEspeciales && rEspeciales.pedidos) || []).filter(p => p.estado !== 'Cancelado' && p.fechaEntrega === fecha);
+    DATOS_ENVIOS = { fecha, data, categorias, traspasos, enviosPorLocal, especialesHoy, pedidoInicial: rGuardado.pedidoInicial || null, disponibleFabrica: rGuardado.disponibleFabrica || {} };
+    let avisoEsp = document.getElementById('avisoEspecialEnvios');
+    if(!avisoEsp){ avisoEsp = document.createElement('div'); avisoEsp.id = 'avisoEspecialEnvios'; tabsEnviosAntes().before(avisoEsp); }
+    avisoEsp.innerHTML = htmlAvisoEnvioEspecial(especialesHoy, null, 'despacho');
     pintarBarraPlan('barraPlanEnvios', fecha, data.plan, cargarEnvios, data.proyeccion);
     // quién despacha / repartidor: los del envío abierto más nuevo (si ya tiene), si no los del primero
     const todosEnvios = LOCALES_VENTA.flatMap(l => enviosPorLocal[l]);
@@ -3888,7 +4153,7 @@ async function cargarEnvios(){
 
     const tabs = document.getElementById('tabsEnvios');
     tabs.style.display = 'flex';
-    const pestañas = LOCALES_VENTA.map(l => ({ id: l, texto: l + (enviosPorLocal[l].every(g => g.cierre) ? ' ✓' : '') + (enviosPorLocal[l].length > 1 ? ` (${enviosPorLocal[l].length} envíos)` : '') }))
+    const pestañas = LOCALES_VENTA.map(l => ({ id: l, texto: l + (especialesHoy.some(p => p.local === l) ? ' 🔔' : '') + (enviosPorLocal[l].every(g => g.cierre) ? ' ✓' : '') + (enviosPorLocal[l].length > 1 ? ` (${enviosPorLocal[l].length} envíos)` : '') }))
       .concat([{ id: 'resumen', texto: 'Total a enviar' }, { id: 'traspaso', texto: 'Traspaso entre locales' }]);
     tabs.innerHTML = pestañas.map(p => `<button class="tab-btn ${p.id===TAB_ENVIO_ACTIVO?'active':''}" data-tab="${p.id}">${p.texto}</button>`).join('');
     const mostrar = () => {
@@ -4147,6 +4412,21 @@ function pintarPanelEnvio({ origen, destino, nro, itemsCalculados, data, categor
   if(!origen) div.dataset.local = destino;
   div._estado = panelEstado;
 
+  // LOCAL FIJO ARRIBA (14/11/2026, Carolina): al bajar por la lista se pierde
+  // de vista en qué local se está cargando.
+  const fijo = document.createElement('div');
+  fijo.className = 'local-fijo';
+  fijo.textContent = origen ? `TRASPASO ${String(origen).toUpperCase()} → ${String(destino).toUpperCase()}`
+    : `${String(NOMBRE_LOCAL_VISTA[destino] || destino).toUpperCase()}${nro > 1 ? ` · ENVÍO ${nro}` : ''}`;
+  const espLocal = !origen && DATOS_ENVIOS && DATOS_ENVIOS.especialesHoy ? DATOS_ENVIOS.especialesHoy.filter(p => p.local === destino) : [];
+  if(espLocal.length) fijo.textContent += ' · 🔔 PEDIDO ESPECIAL';
+  div.appendChild(fijo);
+  if(espLocal.length){
+    const av = document.createElement('div');
+    av.innerHTML = htmlAvisoEnvioEspecial(espLocal, destino, 'despacho');
+    div.appendChild(av);
+  }
+
   const intro = document.createElement('p');
   intro.style.cssText = 'color:var(--ink-soft);font-size:13px;';
   intro.textContent = origen
@@ -4202,7 +4482,7 @@ function pintarPanelEnvio({ origen, destino, nro, itemsCalculados, data, categor
       filas.forEach(tr => tbody.appendChild(tr));
       // MANDAR PRIMERO LO QUE VENCE ANTES (16/10/2026)
       const it = porSabor[nombre];
-      if(conOrden && it) filas[0].cells[0].insertAdjacentHTML('beforeend', htmlSugerenciaLotes(it));
+      if(conOrden && it) filas[0].cells[0].insertAdjacentHTML('beforeend', badgeEspecial(it) + htmlSugerenciaLotes(it));
       if(faltantes){
         if(!(orden > 0) && !gs.length) filas.forEach(tr => tr.classList.add('sin-falta'));
         if(it && it.disponible != null && !ENVIO_EN_KILOS[nombre]) filas[0].cells[0].insertAdjacentHTML('beforeend', `<div class="disp-fab">Fábrica ≈ ${ent(it.disponible)}${it.yaEnviado ? ` · ya mandado hoy ${ent(it.yaEnviado)}` : ''}</div>`);
@@ -4461,13 +4741,15 @@ async function cargarPendientesRecepcion(){
   if(extraDiv) extraDiv.innerHTML = '';
 
   try{
-    const [r, categorias] = await Promise.all([
+    const [r, categorias, rEsp] = await Promise.all([
       fetch(`${APPS_SCRIPT_URL}?action=listarEnviosPendientes&local=${encodeURIComponent(local)}`).then(x => x.json()),
-      obtenerCategorias()
+      obtenerCategorias(),
+      fetch(`${APPS_SCRIPT_URL}?action=listarPedidosEspeciales&desde=${hoyISO()}&hasta=${hoyISO()}&local=${encodeURIComponent(local)}`).then(x => x.json()).catch(() => ({}))
     ]);
     const data = r;
     if(data.error) throw new Error(data.error);
     if(document.getElementById('selLocalRecepcion').value !== local) return;
+    const avisoRecep = htmlAvisoEnvioEspecial(((rEsp && rEsp.pedidos) || []).filter(p => p.fechaEntrega === hoyISO()), local, 'recepcion');
     const pendientes = data.pendientes || [];
     const salidas = data.salidas || [];
     cont.className = '';
@@ -4482,7 +4764,7 @@ async function cargarPendientesRecepcion(){
       return ordenCats.concat(['Otros']).filter(c => grupos[c]).map(c => ({ cat: c, items: grupos[c].sort((a, b) => compararTexto(a.Sabor, b.Sabor)) }));
     };
 
-    let html = '';
+    let html = avisoRecep;
     if(pendientes.length === 0){
       html += `<div class="empty">No hay envíos pendientes de recibir en ${local}.</div>`;
     } else {
@@ -4739,6 +5021,93 @@ async function guardarRecepcion(confirmar){
 /* ---------------------------------------------------------------------
    Pantalla HISTORIAL: enviado vs. recibido, por local — solo lectura
    --------------------------------------------------------------------- */
+/* ---------------------------------------------------------------------
+   PEDIDOS ESPECIALES DE LOS LOCALES (14/11/2026, Carolina)
+   El local carga qué necesita (empanadas, copetín o postres), el día y la
+   hora en que lo necesita en el local — mínimo de un día para el otro. Va
+   en el envío normal de ese día. Fábrica lo ve en Qué producir hoy.
+   --------------------------------------------------------------------- */
+async function renderPedidosEspeciales(){
+  const manana = sumarDiasISO(hoyISO(), 1);
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <header class="top"><h1>Pedidos especiales</h1></header>
+    <p style="color:var(--ink-soft);font-size:12.5px;max-width:620px;">Se carga <strong>como mínimo de un día para el otro</strong>. Va en el envío de ese día y fábrica lo ve en "Qué producir hoy".</p>
+    <div class="fab-toolbar" style="justify-content:flex-start;align-items:flex-end;flex-wrap:wrap;">
+      <div class="field-row"><label>Local</label><select id="peLocal">${LOCALES_VENTA.map(l => `<option value="${l}">${NOMBRE_LOCAL_VISTA[l] || l}</option>`).join('')}</select></div>
+      <div class="field-row"><label>¿Quién pide?</label><input type="text" id="peResp" placeholder="Nombre y apellido"></div>
+      <div class="field-row"><label>Día que lo necesitan</label><input type="date" id="peFecha" min="${manana}" value="${manana}"></div>
+      <div class="field-row"><label>Hora en el local</label><input type="time" id="peHora" value="20:00"></div>
+    </div>
+    <div class="field-row" style="max-width:620px;"><label>Observaciones (opcional)</label><input type="text" id="peObs" placeholder="Ej.: cumpleaños, retira el cliente a las 21"></div>
+    <table class="lotes" id="peItems" style="max-width:620px;"><thead><tr><th>Producto</th><th class="col-cant">Cantidad</th><th class="col-del"></th></tr></thead><tbody></tbody></table>
+    <div class="actions" style="margin-top:8px;"><button type="button" class="btn secondary" id="peAgregar">+ Agregar producto</button>
+      <button type="button" class="btn" id="peGuardar" style="margin-left:8px;">Guardar pedido</button></div>
+    <div class="msg" id="peMsg"></div>
+    <h3 style="margin-top:28px;">Próximos pedidos</h3>
+    <div id="peLista" class="loading">Cargando…</div>`;
+  let productos = {};
+  const tbody = document.querySelector('#peItems tbody');
+  const opciones = () => '<option value="">— Elegir —</option>' + ['Empanadas Horno', 'Empanadas Frito', 'Copetín', 'Postres'].filter(g => productos[g]).map(g => `<optgroup label="${g}">${productos[g].map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('')}</optgroup>`).join('');
+  const agregarFila = () => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td><select class="pe-prod" style="min-width:230px;">${opciones()}</select></td><td><input type="number" min="1" step="1" class="pe-cant" style="width:90px;"></td><td class="col-del"><button type="button" class="del-btn" title="Quitar">✕</button></td>`;
+    tr.querySelector('.del-btn').onclick = () => tr.remove();
+    tbody.appendChild(tr);
+  };
+  async function cargarLista(){
+    const cont = document.getElementById('peLista');
+    try{
+      const r = await fetch(`${APPS_SCRIPT_URL}?action=listarPedidosEspeciales&desde=${hoyISO()}`);
+      const d = await r.json();
+      if(d.error) throw new Error(d.error);
+      productos = d.productos || {};
+      if(!tbody.children.length) agregarFila();
+      else [...tbody.querySelectorAll('.pe-prod')].forEach(sel => { const v = sel.value; sel.innerHTML = opciones(); sel.value = v; });
+      const g = {};
+      d.pedidos.forEach(p => { (g[p.id] = g[p.id] || Object.assign({ items: [] }, p)).items.push(p); });
+      const lista = Object.values(g);
+      cont.className = '';
+      if(!lista.length){ cont.innerHTML = '<div class="empty">No hay pedidos especiales cargados para los próximos días.</div>'; return; }
+      cont.innerHTML = `<table class="prod"><thead><tr><th>Para</th><th>Local</th><th>Productos</th><th>Pidió</th><th></th></tr></thead><tbody>${lista.map(p => `
+        <tr class="${p.estado === 'Cancelado' ? 'pe-cancelado' : ''}"><td><strong>${diaCorto(p.fechaEntrega)}</strong> ${p.horaEntrega} hs</td><td>${NOMBRE_LOCAL_VISTA[p.local] || p.local}</td>
+        <td>${p.items.map(x => `${escHtml(x.producto)} <strong>${ent(x.cantidad)}</strong>`).join('<br>')}${p.observaciones ? `<div class="gris-txt" style="font-size:12px;">${escHtml(p.observaciones)}</div>` : ''}</td>
+        <td style="font-size:12px;">${escHtml(p.responsable)}<br><span class="gris-txt">${fmtFecha(p.fechaCarga).slice(0, 5)} ${p.horaCarga}</span></td>
+        <td>${p.estado === 'Cancelado' ? '<span class="gris-txt">Cancelado</span>' : `<button type="button" class="btn secondary pe-cancelar" data-id="${p.id}" style="font-size:12px;padding:5px 9px;">Cancelar</button>`}</td></tr>`).join('')}</tbody></table>`;
+      cont.querySelectorAll('.pe-cancelar').forEach(b => b.onclick = async () => {
+        if(!confirm('¿Cancelar este pedido especial? Fábrica deja de verlo.')) return;
+        try{ await postJSON({ action: 'cancelarPedidoEspecial', id: b.dataset.id }); avisar('✓ Pedido cancelado'); borrarMemoria(); cargarLista(); }
+        catch(err){ avisar('✗ No se pudo cancelar — ' + err.message, 'err'); }
+      });
+    }catch(err){
+      cont.className = ''; cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo leer la lista: ${err.message}</div>`;
+    }
+  }
+  document.getElementById('peAgregar').onclick = agregarFila;
+  document.getElementById('peGuardar').onclick = async (ev) => {
+    const msg = document.getElementById('peMsg');
+    const items = [...tbody.querySelectorAll('tr')].map(tr => ({ producto: tr.querySelector('.pe-prod').value, cantidad: Number(tr.querySelector('.pe-cant').value) || 0 })).filter(it => it.producto || it.cantidad);
+    const datos = { action: 'guardarPedidoEspecial', local: document.getElementById('peLocal').value, responsable: document.getElementById('peResp').value.trim(),
+      fechaEntrega: document.getElementById('peFecha').value, horaEntrega: document.getElementById('peHora').value, observaciones: document.getElementById('peObs').value.trim(), items };
+    const error = !datos.responsable ? 'Indicá quién hace el pedido.' : !datos.fechaEntrega ? 'Elegí el día.' : datos.fechaEntrega <= hoyISO() ? 'Tiene que ser para mañana o después (mínimo de un día para el otro).'
+      : !datos.horaEntrega ? 'Poné la hora en que lo necesitan.' : !items.length ? 'Agregá al menos un producto.' : items.some(it => !it.producto || !(it.cantidad > 0)) ? 'Hay un renglón sin producto o sin cantidad.' : '';
+    if(error){ msg.className = 'msg err'; msg.textContent = error; return; }
+    const resumen = items.map(it => `• ${it.producto}: ${it.cantidad}`).join('\n');
+    if(!confirm(`¿Guardar el pedido especial de ${NOMBRE_LOCAL_VISTA[datos.local] || datos.local} para el ${fmtFecha(datos.fechaEntrega)} a las ${datos.horaEntrega}?\n\n${resumen}`)) return;
+    const btn = ev.target; btn.disabled = true; btn.textContent = 'Guardando...';
+    try{
+      await postJSON(datos);
+      msg.className = 'msg ok'; msg.textContent = `✓ Pedido guardado para el ${fmtFecha(datos.fechaEntrega)} ${datos.horaEntrega} hs. Fábrica ya lo ve en "Qué producir hoy".`;
+      avisar('✓ Pedido especial guardado · ' + horaCorta());
+      tbody.innerHTML = ''; document.getElementById('peObs').value = '';
+      borrarMemoria();
+      cargarLista();
+    }catch(err){ msg.className = 'msg err'; msg.textContent = '✗ NO se guardó: ' + err.message; avisar('✗ NO se guardó — ' + err.message, 'err'); }
+    finally{ btn.disabled = false; btn.textContent = 'Guardar pedido'; }
+  };
+  cargarLista();
+}
+
 async function renderHistorialEnvios(){
   app.innerHTML = `
     <button class="back" onclick="irA('home')">← Volver</button>
@@ -4907,7 +5276,7 @@ const ALIAS_IMPORT = {
   'CAJITA CRIOLLA|POLLO Y CHEDDAR': 'CAJITA POLLO Y CHEDDAR',
   'CAJITA CRIOLLA|COOKIES *2': 'BOLSA COOKIES X2',
 };
-const CATEGORIAS_EXCEL = ['EMPANADAS','TOPPINGS','DIPS','POSTRES','CAJITA CRIOLLA'];
+const CATEGORIAS_EXCEL = ['EMPANADAS','TOPPINGS','DIPS','POSTRES','CAJITA CRIOLLA','COPETIN','HUEVOS'];
 const HOJA_A_LOCAL = { CENTRO: 'Centro', PATAGONIA: 'Patagonia', ZELARRAYAN: 'Zelarrayan' };
 
 function normalizarNombre(s){
@@ -5047,6 +5416,27 @@ async function importarExcelPlanificacion(ev){
       if(parametros.length){
         await postJSON({ action: 'guardarParametrosProyeccion', parametros });
         resumenNormal.push('parámetros: ' + parametros.map(p => `${p.local} colchón ${Math.round(p.colchon * 100)}% mín. ${p.minimo}`).join(', '));
+      }
+    }
+
+    // PRODUCCIÓN SEMANAL (14/11/2026): solapa con las reglas de lo que se hace
+    // una vez por semana (masa de cookies, cajitas, copetín de cortesía)
+    const hojaSem = wb.SheetNames.find(n => normalizarNombre(n).normalize('NFD').replace(/[\u0300-\u036f]/g, '') === 'PRODUCCION SEMANAL');
+    if(hojaSem){
+      const filasSem = XLSX.utils.sheet_to_json(wb.Sheets[hojaSem], { header: 1, raw: true, defval: '' });
+      const sinTilde = t => String(t == null ? '' : t).trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+      const iHead = filasSem.findIndex(f => sinTilde(f[0]) === 'PRODUCTO');
+      if(iHead !== -1){
+        const head = filasSem[iHead].map(sinTilde);
+        const col = (...nombres) => head.findIndex(h => nombres.some(n => h.startsWith(n)));
+        const c = { p: 0, d: col('DIA'), s: col('SECTOR'), min: col('SI QUEDAN'), hasta: col('HACER HASTA'), col: col('COLCHON'), red: col('REDONDEO'), cong: col('CONGELADO') };
+        const v = (f, i) => i === -1 ? '' : f[i];
+        const pct = x => { if(x === '' || x == null) return ''; const t = String(x).replace('%', '').replace(',', '.').trim(); const n = Number(t); if(isNaN(n)) return ''; return String(x).includes('%') || n > 1 ? n / 100 : n; };
+        const reglas = filasSem.slice(iHead + 1).filter(f => String(f[0] || '').trim() && String(f[c.d] || '').trim()).map(f => ({ producto: String(f[0]).trim(), dia: v(f, c.d), sector: v(f, c.s), siQuedanMenosDe: v(f, c.min), hacerHasta: v(f, c.hasta), colchon: pct(v(f, c.col)), redondeo: v(f, c.red), congelado: v(f, c.cong) }));
+        if(reglas.length){
+          const rr = await postJSON({ action: 'guardarProduccionSemanal', reglas });
+          resumenNormal.push(`producción semanal: ${rr.reglas} producto(s)`);
+        }
       }
     }
 
