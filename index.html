@@ -157,6 +157,11 @@
   .chip.na{background:#f1ece3;color:var(--ink-soft);}
   .sug-lotes{font-size:11.5px;color:var(--herb);margin-top:3px;line-height:1.3;}
   .sug-lotes.vencidos{color:var(--alert);}
+  /* 18/11/2026: urgente en verde sin número + vence hoy/mañana en rojo */
+  .urg-enplan{font-size:12px;font-weight:600;color:var(--herb);white-space:nowrap;}
+  .urg-vence{background:#fdecea;border:1px solid #e5a29b;border-radius:6px;padding:8px 10px;margin:8px 0;color:#8a2a1f;font-size:13px;line-height:1.4;}
+  .sug-lotes.por-vencer{color:var(--alert);font-weight:600;}
+  .aviso-exceso{display:block;font-size:11px;font-weight:600;color:var(--alert);white-space:nowrap;}
   input.venc-rojo{border-color:var(--alert) !important;background:var(--alert-bg) !important;color:var(--alert) !important;font-weight:700;}
   td.dif-rec{font-weight:700;font-variant-numeric:tabular-nums;text-align:center;}
   .bloque-extra{margin-top:22px;padding-top:14px;border-top:1px dashed var(--line);}
@@ -1646,21 +1651,33 @@ function htmlEstadoCargasUrgentes(u){
   });
   return `<div class="urg-estado">Calculado con el stock que cargaron los locales: ${partes.join(' · ')}</div>`;
 }
+// 18/11/2026 (Carolina): lo urgente que YA está en el plan de hoy (verde) va
+// sin número, para que no se sume a lo planificado (se armaba dos veces)
+const EN_TU_PLAN = '<span class="urg-enplan">en tu plan</span>';
+// VENCE HOY O MAÑANA EN FÁBRICA (18/11/2026): aviso rojo arriba de lo urgente
+function htmlPorVencer(u, sector){
+  const l = ((u && u.porVencer) || {})[sector === 'cocina' ? 'cocina' : 'produccion'] || [];
+  if(!l.length) return '';
+  const cuando = x => x.hoy ? '<strong>vence HOY</strong>' : `vence mañana ${fmtFecha(x.venc).slice(0, 5)}`;
+  const cant = x => sector === 'cocina' ? `${dec(x.cant)} kg` : ent(x.cant);
+  const titulo = sector === 'cocina' ? '⚠ Relleno en cámara que vence hoy o mañana — usarlo primero' : '⚠ En fábrica vence hoy o mañana — mandarlo primero en el envío de hoy';
+  return `<div class="urg-vence"><strong>${titulo}</strong><div>${l.map(x => `${x.producto} ${cant(x)} (${cuando(x)})`).join(' · ')}</div></div>`;
+}
 const badgePlanUrg = plan => plan ? '<span class="urg-b plan">PLAN DE HOY</span>' : '<span class="urg-b fuera">FUERA DE PLAN</span>';
 function htmlUrgentesCocina(u){
   const filas = u.cocina || [];
   const titulo = `<h3>Urgente para el envío de hoy — ${String(u.dia || '').toLowerCase()} ${fmtFecha(u.fecha).slice(0, 5)}</h3>`;
-  if(!filas.length) return `<div class="urg-card">${titulo}${htmlEstadoCargasUrgentes(u)}<div class="urg-nota">No hace falta ningún relleno urgente: con lo armado en fábrica y lo que hay en cámara alcanza para lo que piden hoy los locales. Seguí con la planificación habitual.</div></div>`;
+  if(!filas.length) return `<div class="urg-card">${titulo}${htmlPorVencer(u, 'cocina')}${htmlEstadoCargasUrgentes(u)}<div class="urg-nota">No hace falta ningún relleno urgente: con lo armado en fábrica y lo que hay en cámara alcanza para lo que piden hoy los locales. Seguí con la planificación habitual.</div></div>`;
   const tabla = lista => `<table class="urg"><thead><tr><th>Relleno</th><th style="text-align:center;">Kg</th><th>Para</th><th></th></tr></thead><tbody>${lista.map(c => `
     <tr class="${c.plan ? '' : 'fuera'}">
       <td><strong>${c.relleno}</strong>${c.kgCamara > 0 ? `<div style="font-size:11.5px;color:var(--ink-soft);">ya descontado lo de cámara (${dec(c.kgCamara)} kg)</div>` : ''}</td>
-      <td class="num">${dec(c.kg)}</td>
+      <td class="num">${c.plan ? EN_TU_PLAN : dec(c.kg)}</td>
       <td style="font-size:12.5px;">${c.sabores.map(x => `${x.sabor} ${ent(x.unidades)}`).join(' · ')}</td>
       <td>${badgePlanUrg(c.plan)}${c.hecha ? ' <span class="urg-hecho">✓ enviada</span>' : ''}</td>
     </tr>`).join('')}</tbody></table>`;
   const p1 = filas.filter(c => c.paso === 1), p2 = filas.filter(c => c.paso === 2);
-  return `<div class="urg-card">${titulo}${htmlEstadoCargasUrgentes(u)}
-    <div class="urg-nota">Lo que piden hoy los locales − empanadas armadas en fábrica − relleno en cámara. <strong>Verde</strong> = ya está dentro de la planificación de hoy (no se suma). <strong>Amarillo = fuera de plan</strong>: es extra y ya aparece solo en Registrar producción → Cocina.</div>
+  return `<div class="urg-card">${titulo}${htmlPorVencer(u, 'cocina')}${htmlEstadoCargasUrgentes(u)}
+    <div class="urg-nota">Lo que piden hoy los locales − empanadas armadas en fábrica − relleno en cámara. <strong>Verde = en tu plan</strong>: hacelo primero, sin sumar nada. <strong>Amarillo = fuera de plan</strong>: es extra y ya aparece solo en Registrar producción → Cocina.</div>
     ${p1.length ? `<div class="urg-paso"><div class="urg-num">1</div><h4>Primera hora — rellenos que hay que enfriar (hacerlos primero)</h4></div>${tabla(p1)}` : ''}
     ${p2.length ? `<div class="urg-paso"><div class="urg-num">${p1.length ? 2 : 1}</div><h4>Después — rellenos que no se enfrían (se arman enseguida)</h4></div>${tabla(p2)}` : ''}
     <div class="urg-resto"><strong>Después</strong>, el resto del día con la planificación habitual (abajo).</div></div>`;
@@ -1669,21 +1686,21 @@ function htmlUrgentesProduccion(u){
   const filas = u.produccion || [];
   const titulo = `<h3>Urgente para el envío de hoy — ${String(u.dia || '').toLowerCase()} ${fmtFecha(u.fecha).slice(0, 5)}</h3>`;
   const franco = u.francoProduccion ? `<div class="urg-nota" style="color:var(--alert);font-weight:600;">Hoy es franco de Producción.</div>` : '';
-  if(!filas.length) return `<div class="urg-card">${titulo}${htmlEstadoCargasUrgentes(u)}${franco}<div class="urg-nota">No hay empanadas urgentes: lo armado en fábrica alcanza para lo que piden hoy los locales. Seguí con la planificación habitual.</div></div>`;
+  if(!filas.length) return `<div class="urg-card">${titulo}${htmlPorVencer(u, 'produccion')}${htmlEstadoCargasUrgentes(u)}${franco}<div class="urg-nota">No hay empanadas urgentes: lo armado en fábrica alcanza para lo que piden hoy los locales. Seguí con la planificación habitual.</div></div>`;
   const tabla = lista => `<table class="urg"><thead><tr><th>Sabor</th><th style="text-align:center;">Armar</th><th>Relleno</th><th></th></tr></thead><tbody>${lista.map(p => `
     <tr class="${p.plan ? '' : 'fuera'}">
       <td><strong>${p.sabor}</strong></td>
-      <td class="num">${ent(p.unidades)}</td>
+      <td class="num">${p.plan ? EN_TU_PLAN : ent(p.unidades)}</td>
       <td style="font-size:12.5px;">${p.detalle || p.relleno || ''}</td>
       <td>${badgePlanUrg(p.plan)}${p.armadasHoy > 0 ? ` <span class="urg-hecho">✓ ${ent(p.armadasHoy)} armadas hoy</span>` : ''}</td>
     </tr>`).join('')}</tbody></table>`;
   const titulos = { 1: 'Arrancar — relleno frío que ya está en cámara / rollos armados', 2: 'A medida que Cocina termina los rellenos que no se enfrían', 3: 'Al final — cuando estén fríos los rellenos calientes' };
   let n = 0;
   const pasos = [1, 2, 3].map(k => { const l = filas.filter(p => p.paso === k); if(!l.length) return ''; n++; return `<div class="urg-paso"><div class="urg-num">${n}</div><h4>${titulos[k]}</h4></div>${tabla(l)}`; }).join('');
-  return `<div class="urg-card">${titulo}${htmlEstadoCargasUrgentes(u)}${franco}
-    <div class="urg-nota">Empanadas que tienen que estar armadas antes del reparto, en el orden de la máquina. <strong>Amarillo = fuera de plan</strong> (no se arma hoy en la planificación): ya aparece solo en Registrar producción.</div>
+  return `<div class="urg-card">${titulo}${htmlPorVencer(u, 'produccion')}${htmlEstadoCargasUrgentes(u)}${franco}
+    <div class="urg-nota">Empanadas que tienen que estar armadas antes del reparto, en el orden de la máquina. <strong>Verde = en tu plan</strong>: armalo primero, sin sumar nada. <strong>Amarillo = fuera de plan</strong> (no se arma hoy en la planificación): ya aparece solo en Registrar producción.</div>
     ${pasos}
-    <div class="urg-resto"><strong>Después</strong>, el resto de la tanda con la planificación habitual (abajo). Lo verde ya está incluido ahí.</div></div>`;
+    <div class="urg-resto"><strong>Después</strong>, el resto de la tanda con la planificación habitual (abajo). Lo verde ya está incluido ahí: no se arma dos veces.</div></div>`;
 }
 async function pintarUrgentes(sector, fecha){
   const id = sector === 'cocina' ? 'urgentesCocina' : 'urgentesProduccion';
@@ -3384,10 +3401,11 @@ function filaRegistroProduccion(etiqueta, saborKey, aHacerMostrar, etiquetaExtra
 
   const tr = document.createElement('tr');
   tr.dataset.sabor = saborKey;
+  if(aHacerMostrar != null && !isNaN(Number(aHacerMostrar))) tr.dataset.ahacer = String(Number(aHacerMostrar));
   if(yaGuardado) tr.classList.add('fila-guardada');
   tr.innerHTML = `
     <td>${etiqueta}${etiquetaExtra || ''}</td>
-    <td class="num" style="color:var(--ink-soft);">${aHacerMostrar != null ? ent(aHacerMostrar) : '—'}</td>
+    <td class="num celda-ahacer" style="color:var(--ink-soft);">${aHacerMostrar != null ? ent(aHacerMostrar) : '—'}</td>
     <td>${celdaMaquina}</td>
     <td><input type="text" class="inp-maq-vel" style="width:64px;" value="${g.maquinaVelocidad || ''}" ${dis}></td>
     <td>${celdaFechaBorrable('inp-disco-lote', /^\d{4}-\d{2}-\d{2}$/.test(g.discosLote || '') ? g.discosLote : '', dis)}</td>
@@ -3406,6 +3424,36 @@ function filaRegistroProduccion(etiqueta, saborKey, aHacerMostrar, etiquetaExtra
     ponerSello(tr, null);
   }
   return tr;
+}
+
+// AVISO SI SE ARMA DE MÁS (18/11/2026, Carolina): si lo armado de un sabor
+// (sumando las filas "(adicional)") pasa en más de 10% lo calculado, la
+// celda "A producir" se marca en rojo. Solo aviso: no bloquea el guardado.
+const TOLERANCIA_EXCESO = 0.10;
+function revisarExcesoProduccion(tbody){
+  const filas = [...tbody.querySelectorAll('tr[data-sabor]')];
+  const base = n => String(n).replace(/\s*\(adicional\)\s*$/i, '');
+  const total = {};
+  filas.forEach(tr => { const v = Number((tr.querySelector('.inp-total-prod') || {}).value) || 0; const k = base(tr.dataset.sabor); total[k] = (total[k] || 0) + v; });
+  filas.forEach(tr => {
+    const celda = tr.querySelector('.celda-ahacer');
+    if(!celda) return;
+    const prev = celda.querySelector('.aviso-exceso');
+    if(prev) prev.remove();
+    if(tr.dataset.ahacer == null || base(tr.dataset.sabor) !== tr.dataset.sabor) return;
+    const plan = Number(tr.dataset.ahacer) || 0, hecho = total[tr.dataset.sabor] || 0;
+    if(plan > 0 && hecho > plan * (1 + TOLERANCIA_EXCESO)){
+      const sp = document.createElement('span');
+      sp.className = 'aviso-exceso';
+      sp.textContent = `⚠ +${ent(hecho - plan)} de más (${Math.round((hecho / plan - 1) * 100)}%)`;
+      sp.title = 'Se armó más de lo calculado (plan + urgente fuera de plan). Lo que sobra queda en fábrica y sale con menos días.';
+      celda.appendChild(sp);
+    }
+  });
+}
+function conectarAvisoExceso(tbody){
+  tbody.addEventListener('input', ev => { if(ev.target.classList && ev.target.classList.contains('inp-total-prod')) revisarExcesoProduccion(tbody); });
+  setTimeout(() => revisarExcesoProduccion(tbody), 0);
 }
 
 let REG_PROD_ESTADO = null;
@@ -3558,6 +3606,7 @@ async function pintarRegistroProduccionSector(){
   adicionalesGuardados.forEach(k => {
     tbody.appendChild(filaRegistroProduccion(k, k, null, '', !vaEnMaquina(k), EMPLEADOS_REGISTRO, guardadoPorSabor[k], bloqueadoGlobal));
   });
+  conectarAvisoExceso(tbody);
   cont.appendChild(wrap);
   const hExtras = document.createElement('h4');
   hExtras.className = 'cat-heading';
@@ -4182,6 +4231,10 @@ async function cargarEnvios(){
     let avisoEsp = document.getElementById('avisoEspecialEnvios');
     if(!avisoEsp){ avisoEsp = document.createElement('div'); avisoEsp.id = 'avisoEspecialEnvios'; tabsEnviosAntes().before(avisoEsp); }
     avisoEsp.innerHTML = htmlAvisoEnvioEspecial(especialesHoy, null, 'despacho');
+    // 18/11/2026: lo que vence hoy o mañana y sobra en fábrica después de las órdenes (solo aviso)
+    let avisoVence = document.getElementById('avisoVenceEnvios');
+    if(!avisoVence){ avisoVence = document.createElement('div'); avisoVence.id = 'avisoVenceEnvios'; avisoVence.className = 'no-print'; tabsEnviosAntes().before(avisoVence); }
+    avisoVence.innerHTML = htmlSobranPorVencer(data.sobranPorVencer, fecha);
     pintarBarraPlan('barraPlanEnvios', fecha, data.plan, cargarEnvios, data.proyeccion);
     // quién despacha / repartidor: los del envío abierto más nuevo (si ya tiene), si no los del primero
     const todosEnvios = LOCALES_VENTA.flatMap(l => enviosPorLocal[l]);
@@ -4421,10 +4474,21 @@ function stockLocalVista(nombre, n){
 }
 const AYUDA_STOCK_LOCAL = 'Lo que cargó el local en su último stock (sin lo vencido). La orden calculada ya lo descuenta. Si el local no cargó, es 0.';
 
+// VENCE HOY O MAÑANA (18/11/2026, Carolina — opción b): lo que sobra en
+// fábrica después de cubrir las órdenes de hoy y vence hoy o mañana. Solo
+// aviso: no se suma a ningún envío.
+function htmlSobranPorVencer(lista, fecha){
+  if(!lista || !lista.length) return '';
+  const cuando = x => x.venc === fecha ? '<strong>vencen HOY</strong>' : `vencen mañana ${fmtFecha(x.venc).slice(0, 5)}`;
+  return `<div class="urg-vence"><strong>⚠ Sobran en fábrica y vencen hoy o mañana</strong> (después de cubrir las órdenes de hoy)<div>${lista.map(x => `${x.sabor} ${ent(x.cant)} (${cuando(x)})`).join(' · ')}</div></div>`;
+}
 function htmlSugerenciaLotes(it){
   let h = '';
   const sug = it.sugerencia || [];
-  if(sug.length) h += `<div class="sug-lotes no-print">Mandar primero: ${sug.map(x => `${ent(x.cant)} que vencen ${fmtFecha(x.venc).slice(0, 5)}`).join(' · ')}${Math.round(it.aHacerUnidades || 0) > sug.reduce((a, x) => a + x.cant, 0) ? ' · el resto, de lo armado hoy' : ''}</div>`;
+  // 18/11/2026: lo que vence hoy o mañana va en rojo (sale primero igual)
+  const hoyE = DATOS_ENVIOS ? DATOS_ENVIOS.fecha : hoyISO();
+  const txtVence = x => x.porVencer ? (x.venc === hoyE ? 'vencen HOY' : `vencen mañana ${fmtFecha(x.venc).slice(0, 5)}`) : `vencen ${fmtFecha(x.venc).slice(0, 5)}`;
+  if(sug.length) h += `<div class="sug-lotes no-print${sug.some(x => x.porVencer) ? ' por-vencer' : ''}">${sug.some(x => x.porVencer) ? '⚠ ' : ''}Mandar primero: ${sug.map(x => `${ent(x.cant)} que ${txtVence(x)}`).join(' · ')}${Math.round(it.aHacerUnidades || 0) > sug.reduce((a, x) => a + x.cant, 0) ? ' · el resto, de lo armado hoy' : ''}</div>`;
   if(it.vencidosEnFabrica) h += `<div class="sug-lotes vencidos no-print">⚠ En fábrica hay ${ent(it.vencidosEnFabrica)} vencidas (no se sugieren)</div>`;
   return h;
 }
