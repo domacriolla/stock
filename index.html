@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<!-- versión 05/11/2026 — plan y registro de Discos -->
+<!-- versión 20/11/2026 — dispositivos autorizados (base: 19/11/2026) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -437,6 +437,19 @@
   .titulo-envio{font-size:16px;margin:4px 0 6px;color:var(--crust-dark);}
   .disp-fab{font-size:11px;color:var(--ink-soft);}
   .panel-envio-local.solo-faltan tr[data-item].sin-falta, .panel-envio-local.solo-faltan .cat-vacia{display:none;}
+  /* Activar dispositivo (20/11/2026) */
+  #activarDisp{position:fixed;inset:0;z-index:3000;background:rgba(49,27,16,.72);display:flex;align-items:center;justify-content:center;padding:20px;}
+  body.con-activar-disp{overflow:hidden;}
+  #activarDisp .disp-caja{background:var(--panel);border-radius:8px;border-top:6px solid var(--accent);width:100%;max-width:420px;padding:28px 26px 24px;text-align:center;}
+  #activarDisp .disp-marca{font-family:'Cinzel',serif;font-weight:700;color:var(--crust-dark);font-size:15px;letter-spacing:.12em;text-transform:uppercase;margin-bottom:14px;}
+  #activarDisp h2{font-size:21px;color:var(--ink);margin-bottom:10px;}
+  #activarDisp .disp-texto{color:var(--ink-soft);font-size:14px;line-height:1.5;margin:0 0 18px;}
+  #activarDisp input{width:100%;font-family:'Poppins',sans-serif;font-size:24px;font-weight:600;letter-spacing:.12em;text-align:center;text-transform:uppercase;padding:12px;border:2px solid var(--line);border-radius:6px;color:var(--ink);background:#fff;}
+  #activarDisp input:focus{outline:none;border-color:var(--accent);}
+  #activarDisp .disp-error{min-height:20px;color:var(--alert);font-size:13px;font-weight:600;margin:8px 0 4px;}
+  #activarDisp .disp-botones{display:flex;gap:10px;justify-content:center;margin-top:8px;}
+  #activarDisp .disp-botones .btn{min-width:140px;font-size:16px;padding:12px 18px;}
+  header.top .sub .sub-disp{display:block;color:var(--ink-soft);font-size:11px;letter-spacing:.06em;margin-top:3px;}
 </style>
 </head>
 <body>
@@ -464,18 +477,122 @@ function registrarTiempo(accion, totalMs, servidorMs, desdeCache){
     localStorage.setItem(k, JSON.stringify(lista.slice(-300)));
   }catch(e){}
 }
+/* ---------------------------------------------------------------------
+   DISPOSITIVOS AUTORIZADOS (20/11/2026, Carolina): cada tablet/PC se activa
+   una sola vez con su código. Un código = un solo dispositivo: al activarlo,
+   el servidor le da a esta tablet una llave única, y código + llave viajan
+   en cada pedido. Si el servidor dice que no está autorizado, se muestra
+   "Activar este dispositivo". Código y llave quedan en esta tablet aunque se
+   toque "Refrescar datos" (esa función borra solo lo que empieza con "doma:").
+   --------------------------------------------------------------------- */
+const CLAVE_DISPOSITIVO = 'domaDispositivo';
+let DISPOSITIVO = { codigo: '', llave: '', nombre: '', sector: '' };
+try{ DISPOSITIVO = Object.assign(DISPOSITIVO, JSON.parse(localStorage.getItem(CLAVE_DISPOSITIVO) || '{}')); }catch(e){}
+function guardarDispositivo(d){
+  DISPOSITIVO = { codigo: d.codigo || '', llave: d.llave || '', nombre: d.nombre || '', sector: d.sector || '' };
+  try{ localStorage.setItem(CLAVE_DISPOSITIVO, JSON.stringify(DISPOSITIVO)); }catch(e){}
+}
+function conCodigoDispositivo(url){
+  if(!DISPOSITIVO.codigo) return url;
+  const s = String(url);
+  return s + (s.indexOf('?') === -1 ? '?' : '&') + 'disp=' + encodeURIComponent(DISPOSITIVO.codigo) + '&dtok=' + encodeURIComponent(DISPOSITIVO.llave || '');
+}
+
 window.fetch = async function(url, opts){
   if(!String(url).startsWith(APPS_SCRIPT_URL)) return _fetchOriginal(url, opts);
   let accion = '';
   try{ accion = opts && opts.body ? JSON.parse(opts.body).action : new URL(url).searchParams.get('action'); }catch(e){}
   const t0 = performance.now();
-  const resp = await _fetchOriginal(url, opts);
+  const resp = await _fetchOriginal(conCodigoDispositivo(url), opts);
   try{
-    resp.clone().json().then(d => registrarTiempo(accion, performance.now() - t0, d && d._ms, d && d._cache))
-      .catch(() => registrarTiempo(accion, performance.now() - t0));
+    resp.clone().json().then(d => {
+      registrarTiempo(accion, performance.now() - t0, d && d._ms, d && d._cache);
+      if(d && d.noAutorizado) mostrarActivarDispositivo({ motivo: 'bloqueado' });
+    }).catch(() => registrarTiempo(accion, performance.now() - t0));
   }catch(e){}
   return resp;
 };
+
+// Pantalla para activar (o cambiar) el código de este dispositivo.
+// opciones.motivo: 'bloqueado' (no se puede cerrar) o 'cambiar' (desde el inicio, se puede cancelar)
+function mostrarActivarDispositivo(opciones){
+  const o = opciones || {};
+  if(document.getElementById('activarDisp')) return;
+  const bloqueado = o.motivo !== 'cambiar';
+  const div = document.createElement('div');
+  div.id = 'activarDisp';
+  div.innerHTML = `
+    <div class="disp-caja" role="dialog" aria-modal="true" aria-labelledby="dispTitulo">
+      <div class="disp-marca">Doma Criolla</div>
+      <h2 id="dispTitulo">${bloqueado ? 'Activar este dispositivo' : 'Código de este dispositivo'}</h2>
+      <p class="disp-texto">${bloqueado
+        ? 'Este dispositivo todavía no está autorizado para usar la app. Escribí el código que te dieron en la oficina.'
+        : (DISPOSITIVO.nombre ? `Ahora está activado como <strong>${escHtml(DISPOSITIVO.nombre)}</strong>. Para cambiarlo, escribí otro código.` : 'Escribí el código de este dispositivo.')}</p>
+      <input id="dispCodigo" type="text" inputmode="text" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="Ej. COC-7K4P" aria-label="Código del dispositivo">
+      <div class="disp-error" id="dispError" role="alert">${escHtml(o.error || '')}</div>
+      <div class="disp-botones">
+        ${bloqueado ? '' : '<button class="btn secondary" id="dispCancelar" type="button">Cancelar</button>'}
+        <button class="btn" id="dispActivar" type="button">Activar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(div);
+  document.body.classList.add('con-activar-disp');
+  const inp = document.getElementById('dispCodigo'), btn = document.getElementById('dispActivar'), err = document.getElementById('dispError');
+  setTimeout(() => inp.focus(), 50);
+  inp.addEventListener('input', () => { err.textContent = ''; });
+  inp.addEventListener('keydown', ev => { if(ev.key === 'Enter') btn.click(); });
+  const cerrar = () => { div.remove(); document.body.classList.remove('con-activar-disp'); };
+  if(!bloqueado) document.getElementById('dispCancelar').onclick = cerrar;
+  btn.onclick = async () => {
+    const codigo = inp.value.trim();
+    if(!codigo){ err.textContent = 'Escribí el código.'; inp.focus(); return; }
+    btn.disabled = true; btn.textContent = 'Revisando…';
+    try{
+      const mismaLlave = codigo.toUpperCase() === String(DISPOSITIVO.codigo || '').toUpperCase() ? (DISPOSITIVO.llave || '') : '';
+      const r = await _fetchOriginal(`${APPS_SCRIPT_URL}?action=verificarDispositivo&codigo=${encodeURIComponent(codigo)}&dtok=${encodeURIComponent(mismaLlave)}`);
+      const d = await r.json();
+      if(!d.ok){ err.textContent = d.error || 'No se pudo activar.'; btn.disabled = false; btn.textContent = 'Activar'; inp.select(); return; }
+      if(d.candado === false && !d.codigo){ err.textContent = 'Ese código no existe. Revisalo.'; btn.disabled = false; btn.textContent = 'Activar'; return; }
+      guardarDispositivo(d);
+      cerrar();
+      irA('home');
+      avisar(`✓ Dispositivo activado: ${d.nombre}`, 'ok');
+    }catch(e2){
+      err.textContent = 'No hay conexión con el servidor. Probá de nuevo.';
+      btn.disabled = false; btn.textContent = 'Activar';
+    }
+  };
+}
+
+// Al abrir la app: confirma en segundo plano que este dispositivo sigue
+// autorizado y actualiza su nombre (por si lo cambiaron en la planilla).
+async function revisarDispositivoAlAbrir(){
+  try{
+    const r = await _fetchOriginal(`${APPS_SCRIPT_URL}?action=verificarDispositivo&codigo=${encodeURIComponent(DISPOSITIVO.codigo || '')}&dtok=${encodeURIComponent(DISPOSITIVO.llave || '')}`);
+    const d = await r.json();
+    if(d.ok){
+      if(d.codigo && (d.llave !== DISPOSITIVO.llave || d.nombre !== DISPOSITIVO.nombre || d.sector !== DISPOSITIVO.sector)){
+        guardarDispositivo(d);
+        const s = document.getElementById('subDispositivo');
+        if(s) s.textContent = d.nombre;
+      }
+    } else if(d.candado){
+      mostrarActivarDispositivo({ motivo: 'bloqueado', error: DISPOSITIVO.codigo ? d.error : '' });
+    }
+  }catch(e){}
+}
+// Arranque: si esta tablet tiene código pero todavía no tiene llave (se
+// activó con la versión anterior), primero se vincula y después abre el inicio.
+async function iniciarApp(){
+  if(DISPOSITIVO.codigo && !DISPOSITIVO.llave){
+    await revisarDispositivoAlAbrir();
+    if(document.getElementById('activarDisp')) return;
+    irA('home');
+    return;
+  }
+  irA('home');
+  revisarDispositivoAlAbrir();
+}
 
 const LOCALES = ['Centro', 'Patagonia', 'Zelarrayan', 'Fábrica - Producción', 'Fábrica - Cocina', 'Fábrica - Discos'];
 // LUNES FRANCO de Producción (desde el 19/10/2026): ese día no se arman
@@ -831,7 +948,7 @@ function renderHome(){
   app.innerHTML = `
     <header class="top">
       <h1>Doma Criolla</h1>
-      <div class="sub">Stock y producción</div>
+      <div class="sub">Stock y producción<span class="sub-disp" id="subDispositivo">${escHtml(DISPOSITIVO.nombre || '')}</span></div>
     </header>
 
     <div class="control-reg" id="controlRegistros"><h3>Control de registros</h3><div class="loading" style="font-size:12.5px;">Revisando…</div></div>
@@ -873,6 +990,10 @@ function renderHome(){
       ${tarjetaHome('fichas', 'Fichas técnicas', 'Importar y actualizar las recetas (Rellenos, Preparados, Postres, Dips, Edición Limitada).')}
       ${tarjetaHome('planificacion', 'Editar venta proyectada', 'Actualizar, por local, cuánto se espera vender de cada sabor cada día de la semana.')}
       ${tarjetaHome('tiempos', 'Tiempos de carga', 'Cuánto tarda cada pantalla en esta tablet (para detectar lentitud).')}
+      <button class="home-card" onclick="mostrarActivarDispositivo({ motivo: 'cambiar' })">
+        <h2>Este dispositivo</h2>
+        <p>${DISPOSITIVO.nombre ? `Activado como <strong>${escHtml(DISPOSITIVO.nombre)}</strong>${DISPOSITIVO.sector ? ' · ' + escHtml(DISPOSITIVO.sector) : ''}. Tocá para cambiar el código.` : 'Cargar el código de esta tablet o PC.'}</p>
+      </button>
       <button class="home-card" id="btnRefrescarDatos" onclick="refrescarDatosPlanilla()">
         <h2>Refrescar datos de la planilla</h2>
         <p>Usalo si cambiaste algo a mano en la planilla (sabores, calendario, empleados) y la app todavía no lo muestra.</p>
@@ -6681,7 +6802,7 @@ function sumarDiasISO(iso, n){
   return `${d.getFullYear()}-${mes}-${dia}`;
 }
 
-irA('home');
+iniciarApp();
 </script>
 </body>
 </html>
