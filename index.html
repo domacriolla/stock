@@ -324,6 +324,8 @@
   .btn-mas-resp{font-size:11px;padding:2px 7px;border:1px dashed var(--line);background:#fff;border-radius:6px;cursor:pointer;color:var(--crust);}
   .cong-titulo{margin:30px 0 4px;font-size:17px;color:#2e5d7a;border-top:2px dashed #b9d3e3;padding-top:14px;}
   .tabla-congelados td.cong-ultima{font-size:12.5px;min-width:130px;}
+  .tabla-congelados tr.cong-cambio td{background:#fdf3d6;}
+  .tabla-congelados .cong-antes{font-size:11px;color:#8a5a00;font-weight:600;}
   .local-fijo{position:sticky;top:0;z-index:20;background:var(--crust);color:#fff;font-weight:700;font-size:17px;letter-spacing:.5px;padding:9px 14px;border-radius:8px;margin:6px 0 10px;box-shadow:0 2px 6px rgba(0,0,0,.18);text-align:center;}
   @media print{ .local-fijo{position:static;box-shadow:none;} }
   .cat-nav a{font-size:11.5px;color:var(--ink-soft);border:1px solid var(--line);
@@ -727,6 +729,7 @@ function irA(pantalla){
   // y el selector "¿Dónde estás cargando?" muestra solo los de ese bloque.
   if(pantalla === 'stockLocales') renderLocal('locales');
   if(pantalla === 'stockFabrica') renderLocal('fabrica');
+  if(pantalla === 'stockCongelado') renderStockCongelado();
   if(pantalla === 'local') renderLocal('locales');
   if(pantalla === 'fabrica') renderFabrica();
   if(pantalla === 'planificacion') renderPlanificacion();
@@ -998,7 +1001,8 @@ function renderHome(){
       </div>
       <div class="home-sub"><span class="num-paso">2</span>Registros</div>
       <div class="home-grid">
-        ${tarjetaHome('stockFabrica', 'Cargar stock de fábrica', 'Stock de Producción, Cocina (rellenos en kilos) y Discos.')}
+        ${tarjetaHome('stockFabrica', 'Cargar stock de fábrica', 'Stock del día de Producción, Cocina (rellenos en kilos) y Discos.')}
+        ${tarjetaHome('stockCongelado', '❄ Stock congelado', 'Freezer: rellenos, preparados, copetín, cajitas, toppings y masas de cookies. Queda la última carga.', true)}
         ${tarjetaHome('registro', 'Registrar producción', 'Cocina, Producción y Discos: quién, cuánto, máquina, horas y trazabilidad.')}
       </div>
       <div class="home-sub"><span class="num-paso">3</span>Informes</div>
@@ -1117,99 +1121,184 @@ function opcionesEmpleadosSeleccion(empleados, seleccionado){
 }
 
 /* ---------------------------------------------------------------------
-   STOCK CONGELADO POR SECTOR (14/11/2026, Carolina)
-   Cocina: rellenos congelados (kilos) · Producción: copetín, cajitas y
-   toppings · Postres: masas de cookies (vainilla y chocolate). Todo con vencimiento. Si un producto
-   no se vuelve a cargar, se CONSERVA su última carga (con fecha y quién).
+   STOCK CONGELADO (14/11/2026; pantalla propia desde el 24/11/2026, Carolina)
+   Una sola pantalla para el freezer: Rellenos y Preparados (Cocina, kg),
+   Copetín, Cajita Criolla y Toppings (Producción) y Masas de cookies
+   (Postres). Cada producto arranca con su ÚLTIMA CARGA ya escrita: si nada
+   cambió no se toca y sigue valiendo. Lo que cambia se marca en amarillo y se
+   guarda todo junto con un solo botón (solo los productos que cambiaron).
+   Los preparados congelados son solo registro (no cambian ningún cálculo).
    --------------------------------------------------------------------- */
-const SECTOR_POSTRES_STOCK = 'Fábrica - Postres';
-const SECTOR_CONGELADO_DE = { 'Fábrica - Cocina': 'Cocina', 'Fábrica - Producción': 'Producción', [SECTOR_POSTRES_STOCK]: 'Postres' };
-function filaCongelado(it, esExtra, onSoloQuitar){
-  const tr = document.createElement('tr');
-  tr.dataset.prod = it.producto;
-  if(esExtra) tr.classList.add('cong-extra');
-  const conElab = it.unidad === 'kg' || it.grupo === 'Rellenos';
-  tr.innerHTML = `
-    <td>${esExtra ? '<span class="item-extra">↳ otro lote</span>' : `<strong>${it.producto}</strong> <span class="unidad-prod">(${it.unidad})</span>`}</td>
-    <td class="cong-ultima">${esExtra ? '' : htmlUltimaCongelado(it)}</td>
-    <td><input type="number" min="0" step="${it.unidad === 'kg' ? '0.01' : '1'}" class="inp-cong-cant" placeholder="—" style="width:80px;"></td>
-    <td><input type="date" class="inp-cong-venc"></td>
-    <td>${conElab ? '<input type="date" class="inp-cong-elab" title="Fecha de elaboración">' : ''}</td>
-    <td class="col-add">${esExtra ? '<button type="button" class="del-btn" title="Quitar">✕</button>' : '<button type="button" class="add-lote-btn" title="Otro vencimiento">+</button>'}</td>
-    <td class="no-print celda-estado" style="white-space:nowrap;">${esExtra ? '' : '<button type="button" class="btn secondary btn-guardar-cong" style="font-size:12px;padding:5px 10px;">Guardar</button>'}</td>`;
-  if(esExtra) tr.querySelector('.del-btn').onclick = () => { tr.remove(); if(onSoloQuitar) onSoloQuitar(); };
-  return tr;
-}
+const GRUPO_CONGELADO_TITULO = { 'Rellenos': 'Rellenos', 'Preparados': 'Preparados', 'Copetín': 'Copetín', 'Cajita Criolla': 'Cajita Criolla', 'Toppings': 'Toppings', 'Masas': 'Masas de cookies' };
 function htmlUltimaCongelado(it){
   if(!it.cargado) return '<span class="gris-txt">sin cargar</span>';
-  const lotes = it.lotes.length ? it.lotes.map(l => `${it.unidad === 'kg' ? dec(l.cantidad) : ent(l.cantidad)}${l.vencimiento ? ` · vence ${fmtFecha(l.vencimiento).slice(0, 5)}` : ''}${l.vencimiento && l.vencimiento < hoyISO() ? ' <span class="mal-txt">(vencido)</span>' : ''}`).join('<br>') : '0 (no hay)';
-  return `<div><strong>${lotes}</strong></div><div style="font-size:11px;color:var(--ink-soft);">${fmtFecha(it.fecha).slice(0, 5)}${it.hora ? ' ' + it.hora : ''} · ${it.responsable || '—'}</div>`;
+  const fmt = n => it.unidad === 'kg' || it.unidad === 'L' ? dec(n) : ent(n);
+  const lotes = it.lotes.length ? it.lotes.map(l => `${fmt(l.cantidad)}${l.vencimiento ? ` · vence ${fmtFecha(l.vencimiento).slice(0, 5)}` : ''}${l.vencimiento && l.vencimiento < hoyISO() ? ' <span class="mal-txt">(vencido: no se cuenta)</span>' : ''}`).join('<br>') : '0 (no hay)';
+  return `<div>${lotes}</div><div style="font-size:11px;color:var(--ink-soft);">${fmtFecha(it.fecha).slice(0, 5)}${it.hora ? ' ' + it.hora : ''} · ${it.responsable || '—'}</div>`;
 }
-async function pintarCongelados(cont, sector, fecha, obtenerResponsable){
-  cont.innerHTML = `<h3 class="cong-titulo">❄ Congelados — ${sector}</h3><p class="loading" style="font-size:12.5px;">Cargando congelados…</p>`;
-  let data;
-  try{
-    const r = await fetch(`${APPS_SCRIPT_URL}?action=obtenerCongelados&sector=${encodeURIComponent(sector)}&fecha=${fecha}`);
-    data = await r.json();
-    if(data.error) throw new Error(data.error);
-  }catch(err){
-    cont.innerHTML = `<h3 class="cong-titulo">❄ Congelados — ${sector}</h3><div class="msg err" style="display:block;">No se pudieron leer los congelados: ${err.message}</div>`;
-    return;
+async function renderStockCongelado(){
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <header class="top"><h1>❄ Stock congelado</h1></header>
+    <div class="field-row">
+      <label>¿Quién está cargando?</label>
+      <div id="congRespWrap"><select id="congResp"><option value="">Cargando…</option></select></div>
+    </div>
+    <div class="field-row">
+      <label>Fecha (por si cargás con atraso)</label>
+      <input type="date" id="congFecha" value="${hoyISO()}">
+    </div>
+    <p style="color:var(--ink-soft);font-size:12.5px;max-width:600px;">${conAyuda('Ya está escrita la última carga de cada producto', 'Si un producto no cambió, no lo toques: sigue valiendo lo último que se cargó. Si cambió, corregí la cantidad o el vencimiento (si ya no hay, poné 0). Lo que cambia se marca en amarillo y se guarda todo junto con el botón de abajo. Lo vencido no se cuenta.')}</p>
+    <div id="congNav" class="cat-nav"></div>
+    <div id="congCont" class="loading">Cargando…</div>
+    <div class="barra-final no-print">
+      <div class="barra-fija"><div class="interior">
+        <span class="ultimo-guardado" id="congEstado">Sin cambios.</span>
+        <div class="botones"><button class="btn" id="btnGuardarCong">Guardar cambios</button></div>
+      </div></div>
+    </div>`;
+  const cont = document.getElementById('congCont');
+  let datos = null, empleados = [];
+  async function cargar(){
+    const fecha = document.getElementById('congFecha').value;
+    cont.className = 'loading'; cont.textContent = 'Cargando…';
+    try{
+      const [r, emp] = await Promise.all([fetch(`${APPS_SCRIPT_URL}?action=obtenerStockCongelado&fecha=${fecha}`).then(x => x.json()), obtenerEmpleados()]);
+      if(r.error) throw new Error(r.error);
+      datos = r; empleados = emp || [];
+    }catch(err){
+      cont.className = '';
+      cont.innerHTML = `<div class="msg err" style="display:block;">No se pudo leer el stock congelado: ${err.message}. <button class="btn secondary" style="font-size:12px;padding:5px 9px;margin-left:8px;" id="btnReintCong">Reintentar</button></div>`;
+      document.getElementById('btnReintCong').onclick = cargar;
+      return;
+    }
+    if(document.getElementById('congFecha').value !== fecha) return;
+    const sel = document.getElementById('congResp');
+    const previo = sel ? sel.value : '';
+    document.getElementById('congRespWrap').innerHTML = `<select id="congResp">${opcionesEmpleadosSeleccion(empleados, previo)}</select>`;
+    pintar();
   }
-  cont.innerHTML = `<h3 class="cong-titulo">❄ Congelados — ${sector}</h3>
-    <p style="color:var(--ink-soft);font-size:12.5px;max-width:620px;margin:0 0 8px;">${conAyuda('Se guarda la última carga de cada producto', 'Si un producto no se vuelve a cargar, queda lo último que se cargó (con la fecha y quién). Cargá solo lo que cambió y tocá Guardar en esa fila. Si ya no hay, poné 0.')}</p>`;
-  const grupos = [...new Set(data.items.map(i => i.grupo))];
-  grupos.forEach(g => {
-    const h = document.createElement('h4'); h.className = 'cat-heading'; h.textContent = g; cont.appendChild(h);
-    const conElab = data.items.some(i => i.grupo === g && (i.unidad === 'kg' || i.grupo === 'Rellenos'));
-    const table = document.createElement('table');
-    table.className = 'lotes tabla-congelados';
-    table.innerHTML = `<thead><tr><th>Producto</th><th>Última carga</th><th class="col-cant">Cantidad</th><th class="col-venc">Vencimiento</th><th>${conElab ? 'Elaboración' : ''}</th><th class="col-add"></th><th class="no-print"></th></tr></thead><tbody></tbody>`;
-    const tbody = table.querySelector('tbody');
-    data.items.filter(i => i.grupo === g).forEach(it => {
-      const tr = filaCongelado(it, false);
-      tbody.appendChild(tr);
-      tr.querySelector('.add-lote-btn').onclick = () => {
-        let ult = tr; while(ult.nextElementSibling && ult.nextElementSibling.classList.contains('cong-extra')) ult = ult.nextElementSibling;
-        ult.insertAdjacentElement('afterend', filaCongelado(it, true));
-      };
-      tr.querySelector('.btn-guardar-cong').onclick = async (ev) => {
-        const btn = ev.target;
-        const responsable = obtenerResponsable();
-        if(!responsable){ avisar('✗ Elegí arriba quién está cargando.', 'err'); return; }
-        const filas = [tr]; let x = tr.nextElementSibling; while(x && x.classList.contains('cong-extra')){ filas.push(x); x = x.nextElementSibling; }
-        const lotes = [], faltan = [];
-        filas.forEach(f => {
-          const c = f.querySelector('.inp-cong-cant').value.trim(), v = f.querySelector('.inp-cong-venc').value;
-          const el = f.querySelector('.inp-cong-elab');
-          if(c === '' && !v) return;
-          if(c === ''){ faltan.push('cantidad'); return; }
-          if(Number(c) > 0 && !v){ faltan.push('vencimiento'); return; }
-          lotes.push({ cantidad: Number(c), vencimiento: Number(c) > 0 ? v : '', elaboracion: el ? el.value : '' });
-        });
-        if(faltan.length){ avisar(`✗ ${it.producto}: falta ${[...new Set(faltan)].join(' y ')}.`, 'err'); return; }
-        if(!lotes.length){ avisar(`✗ ${it.producto}: cargá la cantidad (0 si no hay).`, 'err'); return; }
-        if(!confirmarVencimientos(lotes.filter(l => l.cantidad > 0).map(l => ({ sabor: it.producto, vencimiento: l.vencimiento })), fecha)) return;
-        btn.disabled = true; btn.textContent = 'Guardando...';
-        try{
-          const resp = await postJSON({ action: 'guardarCongelado', sector, producto: it.producto, fecha, responsable, lotes });
-          Object.assign(it, { cargado: true, fecha, hora: resp.hora, responsable, lotes: lotes.filter(l => l.cantidad > 0) });
-          tr.querySelector('.cong-ultima').innerHTML = htmlUltimaCongelado(it);
-          filas.forEach(f => { f.querySelectorAll('input').forEach(i => { i.value = ''; }); if(f !== tr) f.remove(); });
-          avisar(`✓ Congelado guardado · ${resp.hora} — ${it.producto}: ${it.unidad === 'kg' ? dec(resp.total) : ent(resp.total)} ${it.unidad}`);
-        }catch(err){ avisar('✗ NO se guardó — ' + err.message, 'err'); }
-        finally{ btn.disabled = false; btn.textContent = 'Guardar'; }
-      };
+  // filas de un producto: una por lote vigente de la última carga (o una vacía)
+  function filaLote(it, lote, esExtra){
+    const tr = document.createElement('tr');
+    tr.dataset.clave = it.sector + '|' + it.producto;
+    if(esExtra) tr.classList.add('cong-extra');
+    const conElab = it.grupo === 'Rellenos' || it.grupo === 'Preparados';
+    const l = lote || {};
+    tr.innerHTML = `
+      <td>${esExtra ? '<span class="item-extra">↳ otro lote</span>' : `<strong>${it.producto}</strong> <span class="unidad-prod">(${it.unidad})</span><div class="cong-antes"></div>`}</td>
+      <td><input type="number" min="0" step="${it.unidad === 'kg' || it.unidad === 'L' ? '0.01' : '1'}" class="inp-cong-cant" placeholder="—" value="${l.cantidad != null ? l.cantidad : ''}" style="width:80px;"></td>
+      <td><input type="date" class="inp-cong-venc" value="${l.vencimiento || ''}"></td>
+      <td>${conElab ? `<input type="date" class="inp-cong-elab" title="Fecha de elaboración" value="${l.elaboracion || ''}">` : ''}</td>
+      <td class="col-add">${esExtra ? '<button type="button" class="del-btn" title="Quitar">✕</button>' : '<button type="button" class="add-lote-btn" title="Otro vencimiento">+</button>'}</td>
+      <td class="cong-ultima">${esExtra ? '' : htmlUltimaCongelado(it)}</td>`;
+    return tr;
+  }
+  const clavesDe = it => it.sector + '|' + it.producto;
+  function filasDe(clave){ return [...cont.querySelectorAll('tr')].filter(tr => tr.dataset.clave === clave); }
+  function lotesDeFilas(filas){
+    return filas.map(f => ({ c: f.querySelector('.inp-cong-cant').value.trim(), v: f.querySelector('.inp-cong-venc').value, e: (f.querySelector('.inp-cong-elab') || {}).value || '' }))
+      .filter(x => x.c !== '' || x.v);
+  }
+  const firma = lotes => JSON.stringify(lotes.map(x => [Number(x.c) || 0, (Number(x.c) || 0) > 0 ? x.v : '', (Number(x.c) || 0) > 0 ? x.e : '']).filter(x => x[0] > 0).sort());
+  const ORIGINAL = {};
+  function revisar(){
+    let n = 0;
+    (datos.items || []).forEach(it => {
+      const k = clavesDe(it), filas = filasDe(k);
+      if(!filas.length) return;
+      const cambio = firma(lotesDeFilas(filas)) !== ORIGINAL[k];
+      filas.forEach(f => f.classList.toggle('cong-cambio', cambio));
+      const antes = filas[0].querySelector('.cong-antes');
+      if(antes) antes.textContent = cambio ? `cambió · antes ${it.cargado ? (it.vigenteTxt || '0') : 'sin cargar'}` : '';
+      if(cambio) n++;
     });
-    cont.appendChild(table);
+    document.getElementById('congEstado').textContent = n ? `${n} producto${n > 1 ? 's' : ''} con cambios sin guardar.` : 'Sin cambios.';
+    document.getElementById('btnGuardarCong').textContent = n ? `Guardar cambios (${n})` : 'Guardar cambios';
+    return n;
+  }
+  function pintar(){
+    cont.className = ''; cont.innerHTML = '';
+    const nav = document.getElementById('congNav'); nav.innerHTML = '';
+    const grupos = [...new Set(datos.items.map(i => i.grupo))];
+    grupos.forEach((g, gi) => {
+      const id = `cong-g-${gi}`;
+      const h = document.createElement('h4'); h.className = 'cat-heading'; h.id = id; h.textContent = GRUPO_CONGELADO_TITULO[g] || g; cont.appendChild(h);
+      const a = document.createElement('a'); a.href = `#${id}`; a.textContent = GRUPO_CONGELADO_TITULO[g] || g; nav.appendChild(a);
+      const conElab = g === 'Rellenos' || g === 'Preparados';
+      const table = document.createElement('table');
+      table.className = 'lotes tabla-congelados';
+      table.innerHTML = `<thead><tr><th>Producto</th><th class="col-cant">Cantidad</th><th class="col-venc">Vencimiento</th><th>${conElab ? 'Elaboración' : ''}</th><th class="col-add"></th><th>Última carga</th></tr></thead><tbody></tbody>`;
+      const tbody = table.querySelector('tbody');
+      datos.items.filter(i => i.grupo === g).forEach(it => {
+        const vig = (it.lotes || []).filter(l => !l.vencimiento || l.vencimiento >= datos.fecha);
+        it.vigenteTxt = vig.length ? vig.map(l => (it.unidad === 'kg' || it.unidad === 'L' ? dec(l.cantidad) : ent(l.cantidad))).join(' + ') : '0';
+        ORIGINAL[clavesDe(it)] = firma(vig.map(l => ({ c: String(l.cantidad), v: l.vencimiento, e: l.elaboracion })));
+        const lotesIni = vig.length ? vig : (it.cargado ? [{ cantidad: 0 }] : [null]);
+        lotesIni.forEach((l, i) => {
+          const tr = filaLote(it, l, i > 0);
+          tbody.appendChild(tr);
+          if(i === 0) tr.querySelector('.add-lote-btn').onclick = () => {
+            const fs = filasDe(clavesDe(it));
+            fs[fs.length - 1].insertAdjacentElement('afterend', filaLote(it, null, true));
+          };
+        });
+      });
+      cont.appendChild(table);
+    });
+    revisar();
+  }
+  cont.addEventListener('click', ev => {
+    const b = ev.target.closest('.cong-extra .del-btn');
+    if(b){ b.closest('tr').remove(); revisar(); }
   });
+  cont.addEventListener('input', () => datos && revisar());
+  cont.addEventListener('change', () => datos && revisar());
+  document.getElementById('congFecha').onchange = () => {
+    if(datos && revisar() && !confirm('Hay cambios sin guardar. ¿Cambiar la fecha igual? (se pierden)')) return;
+    cargar();
+  };
+  document.getElementById('btnGuardarCong').onclick = async (ev) => {
+    if(!datos) return;
+    const btn = ev.target;
+    const responsable = (document.getElementById('congResp') || {}).value || '';
+    const fecha = document.getElementById('congFecha').value;
+    const items = [], errores = [], paraVenc = [];
+    (datos.items || []).forEach(it => {
+      const k = clavesDe(it), filas = filasDe(k);
+      if(!filas.length || !filas[0].classList.contains('cong-cambio')) return;
+      const lotes = [];
+      lotesDeFilas(filas).forEach(x => {
+        if(x.c === ''){ errores.push(`${it.producto}: falta la cantidad`); return; }
+        const c = Number(x.c);
+        if(c > 0 && !x.v){ errores.push(`${it.producto}: falta el vencimiento`); return; }
+        lotes.push({ cantidad: c, vencimiento: c > 0 ? x.v : '', elaboracion: c > 0 ? x.e : '' });
+        if(c > 0) paraVenc.push({ sabor: it.producto, vencimiento: x.v });
+      });
+      items.push({ sector: it.sector, producto: it.producto, lotes });
+    });
+    if(!items.length){ avisar('No hay cambios para guardar.'); return; }
+    if(!responsable){ avisar('✗ Elegí arriba quién está cargando.', 'err'); return; }
+    if(errores.length){ avisar('✗ ' + [...new Set(errores)].join(' · '), 'err'); return; }
+    if(!confirmarVencimientos(paraVenc, fecha)) return;
+    btn.disabled = true; btn.textContent = 'Guardando...';
+    try{
+      const resp = await postJSON({ action: 'guardarCongeladosLote', fecha, responsable, items });
+      avisar(`✓ Stock congelado guardado · ${resp.hora} — ${resp.guardados} producto${resp.guardados > 1 ? 's' : ''}`);
+      await cargar();
+    }catch(err){ avisar('✗ NO se guardó — ' + err.message, 'err'); revisar(); }
+    finally{ btn.disabled = false; }
+  };
+  cargar();
 }
 
+const CATEGORIAS_SOLO_CONGELADO = ['CAJITA CRIOLLA', 'COPETIN', 'TOPPINGS'];
+function normalizarCat(c){ return String(c || '').trim().toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
 async function renderLocal(bloque){
   // bloque = 'locales' (Centro/Patagonia/Zelarrayan) o 'fabrica' (sectores de Fábrica)
   const esBloqueFabrica = bloque === 'fabrica';
-  // 14/11/2026: "Fábrica - Postres" solo tiene congelados (masas de cookies)
-  const opcionesSector = LOCALES.filter(l => l.startsWith('Fábrica') === esBloqueFabrica).concat(esBloqueFabrica ? [SECTOR_POSTRES_STOCK] : []);
+  // 24/11/2026: los congelados (y las masas de cookies de Postres) se cargan en "Stock congelado"
+  const opcionesSector = LOCALES.filter(l => l.startsWith('Fábrica') === esBloqueFabrica);
   app.innerHTML = `
     <button class="back" onclick="irA('home')">← Volver</button>
     <header class="top"><h1>${esBloqueFabrica ? 'Cargar stock de fábrica' : 'Cargar stock del local'}</h1></header>
@@ -1237,10 +1326,10 @@ async function renderLocal(bloque){
       producto tiene más de un vencimiento, usá el botón <strong>+</strong> de esa fila.
     </p>
 
+    ${esBloqueFabrica ? `<p class="msg" style="display:block;font-size:12.5px;max-width:560px;">❄ Copetín, cajitas, toppings y todo lo del freezer se cargan en <a href="#" onclick="irA('stockCongelado');return false;"><strong>Stock congelado</strong></a>.</p>` : ''}
     <div id="catNav" class="cat-nav"></div>
     <div id="cartelStock"></div>
     <div id="tablaLotesContainer" class="loading">Cargando…</div>
-    <div id="congeladosContainer"></div>
 
     <div id="barraStock">${htmlBarraFinal('btnProvisorioStock', 'btnGuardar', 'Guardar y enviar final')}</div>
     <div class="msg" id="msg"></div>
@@ -1349,21 +1438,6 @@ async function renderLocal(bloque){
   async function pintarTabla(){
     const local = document.getElementById('selLocal').value;
     const fecha = document.getElementById('fechaCarga').value;
-    // CONGELADOS (14/11/2026): bloque aparte, con su propio Guardar por producto
-    const contCong = document.getElementById('congeladosContainer');
-    const sectorCong = SECTOR_CONGELADO_DE[local];
-    if(contCong){
-      contCong.innerHTML = '';
-      if(sectorCong) pintarCongelados(contCong, sectorCong, fecha, () => (document.getElementById('inpResponsable') || {}).value || '');
-    }
-    if(local === SECTOR_POSTRES_STOCK){
-      // Postres: solo congelados (los postres terminados se cargan en Fábrica - Producción)
-      cont.className = ''; cont.innerHTML = '';
-      document.getElementById('catNav').innerHTML = '';
-      document.getElementById('cartelStock').innerHTML = '';
-      document.getElementById('barraStock').style.display = 'none';
-      return;
-    }
     document.getElementById('barraStock').style.display = '';
     const modo = modoDeLocal(local);
     const labelCantidad = modo === 'relleno' ? 'Kilos' : modo === 'disco' ? 'Docenas' : 'Cantidad';
@@ -1404,8 +1478,10 @@ async function renderLocal(bloque){
     if(modo === 'sabor'){
       // Fábrica - Producción también cuenta lo que queda armado para mañana:
       // rollos de jamón y queso y moldes de canasta (pedido por Carolina 06/10/2026)
+      // 24/11/2026: en Fábrica - Producción, Cajita Criolla, Copetín y Toppings van en "Stock congelado"
+      const sinCongelados = Object.fromEntries(Object.entries(categorias).filter(([c]) => CATEGORIAS_SOLO_CONGELADO.indexOf(normalizarCat(c)) === -1));
       const cats = local === 'Fábrica - Producción'
-        ? Object.assign({}, categorias, { [CATEGORIA_EXTRAS_PRODUCCION]: [NOMBRE_ROLLOS_JYQ, NOMBRE_ROLLOS_JYQ_COPETIN, NOMBRE_MOLDE_CANASTA] })
+        ? Object.assign({}, sinCongelados, { [CATEGORIA_EXTRAS_PRODUCCION]: [NOMBRE_ROLLOS_JYQ, NOMBRE_ROLLOS_JYQ_COPETIN, NOMBRE_MOLDE_CANASTA] })
         : categorias;
       Object.keys(cats).forEach((cat, i) => {
         const id = `cat-${i}`;
@@ -2078,8 +2154,8 @@ function htmlProduccionSemanal(data, sectorNombre){
       <td class="num">${ent(it.objetivo)}</td>
       <td class="num"><strong>${it.hacer > 0 ? ent(it.hacer) + ' ' + unidad(it) : 'no hace falta'}</strong></td></tr>`).join('');
   return `<div class="sem-card"><h3>❄ Producción semanal — ${String(data.dia || '').toLowerCase()} ${fmtFecha(data.fecha).slice(0, 5)}</h3>
-    <table class="prod"><thead><tr><th>Producto</th><th class="num">${conAyuda('Congelado', 'Lo último que se cargó en Congelados de este sector (sin lo vencido).')}</th><th class="num">En locales</th><th class="num">${conAyuda('Objetivo', 'Lo que piden los locales en la semana (proyección) + colchón, o el número fijo de la regla.')}</th><th class="num">Hacer hoy</th></tr></thead><tbody>${filas}</tbody></table>
-    <div class="ae-nota">Lo que se hace se congela: cargalo después en Cargar stock de fábrica → Congelados.</div></div>`;
+    <table class="prod"><thead><tr><th>Producto</th><th class="num">${conAyuda('Congelado', 'Lo último que se cargó en Stock congelado (sin lo vencido).')}</th><th class="num">En locales</th><th class="num">${conAyuda('Objetivo', 'Lo que piden los locales en la semana (proyección) + colchón, o el número fijo de la regla.')}</th><th class="num">Hacer hoy</th></tr></thead><tbody>${filas}</tbody></table>
+    <div class="ae-nota">Lo que se hace se congela: cargalo después en ❄ Stock congelado.</div></div>`;
 }
 // Discos: el día ANTES de la producción semanal, discos de copetín (14/11/2026):
 // cajitas y copetín H → Copetín horno; copetín F → Copetín frito
