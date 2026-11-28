@@ -134,6 +134,12 @@
      las tablas largas y los informes mensuales (Pedido vs hecho, Envíos y
      recepción, Tiempos de máquina) ===== */
   .home-bloque{margin-top:6px;}
+  .home-tabs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:22px 0 4px;}
+  .home-tab{background:var(--card,#fff);border:1.5px solid var(--line);border-radius:12px;padding:14px 8px;font-size:15px;font-weight:700;color:var(--crust-dark);cursor:pointer;font-family:inherit;}
+  .home-tab.activa{background:var(--crust,#7a4a2e);border-color:var(--crust,#7a4a2e);color:#fff;}
+  @media (max-width:640px){.home-tabs{grid-template-columns:1fr 1fr;}}
+  .home-sin-solapa{color:var(--ink-soft);font-size:13px;text-align:center;margin:18px 0;}
+  .home-panel{margin-top:6px;} .config-clave{max-width:360px;margin:18px auto;}
   .home-sub{display:flex;align-items:center;gap:10px;margin:22px 0 10px;font-size:12px;font-weight:700;color:var(--crust-dark);text-transform:uppercase;letter-spacing:.07em;}
   .home-sub::after{content:"";flex:1;height:1px;background:var(--line);}
   .home-sub .num-paso{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;background:var(--accent-bg);color:var(--crust-dark);font-size:11px;}
@@ -160,7 +166,20 @@
   /* 18/11/2026: urgente en verde sin número + vence hoy/mañana en rojo */
   .fila-grupo-urg td{background:#fff4d6 !important;color:#8a5a00;}
   .badge-urg.plan{background:#e7f3ea;color:#2a6a3a;border-color:#9fcaa9;}
-  .urg-tit-fuera, .urg-paso h4.urg-tit-fuera{color:#b3261e;text-transform:uppercase;} .urg-sub-plan{margin:14px 0 2px;font-size:13px;font-weight:700;color:#2a6a3a;}
+  .urg-tit-fuera, .urg-paso h4.urg-tit-fuera{color:#b3261e;text-transform:uppercase;}
+  .reg-bloque-coc{background:#8a5a3c;color:#fff;font-weight:700;letter-spacing:.04em;font-size:14px;padding:8px 12px;border-radius:7px;margin:18px 0 8px;}
+  .reg-bloque-coc span{font-weight:400;font-size:12px;opacity:.9;margin-left:6px;}
+  .bloque-enfriar{background:#fde3ea;border-radius:8px;padding:6px 8px;}
+  table.prod tr.fila-bloque-coc td{background:#8a5a3c !important;color:#fff !important;font-weight:700;letter-spacing:.04em;font-size:13.5px;padding:7px 10px;}
+  table.prod tr.fila-bloque-coc td span{font-weight:400;font-size:12px;opacity:.9;margin-left:6px;}
+  table.prod tr.fila-enfriar td{background:#fde3ea !important;}
+  .tag-enfriar{display:inline-block;margin-top:3px;font-size:11.5px;font-weight:700;color:#a3264b;}
+  .tag-alerta{display:inline-block;margin-top:3px;font-size:11.5px;font-weight:700;color:#a3261b;}
+  .lbl-tot{font-size:11px;color:var(--ink-soft);} .kg-hoy{font-size:12px;color:#a3261b;margin-top:2px;}
+  .prep-carne-det{font-size:12.5px;margin-top:4px;line-height:1.45;font-weight:400;}
+  .urg-info-coc{margin:4px 0 8px;}
+  .marca-manana{display:inline-block;font-size:11px;font-weight:600;color:#2a5a8a;border:1px solid #9fbfd6;border-radius:10px;padding:0 7px;margin-left:4px;white-space:nowrap;}
+  .marca-fuera{display:inline-block;font-size:11px;font-weight:600;color:#8a5a00;border:1px solid #e3c27a;border-radius:10px;padding:0 7px;margin-left:4px;white-space:nowrap;} .urg-sub-plan{margin:14px 0 2px;font-size:13px;font-weight:700;color:#2a6a3a;}
   .reg-totdia{font-size:12px;line-height:1.3;color:var(--ink);}
   .urg-tot{white-space:nowrap;font-size:12.5px;} .urg-hoy{white-space:nowrap;font-size:12.5px;color:var(--herb);}
   .urg-sep{margin:0 6px;color:var(--ink-soft);}
@@ -327,6 +346,14 @@
   .tabla-congelados td.cong-ultima{font-size:12.5px;min-width:130px;}
   .tabla-congelados tr.cong-cambio td{background:#fdf3d6;}
   .tabla-congelados .cong-antes{font-size:11px;color:#8a5a00;font-weight:600;}
+  .envio-fija{position:sticky;top:0;z-index:20;background:var(--bg);padding:4px 0 6px;margin:0 0 4px;}
+  .envio-fija .local-fijo{position:static;margin:2px 0 6px;padding:7px 12px;font-size:16px;}
+  .envio-fija .cat-nav{margin:0;gap:5px;}
+  .envio-fija .cat-nav a{padding:4px 9px;font-size:12px;}
+  .panel-envio-local h4.cat-band{scroll-margin-top:130px;}
+  td.stock-cero{background:#fde3e1;color:#a3261b;font-weight:700;}
+  .sin-stock-nota{font-size:11.5px;color:#a3261b;font-weight:600;}
+  @media print{ .envio-fija{position:static;} td.stock-cero{background:none;} }
   .local-fijo{position:sticky;top:0;z-index:20;background:var(--crust);color:#fff;font-weight:700;font-size:17px;letter-spacing:.5px;padding:9px 14px;border-radius:8px;margin:6px 0 10px;box-shadow:0 2px 6px rgba(0,0,0,.18);text-align:center;}
   @media print{ .local-fijo{position:static;box-shadow:none;} }
   .cat-nav a{font-size:11.5px;color:var(--ink-soft);border:1px solid var(--line);
@@ -499,6 +526,12 @@
   .home-chico{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 18px;}
   .home-chico button{background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:8px 14px;font-family:'Poppins',sans-serif;font-size:13px;color:var(--ink);cursor:pointer;}
   .home-chico button:active{background:var(--accent-bg);}
+  /* Despacho compacto (28/11/2026, Carolina: "reducir la pantalla arriba") */
+  .env-cab{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:2px 0 4px;}
+  .env-cab .field-row{margin:0;} .env-cab label{font-size:11.5px;margin-bottom:2px;} .env-cab input,.env-cab select{width:100%;min-width:0;padding:7px 8px;font-size:13.5px;}
+  @media (max-width:560px){ .env-cab{grid-template-columns:1fr 1fr;} }
+  .env-ayuda{font-size:12.5px;color:var(--ink-soft);margin:2px 0 8px;} .env-ayuda summary{cursor:pointer;font-weight:600;}
+  .solapas-desp .solapa .s-sub{display:none;} .solapas-desp .solapa{padding:7px 10px;} .solapas-desp{margin:2px 0 8px;}
   .solapas-desp{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:4px 0 14px;}
   .solapas-desp .solapa{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--panel);border:1px solid var(--line);border-bottom:4px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;font-family:'Poppins',sans-serif;color:var(--ink);}
   .solapas-desp .solapa .s-tit{font-family:'Cinzel',serif;font-weight:700;font-size:16px;letter-spacing:.02em;color:var(--crust);}
@@ -543,6 +576,9 @@
   @media (max-width:480px){
     .ped-app .row2{grid-template-columns:1fr;}
   }
+  .ped-app .unit-sel{min-height:44px;border:1.5px solid var(--border-strong,#ccc);border-radius:8px;padding:0 6px;font-size:14px;background:#fff;max-width:110px;margin-left:6px;}
+  .ped-app .unit-sel.unit-falta{border-color:#c0392b;background:#fde3e1;}
+  .ped-app .unit-cambio{color:#a3261b;font-weight:600;}
   .ped-app .btn{appearance:none; border:none; cursor:pointer; font-family:'Poppins',sans-serif; font-weight:700; font-size:14px; padding:11px 18px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px;}
   .ped-app .btn-primary{background:var(--accent); color:var(--accent-ink);}
   .ped-app .btn-primary:disabled{opacity:.45; cursor:not-allowed;}
@@ -1381,22 +1417,111 @@ function renderHome(){
       ${tarjetaHome('informeStock', 'Stock por local', 'Última carga de stock de cada local.')}
     </div>` + fabrica(false) + ajustes(false);
   } else {
-    cuerpo = control + `
-    <h3 class="home-seccion">Locales</h3>
+    // INICIO CON SOLAPAS (28/11/2026, Carolina): "solapa locales y todos los
+    // menús dentro… solapa fábrica (1 orden de producción, 2 registro y 3
+    // despacho)… solapa configuración con un código mío… solapa informes
+    // aparte". Todos los dispositivos ven las 4 solapas y entran donde
+    // necesitan; ninguna viene abierta al abrir la app. Al volver de una
+    // pantalla, queda abierta la última que se usó.
+    const panel = (id, html) => `<div class="home-panel" id="homePanel_${id}" style="display:none;">${html}</div>`;
+    const pLocales = `
     <div class="home-grid">
       ${tarjetaHome('stockLocales', 'Cargar stock del local', 'Registrar cuánto queda de cada sabor, con su fecha de vencimiento.')}
       ${tarjetaHome('recepcion', 'Confirmar recepción', 'Registrar cuánto llegó realmente de lo que fábrica despachó hoy.')}
-      ${tarjetaHome('pedirInsumos', 'Pedir insumos o ingredientes', 'Lo que antes era la app Pedidos de Locales. Insumos los martes; ingredientes domingo y miércoles.', true)}
-      ${tarjetaHome('misPedidos', 'Recibir insumos e ingredientes', 'Confirmar lo que llegó de los pedidos de insumos e ingredientes.', true, { idNum: 'numHomeRecibir' })}
+      ${tarjetaHome('pedirInsumos', 'Pedir insumos o ingredientes', 'Insumos los martes; ingredientes domingo y miércoles.', false)}
+      ${tarjetaHome('misPedidos', 'Recibir insumos e ingredientes', 'Confirmar lo que llegó de los pedidos de insumos e ingredientes.', false, { idNum: 'numHomeRecibir' })}
       ${tarjetaHome('pedidosEspeciales', 'Pedidos especiales', 'Pedir empanadas, copetín o postres para un día y hora (mínimo de un día para el otro).')}
       ${tarjetaHome('pedidosInsumos', 'Pedidos de insumos e ingredientes — los 3 locales', 'Ver todos los pedidos de los locales, prepararlos y exportarlos.')}
+    </div>`;
+    const pFabrica = `
+    <div class="home-bloque">
+      <div class="home-sub"><span class="num-paso">1</span>Orden de producción</div>
+      <div class="home-grid">
+        ${tarjetaHome('fabrica', 'Ver qué producir hoy', 'Cocina, Producción, Postres y Discos: calculado con el stock cargado y la venta proyectada.')}
+      </div>
+      <div class="home-sub"><span class="num-paso">2</span>Registro</div>
+      <div class="home-grid">
+        ${tarjetaHome('registro', 'Registrar producción', 'Cocina, Producción, Postres y Discos: quién, cuánto, máquina, horas y trazabilidad.')}
+        ${tarjetaHome('stockFabrica', 'Cargar stock de fábrica', 'Stock del día de Producción, Cocina (rellenos en kilos) y Discos.')}
+        ${tarjetaHome('stockCongelado', '❄ Stock congelado', 'Freezer: rellenos, preparados, copetín, cajitas, toppings y masas de cookies. Queda la última carga.')}
+      </div>
+      <div class="home-sub"><span class="num-paso">3</span>Despacho</div>
+      <div class="home-grid">
+        ${tarjetaHome('envios', '🚚 Envío diario', 'Empanadas, dips, postres, huevos y toppings: cuánto mandarle hoy a cada local.')}
+        ${tarjetaHome('despachoIngredientes', '🥫 Ingredientes', 'Preparar los pedidos de ingredientes de los locales (lunes y jueves).', false, { idNum: 'numHomeIng' })}
+        ${tarjetaHome('despachoInsumos', '📦 Insumos', 'Preparar los pedidos de insumos de los locales (miércoles).', false, { idNum: 'numHomeIns' })}
+      </div>
+    </div>`;
+    const pInformes = `
+    <div class="home-grid compacta">
+      ${tarjetaHome('informePedido', 'Pedido vs hecho', 'Día por día: lo que pidió la app y lo que hicieron Cocina, Producción y Discos.')}
+      ${tarjetaHome('informeEnviosRecepcion', 'Envíos y recepción', 'Pidió, envió y recibió cada local, con quién preparó, repartió y recibió.')}
       ${tarjetaHome('historial', 'Historial de envíos', 'Comparar lo enviado contra lo recibido, por local y sabor.')}
-      ${tarjetaHome('informeStock', 'Informe: Stock por local', 'Última carga de stock de cada local, con semáforo de vencimientos.')}
-    </div>` + fabrica(true) + despacho(false) + ajustes(true);
+      ${tarjetaHome('informeStock', 'Stock por local', 'Última carga de stock de cada local, con semáforo de vencimientos.')}
+      ${tarjetaHome('informeStockFabrica', 'Stock de fábrica', 'Última carga de Producción, Cocina y Discos, con semáforo de vencimientos.')}
+      ${tarjetaHome('informeTiempos', 'Tiempos de máquina', 'Personal, tiempos, unidades por hora, relleno y calidad del registro.')}
+      ${tarjetaHome('informeInsumos', 'Consumo de insumos', 'Consumo real de insumos de Cocina por día.')}
+      ${tarjetaHome('trazabilidad', 'Consultar trazabilidad', 'Por fecha de armado y sabor: relleno, discos, máquina, personal y reparto.')}
+    </div>`;
+    const pConfig = `
+    <div class="home-grid">
+      ${tarjetaHome('planificacion', 'Planificación', 'Importar el Excel de proyección, editar la venta proyectada y recalcular el plan.')}
+      ${tarjetaHome('fichas', 'Fichas técnicas', 'Importar y actualizar las recetas (Rellenos, Preparados, Postres, Dips, Edición Limitada).')}
+      ${tarjetaHome('catalogoPedidos', 'Catálogo de insumos e ingredientes', 'Lo que los locales pueden pedir (con clave para editar).')}
+      ${tarjetaHome('tiempos', 'Tiempos de carga', 'Cuánto tarda cada pantalla en este equipo (para detectar lentitud).')}
+      <button class="home-card" onclick="mostrarActivarDispositivo({ motivo: 'cambiar' })">
+        <h2>Este dispositivo</h2>
+        <p>${DISPOSITIVO.nombre ? `Activado como <strong>${escHtml(DISPOSITIVO.nombre)}</strong>${DISPOSITIVO.sector ? ' · ' + escHtml(DISPOSITIVO.sector) : ''}. Tocá para cambiar el código.` : 'Cargar el código de esta tablet o PC.'}</p>
+      </button>
+      <button class="home-card" id="btnRefrescarDatos" onclick="refrescarDatosPlanilla()">
+        <h2>Refrescar datos de la planilla</h2>
+        <p>Usalo si cambiaste algo a mano en la planilla (sabores, calendario, empleados) y la app todavía no lo muestra.</p>
+      </button>
+    </div>`;
+    cuerpo = control + `
+    <nav class="home-tabs" id="homeTabs">
+      <button type="button" class="home-tab" data-solapa="locales" onclick="abrirSolapaHome('locales')">🏪 Locales</button>
+      <button type="button" class="home-tab" data-solapa="fabrica" onclick="abrirSolapaHome('fabrica')">🏭 Fábrica</button>
+      <button type="button" class="home-tab" data-solapa="informes" onclick="abrirSolapaHome('informes')">📊 Informes</button>
+      <button type="button" class="home-tab" data-solapa="config" onclick="abrirSolapaHome('config')">🔒 Configuración</button>
+    </nav>
+    <div id="homeSinSolapa" class="home-sin-solapa">Elegí una solapa.</div>
+    ${panel('locales', pLocales)}${panel('fabrica', pFabrica)}${panel('informes', pInformes)}
+    <div class="home-panel" id="homePanel_configClave" style="display:none;">
+      <div class="config-clave">
+        <label for="inpConfigClave"><strong>Código de Configuración</strong></label>
+        <div style="display:flex;gap:8px;margin-top:6px;"><input id="inpConfigClave" type="password" inputmode="numeric" autocomplete="off" style="max-width:160px;" onkeydown="if(event.key==='Enter')entrarConfigHome()"><button type="button" class="btn" onclick="entrarConfigHome()">Entrar</button></div>
+        <div id="msgConfigClave" class="mal-txt" style="margin-top:6px;font-size:13px;"></div>
+      </div>
+    </div>
+    ${panel('config', pConfig)}`;
   }
   app.innerHTML = cab + cuerpo + `<footer class="note">Doma Criolla — herramienta interna de planificación de producción.</footer>`;
   if(tipo !== 'local') pintarControlRegistros();
   pintarNumerosPedidosHome(tipo, local);
+  if(document.getElementById('homeTabs') && SOLAPA_HOME) abrirSolapaHome(SOLAPA_HOME);
+}
+// solapas del inicio (28/11/2026). La de Configuración pide el código de
+// Carolina una vez por sesión (Carolina eligió que lo pida la pantalla).
+const CODIGO_CONFIGURACION = '2404';
+let SOLAPA_HOME = '';
+function configHabilitada(){ try{ return sessionStorage.getItem('domaConfigOk') === '1'; }catch(e){ return false; } }
+function abrirSolapaHome(id){
+  if(id === 'config' && !configHabilitada()) id = 'configClave';
+  SOLAPA_HOME = id === 'configClave' ? '' : id;
+  document.querySelectorAll('.home-panel').forEach(p => { p.style.display = p.id === 'homePanel_' + id ? '' : 'none'; });
+  document.querySelectorAll('#homeTabs .home-tab').forEach(b => b.classList.toggle('activa', b.dataset.solapa === (id === 'configClave' ? 'config' : id)));
+  const sin = document.getElementById('homeSinSolapa'); if(sin) sin.style.display = 'none';
+  if(id === 'configClave'){ const i = document.getElementById('inpConfigClave'); if(i){ i.value = ''; setTimeout(() => i.focus(), 0); } }
+}
+function entrarConfigHome(){
+  const i = document.getElementById('inpConfigClave');
+  if(i && String(i.value).trim() === CODIGO_CONFIGURACION){
+    try{ sessionStorage.setItem('domaConfigOk', '1'); }catch(e){}
+    abrirSolapaHome('config');
+  } else {
+    const m = document.getElementById('msgConfigClave'); if(m) m.textContent = 'Código incorrecto.';
+  }
 }
 
 // números de pedidos de insumos/ingredientes en las tarjetas del inicio
@@ -2431,24 +2556,22 @@ function htmlUrgentesProduccion(u){
   if(!filas.length) return `<div class="urg-card">${titulo}${htmlPorVencer(u, 'produccion')}${htmlEstadoCargasUrgentes(u)}${franco}<div class="urg-nota">No hay empanadas urgentes: lo armado en fábrica alcanza para lo que piden hoy los locales (o falta menos de una bandeja). Seguí con la planificación habitual.</div>${htmlUrgOcultas(u)}</div>`;
   const vistos = new Set(); // el detalle (bandejas, sin stock, pedido especial) una sola vez por sabor
   const primera = p => { if(vistos.has(p.sabor)) return false; vistos.add(p.sabor); return true; };
-  const tabla = (lista, conPaso) => `<table class="urg"><thead><tr><th>Sabor</th><th style="text-align:center;">Armar</th><th>${conPaso ? 'Cuándo / relleno' : 'Relleno'}</th><th></th></tr></thead><tbody>${lista.map(p => (p._det = primera(p), p)).map(p => `
-    <tr class="${p.plan ? '' : 'fuera'}">
-      <td><strong>${p.sabor}</strong>${p._det ? htmlUrgEspecial(p.especiales) + htmlUrgCero(p) : ''}</td>
+  // 28/11/2026 (Carolina): el orden lo da el relleno, no la urgencia. Una
+  // sola lista por pasos; lo que no estaba en el plan va en su paso con la
+  // marca "fuera del plan del día" al lado del sabor (sin título aparte ni color).
+  const tabla = (lista) => `<table class="urg"><thead><tr><th>Sabor</th><th style="text-align:center;">Armar</th><th>Relleno</th><th></th></tr></thead><tbody>${lista.map(p => (p._det = primera(p), p)).map(p => `
+    <tr>
+      <td><strong>${p.sabor}</strong>${p.plan ? '' : ' <span class="marca-fuera">fuera del plan del día</span>'}${p._det ? htmlUrgEspecial(p.especiales) + htmlUrgCero(p) : ''}</td>
       <td class="num">${p.plan ? htmlTotalParaHoy(p.totalDia, p.unidades, false) : ent(p.unidades)}${p._det ? htmlUrgBandejas(p) : ''}</td>
       <td style="font-size:12.5px;">${p.detalle || p.relleno || ''}</td>
       <td>${p.armadasHoy > 0 ? `<span class="urg-hecho">✓ ${ent(p.armadasHoy)} armadas hoy</span>` : ''}</td>
     </tr>`).join('')}</tbody></table>`;
-  const titulos = { 1: 'Arrancar — relleno frío que ya está en cámara / rollos armados', 2: 'A medida que Cocina termina los rellenos que no se enfrían', 3: 'Al final — cuando estén fríos los rellenos calientes' };
-  // 19/11/2026: primero lo FUERA DE PLAN (un bloque, con el momento de cada uno), después lo del plan por pasos
-  const fuera = filas.filter(p => !p.plan);
-  let n = 0;
-  const pasos = [1, 2, 3].map(k => { const l = filas.filter(p => p.plan && p.paso === k); if(!l.length) return ''; n++; return `<div class="urg-paso"><div class="urg-num">${n}</div><h4>${titulos[k]}</h4></div>${tabla(l)}`; }).join('');
+  const titulos = { 1: 'Relleno en cámara — se arma primero', 2: 'Rellenos fríos — a medida que Cocina los saca', 3: 'Cuando Cocina lo tenga frío' };
+  const pasos = [1, 2, 3].map(k => { const l = filas.filter(p => p.paso === k).sort((x, y) => (y.plan ? 1 : 0) - (x.plan ? 1 : 0)); if(!l.length) return ''; return `<div class="urg-paso"><div class="urg-num">${k}</div><h4>${titulos[k]}</h4></div>${tabla(l)}`; }).join('');
   return `<div class="urg-card">${titulo}${htmlPorVencer(u, 'produccion')}${htmlEstadoCargasUrgentes(u)}${franco}
-    <div class="urg-nota">${conAyuda('Empanadas que tienen que estar armadas antes del reparto, en bandejas enteras.', 'FUERA DEL PLAN (amarillo): no se arma hoy en la planificación, va primero y ya aparece solo en Registrar producción. Del plan de hoy: "Total del día" es lo que armás hoy de ese sabor; "Para hoy" es la parte que tiene que estar antes del reparto. No se suma nada. Lo que falta por menos de una bandeja (50 comunes / 60 canastas, sumando los 3 locales) no aparece, salvo que un local quede en 0 o sea un pedido especial.')}</div>
-    ${fuera.length ? `<div class="urg-paso"><div class="urg-num urg-num-fuera">!</div><h4 class="urg-tit-fuera">FUERA DEL PLAN: URGENTE PARA HOY — armarlo primero (respetando cuándo está el relleno)</h4></div>${tabla(fuera, true)}` : ''}
-    ${pasos ? `<div class="urg-sub-plan">Del plan de hoy — "Para hoy" es la parte que tiene que estar antes del reparto (ya está dentro del total, no se suma)</div>` : ''}
+    <div class="urg-nota">${conAyuda('Empanadas que tienen que estar armadas antes del reparto, en bandejas enteras.', '"Total del día" es lo que armás hoy de ese sabor; "Para hoy" es la parte que tiene que estar antes del reparto (ya está dentro del total, no se suma). "Fuera del plan del día": hoy no se arma en la planificación; ya aparece solo en Registrar producción. Lo que falta por menos de una bandeja (50 comunes / 60 canastas, sumando los 3 locales) no aparece, salvo que un local quede en 0 o sea un pedido especial.')}</div>
     ${pasos}
-    <div class="urg-resto"><strong>Después</strong>, el resto de la tanda con la planificación habitual (abajo). Lo verde ya está incluido ahí: no se arma dos veces.</div>${htmlUrgOcultas(u)}</div>`;
+    <div class="urg-resto"><strong>Después</strong>, el resto de la tanda con la planificación habitual (abajo). Lo del plan ya está incluido ahí: no se arma dos veces.</div>${htmlUrgOcultas(u)}</div>`;
 }
 async function pintarUrgentes(sector, fecha){
   const id = sector === 'cocina' ? 'urgentesCocina' : 'urgentesProduccion';
@@ -2459,7 +2582,8 @@ async function pintarUrgentes(sector, fecha){
     const u = await obtenerUrgentes(fecha);
     const c = document.getElementById(id);
     if(!c) return;
-    c.innerHTML = sector === 'cocina' ? htmlUrgentesCocina(u) : htmlUrgentesProduccion(u);
+    if(sector === 'cocina'){ c.innerHTML = htmlInfoUrgCocina(u); pintarTablaRellenosCocina(u.cocina || []); }
+    else c.innerHTML = htmlUrgentesProduccion(u);
   }catch(err){
     const c = document.getElementById(id);
     if(c) c.innerHTML = `<p style="color:var(--ink-soft);font-size:12px;">No se pudo calcular lo urgente: ${err.message}</p>`;
@@ -2778,8 +2902,103 @@ function navBloques(bloques){
 }
 function irABloque(id){ const el = document.getElementById(id); if(el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
 function tituloBloque(id, txt, extra){ return `<div class="sec-tit" id="${id}"><span>${txt}</span>${extra ? `<span class="sec-extra">${extra}</span>` : ''}</div>`; }
+// PREPARADO DE CARNE (28/11/2026, Carolina): el relleno se hace a primera
+// hora con todo el preparado que quedó en cámara (ver aplicarPreparadoCarne)
+function textoPrepCarne(f){
+  const p = f && f.prepCarne;
+  if(!p) return '';
+  return ` — PRIMERO: con el preparado de carne de cámara (${cantIng(p.usado)} kg)` + (p.aHacer > 0 ? ` + hacer ${cantIng(p.aHacer)} kg más de preparado` : '') + ` · lo arma Producción hoy`;
+}
+// ORDEN DE COCINA (28/11/2026, Carolina): una sola lista, igual en "Qué
+// producir hoy" y en "Registrar producción":
+//  BLOQUE 1 · DEL DÍA PARA EL DÍA — se cocina y se arma hoy; primero, en
+//    rosa, los que hay que enfriar ("PRIORIDAD: SE TIENE QUE ENFRIAR").
+//  BLOQUE 2 · PLAN DEL DÍA — el resto; arriba los que se necesitan para el
+//    envío de hoy ("ALERTA: SE NECESITA DE ESTE RELLENO PARA HOY", con
+//    "Total producción | Necesarios para hoy" en una sola receta).
+// cocina: copias de data.cocina (kg > 0); urg: calcularUrgentes().cocina
+function ordenarCocina(cocina, urg){
+  cocina.forEach(f => { if(f.kgPlan == null) f.kgPlan = Number(f.kilosDeRelleno) || 0; });
+  const busca = r => cocina.find(x => normalizarFicha(x.relleno) === normalizarFicha(r));
+  const aparte = [];
+  (urg || []).filter(c => c.kg > 0).forEach(u => {
+    const f = busca(u.relleno);
+    if(f && u.plan){ f.kgParaHoy = u.kg; return; }
+    if(f){ f.kgUrgente = u.kg; f.kilosDeRelleno = Math.round((f.kgPlan + u.kg) * 100) / 100; return; }
+    aparte.push({ relleno: u.relleno, aparte: true, urg: u, kgPlan: 0, kgUrgente: u.kg, kilosDeRelleno: u.kg, sabores: (u.sabores || []).map(x => ({ sabor: x.sabor, unidades: x.unidades })), diasQueCubre: 'envío de hoy', mismoDia: false, enfriar: !!u.enfriar });
+  });
+  const b1 = cocina.filter(f => f.mismoDia).sort((x, y) => ((y.enfriar ? 2 : 0) + (y.prepCarne ? 1 : 0)) - ((x.enfriar ? 2 : 0) + (x.prepCarne ? 1 : 0)));
+  const resto = cocina.filter(f => !f.mismoDia);
+  const b2 = aparte.concat(resto.filter(f => f.kgUrgente > 0)).concat(resto.filter(f => !(f.kgUrgente > 0)));
+  return { b1, b2 };
+}
+function cantMedida(c, m){
+  m = String(m || '').toUpperCase(); c = Number(c) || 0;
+  if(m === 'GR') return c >= 1000 ? `${dec(c / 1000)} kg` : `${ent(c)} g`;
+  if(m === 'ML') return c >= 1000 ? `${dec(c / 1000)} l` : `${ent(c)} ml`;
+  if(m === 'KG') return `${dec(c)} kg`;
+  if(m === 'L') return `${dec(c)} l`;
+  return `${dec(c)} ${m.toLowerCase()}`;
+}
+// PREPARADO DE CARNE (28/11/2026): pedido, preparado con lo que hay en cámara
+// y la receta completa de lo que falte
+function htmlPrepCarneDetalle(f){
+  const p = f && f.prepCarne;
+  if(!p) return '';
+  const receta = (p.recetaFaltante || []).map(x => `${x.ingrediente} ${cantMedida(x.cantidad, x.medida)}`).join(' · ');
+  const otros = (p.otros || []).map(x => `${x.ingrediente} ${cantMedida(x.cantidad, x.medida)}`).join(' · ');
+  return `<div class="prep-carne-det">
+    <div>• <strong>Preparado de carne ${dec(p.necesario)} kg</strong> (en cámara hay ${dec(p.enCamara)} kg)${p.aHacer > 0 ? ` → <strong class="mal-txt">faltan ${dec(p.aHacer)} kg — receta completa:</strong> ${receta}` : ''}</div>
+    ${otros ? `<div>• ${otros}</div>` : ''}</div>`;
+}
+let COCINA_VISTA = null; // { data, ollas } para repintar la tabla cuando llegan las urgencias
+function filaCocinaHtml(f, bloque){
+  const alerta = bloque === 2 && f.kgUrgente > 0;
+  const enfr = bloque === 1 && f.enfriar;
+  const base = f.aparte ? 0 : (f.kilosEspecial > 0 ? f.kilosDia : f.kgPlan);
+  const esp = (Number(f.kilosEspecial) || 0) + (Number(f.kgUrgente) || 0);
+  const para = f.aparte ? f.sabores.map(s => `${s.sabor} ${ent(s.unidades)}`).join(' · ') : (f.sabores || []).map(s => s.sabor).join(', ');
+  return `
+    <tr class="${enfr ? 'fila-enfriar' : ''}${alerta ? ' fila-alerta' : ''}" data-kilos-base="${base}" data-kilos-esp="${esp}" data-relleno="${escHtml(f.relleno)}">
+      <td><strong>${f.prepCarne ? `${f.relleno} — pedido ${dec(f.kilosDeRelleno)} kg` : f.relleno}</strong>${f.kilosEspecial > 0 ? ' <span class="badge-especial">★ pedido especial</span>' : ''}
+        ${enfr ? '<div class="tag-enfriar">PRIORIDAD: SE TIENE QUE ENFRIAR</div>' : ''}
+        ${alerta ? '<div class="tag-alerta">⚠ ALERTA: SE NECESITA DE ESTE RELLENO PARA HOY</div>' : ''}
+        ${htmlPrepCarneDetalle(f)}</td>
+      <td style="color:var(--ink-soft);font-size:12.5px;">${para}</td>
+      <td style="color:var(--ink-soft);font-size:12.5px;">${f.diasQueCubre || ''}</td>
+      <td class="num" style="font-size:12.5px;">${f.aparte ? '' : celdaSobrante(f.sobrante)}</td>
+      <td class="num kg-relleno">${alerta ? '<div class="lbl-tot">Total producción</div>' : ''}<strong></strong>${alerta ? `<div class="kg-hoy">Necesarios para hoy <strong>${dec(f.kgUrgente)}</strong> kg</div>` : ''}${htmlSplitEspecialKg(f)}</td>
+      <td class="num ollas-relleno">—</td>
+    </tr>`;
+}
+function pintarTablaRellenosCocina(urg){
+  const tb = document.getElementById('tbodyRellenosCocina');
+  if(!tb || !COCINA_VISTA) return;
+  const copia = COCINA_VISTA.data.cocina.filter(f => f.kilosDeRelleno > 0).map(f => Object.assign({}, f));
+  const { b1, b2 } = ordenarCocina(copia, urg);
+  const cab = (t, n) => `<tr class="fila-bloque-coc"><td colspan="6">${t}${n ? ` <span>${n}</span>` : ''}</td></tr>`;
+  let h = '';
+  if(b1.length) h += cab('BLOQUE 1 · DEL DÍA PARA EL DÍA', 'se cocina y se arma hoy') + b1.map(f => filaCocinaHtml(f, 1)).join('');
+  if(b2.length) h += cab('BLOQUE 2 · PLAN DEL DÍA', '') + b2.map(f => filaCocinaHtml(f, 2)).join('');
+  if(!h) h = '<tr><td colspan="6" class="empty">Hoy no hay rellenos en el plan.</td></tr>';
+  tb.innerHTML = h;
+  aplicarOllasRellenos();
+  recalcularCocinaPct();
+}
+function aplicarOllasRellenos(){
+  const ollas = (COCINA_VISTA && COCINA_VISTA.ollas) || [];
+  ollas.forEach(o => {
+    const fila = [...document.querySelectorAll('#tbodyRellenosCocina tr[data-relleno]')].find(tr => tr.dataset.relleno === o.nombre);
+    const celda = fila ? fila.querySelector('.ollas-relleno') : null;
+    if(celda) celda.innerHTML = `<strong>${o.ollas}</strong>`;
+  });
+}
+function htmlInfoUrgCocina(u){
+  return `<div class="urg-info-coc">${htmlEstadoCargasUrgentes(u)}${htmlPorVencer(u, 'cocina')}</div>`;
+}
 function pintarCocina(data){
   const cont = document.getElementById('contenidoFabrica');
+  COCINA_VISTA = { data, ollas: [] };
   const filasRelleno = data.cocina.filter(f => f.kilosDeRelleno > 0);
   const tituloSector = `<h2 style="font-size:18px;margin:0 0 6px;">Producción del día — Sector Cocina</h2>${htmlAvisosEspeciales(data, 'cocina')}${htmlSemanalMananaCocina(data)}<div id="urgentesCocina"></div>`;
   setTimeout(() => pintarUrgentes('cocina', data.fecha), 0);
@@ -2787,25 +3006,15 @@ function pintarCocina(data){
   const prepLunes = esLunesFranco(data.fecha) ? bloquePrepDiaAnterior() : '';
   const totalKg = filasRelleno.reduce((a, f) => a + (Number(f.kilosDeRelleno) || 0), 0);
 
-  const tablaRellenos = filasRelleno.length === 0 ? '<div class="empty">Hoy no hay rellenos en el plan.</div>' : `
-    <div class="field-row no-print" style="max-width:420px;">
-      <label>${conAyuda('% de venta a cubrir', 'Los locales siempre tienen algo de stock: bajalo si no hace falta cubrir el 100%. Se guarda por día: una vez guardado queda fijo para hoy (también para Registrar producción). Tocá "Reabrir" si necesitás cambiarlo. Los pedidos especiales no se tocan con este %.')}</label>
+  const tablaRellenos = `
+    ${filasRelleno.length ? `<div class="field-row no-print" style="max-width:420px;">
+      <label>${conAyuda('% de venta a cubrir', 'Los locales siempre tienen algo de stock: bajalo si no hace falta cubrir el 100%. Se guarda por día: una vez guardado queda fijo para hoy (también para Registrar producción). Tocá "Reabrir" si necesitás cambiarlo. Los pedidos especiales y lo que se necesita para hoy no se tocan con este %.')}</label>
       <div id="pctCocinaControl"></div>
-    </div>
+    </div>` : ''}
     <p style="color:var(--ink-soft);font-size:13px;"><span id="totalKilosCocina"></span> kg de relleno en total</p>
-    <table class="prod">
-      <thead><tr><th>Relleno</th><th>Sabores que arma</th><th>Días que cubre</th><th class="num">${conAyuda('Sobrante en cámara (descontado)', 'El relleno que quedó del último armado. Se compara el peso final que anotó Producción con lo que contó Cocina en su última carga de stock (si el relleno no figura en el conteo, es 0) y se descuenta el menor. Si no coinciden, se muestra la diferencia para revisar. Si Producción no cargó el peso final, no se descuenta nada.')}</th><th class="num">Kg de relleno</th><th class="num">Ollas</th></tr></thead>
-      <tbody>
-        ${filasRelleno.map(f => `
-          <tr data-kilos-base="${f.kilosEspecial > 0 ? f.kilosDia : f.kilosDeRelleno}" data-kilos-esp="${f.kilosEspecial || 0}" data-relleno="${f.relleno}">
-            <td><strong>${f.relleno}</strong>${f.kilosEspecial > 0 ? ' <span class="badge-especial">★ pedido especial</span>' : ''}</td>
-            <td style="color:var(--ink-soft);font-size:12.5px;">${f.sabores.map(s => s.sabor).join(', ')}</td>
-            <td style="color:var(--ink-soft);font-size:12.5px;">${f.diasQueCubre}</td>
-            <td class="num" style="font-size:12.5px;">${celdaSobrante(f.sobrante)}</td>
-            <td class="num kg-relleno"><strong></strong>${htmlSplitEspecialKg(f)}</td>
-            <td class="num ollas-relleno">—</td>
-          </tr>`).join('')}
-      </tbody>
+    <table class="prod tabla-rellenos-coc">
+      <thead><tr><th>Relleno</th><th>Para</th><th>Días que cubre</th><th class="num">${conAyuda('Sobrante en cámara (descontado)', 'El relleno que quedó del último armado. Se compara el peso final que anotó Producción con lo que contó Cocina en su última carga de stock (si el relleno no figura en el conteo, es 0) y se descuenta el menor. Si no coinciden, se muestra la diferencia para revisar. Si Producción no cargó el peso final, no se descuenta nada.')}</th><th class="num">Kg de relleno</th><th class="num">Ollas</th></tr></thead>
+      <tbody id="tbodyRellenosCocina"></tbody>
     </table>
     <div id="gramajeOllasRellenos"></div>`;
 
@@ -2824,10 +3033,8 @@ function pintarCocina(data){
     <div id="materiaPrimaCocina"><p class="loading" style="font-size:12.5px;">Calculando…</p></div>
   `;
   cargarMateriaPrima(data.fecha, 'Cocina');
-  if(filasRelleno.length > 0){
-    pintarControlPctCocina(data.fecha, data.porcentajeCocina);
-    recalcularCocinaPct();
-  }
+  if(filasRelleno.length > 0) pintarControlPctCocina(data.fecha, data.porcentajeCocina);
+  pintarTablaRellenosCocina(null);
   cargarPreparadosCocina(data.fecha);
 }
 
@@ -2973,11 +3180,8 @@ async function cargarPreparadosCocina(fecha){
 
     // completa la columna "Ollas" de la tabla de Rellenos, ya renderizada
     const gramajeRellenosCont = document.getElementById('gramajeOllasRellenos');
-    ollasRelleno.forEach(o => {
-      const fila = [...document.querySelectorAll('tr[data-relleno]')].find(tr => tr.dataset.relleno === o.nombre);
-      const celda = fila ? fila.querySelector('.ollas-relleno') : null;
-      if(celda) celda.innerHTML = `<strong>${o.ollas}</strong>`;
-    });
+    if(COCINA_VISTA) COCINA_VISTA.ollas = ollasRelleno;
+    aplicarOllasRellenos();
     if(gramajeRellenosCont) gramajeRellenosCont.innerHTML = bloqueGramajeOllas(ollasRelleno);
 
     const demanda = data.demandaPreparados || [];
@@ -2992,9 +3196,9 @@ async function cargarPreparadosCocina(fecha){
     // hace el total y después se divide para cada relleno. Las ollas, sobre
     // el total. El desglose se muestra cuando lo usa más de un relleno.
     const filasDesglose = d => ((d.porRelleno || []).length > 1 || /FILETTO/i.test(d.preparado))
-      ? d.porRelleno.map(x => `<tr class="fila-desglose"><td style="padding-left:22px;color:var(--ink-soft);">↳ para ${/^PICANTE$/i.test(x.relleno) ? 'dip Picante' : x.relleno}${x.urgente > 0 ? ` <span class="mal-txt" style="font-size:11.5px;">(incluye ${cantIng(x.urgente)} ${d.unidad} fuera del plan)</span>` : ''}</td><td class="num" style="color:var(--ink-soft);">${cantIng(x.cantidad)} ${d.unidad}</td><td></td></tr>`).join('')
+      ? d.porRelleno.map(x => `<tr class="fila-desglose"><td style="padding-left:22px;color:var(--ink-soft);">↳ para ${/^PICANTE$/i.test(x.relleno) ? 'dip Picante' : x.relleno}${x.paraManana ? ' <span class="marca-manana">para mañana</span>' : ''}${x.urgente > 0 ? ` <span class="mal-txt" style="font-size:11.5px;">(incluye ${cantIng(x.urgente)} ${d.unidad} para hoy)</span>` : ''}</td><td class="num" style="color:var(--ink-soft);">${cantIng(x.cantidad)} ${d.unidad}</td><td></td></tr>`).join('')
       : ((d.porRelleno || [])[0] && d.porRelleno[0].urgente > 0
-        ? `<tr class="fila-desglose"><td colspan="3" style="padding-left:22px;font-size:11.5px;" class="mal-txt">incluye ${cantIng(d.porRelleno[0].urgente)} ${d.unidad} fuera del plan (${d.porRelleno[0].relleno})</td></tr>` : '');
+        ? `<tr class="fila-desglose"><td colspan="3" style="padding-left:22px;font-size:11.5px;" class="mal-txt">incluye ${cantIng(d.porRelleno[0].urgente)} ${d.unidad} para hoy (${d.porRelleno[0].relleno})</td></tr>` : '');
 
     // ojo: acá NO se muestra "Gramaje por olla" de los Preparados en olla —
     // los 8 kg de la olla son de la MATERIA PRIMA cruda (ej. recortes de
@@ -3006,21 +3210,20 @@ async function cargarPreparadosCocina(fecha){
     // crudo que se está escalando.
     // PARA MAÑANA (16/11/2026): el Pollo Marinado se hace hoy para el
     // Pollo Grille de mañana.
-    const htmlManana = paraManana.length ? `
-      <div class="sem-card" style="margin-top:10px;"><h3>Para mañana — ${String(paraManana[0].paraDia || '').toLowerCase()} ${fmtFecha(paraManana[0].paraFecha).slice(0, 5)}</h3>
-      <table class="prod">
-        <thead><tr><th>Preparado</th><th class="num">Cantidad</th><th></th></tr></thead>
-        <tbody>${paraManana.map(d => `<tr><td><strong>${d.preparado}</strong><div style="font-size:11px;color:var(--ink-soft);">para el ${d.para} de mañana</div></td><td class="num" style="font-size:16px;"><strong>${cantIng(d.cantidad)} ${d.unidad}</strong></td><td></td></tr>` + filasDesglose(d)).join('')}</tbody>
-      </table></div>` : '';
+    // 28/11/2026 (Carolina: "el marinado ¿no sería un preparado?"): lo que se
+    // hace hoy para mañana va en la misma tabla, con la marca "para mañana"
+    const filasManana = paraManana.map(d => `<tr><td><strong>${d.preparado}</strong> <span class="marca-manana">para mañana · ${d.para}</span></td><td class="num"><strong>${cantIng(d.cantidad)} ${d.unidad}</strong></td><td class="num">—</td></tr>` + filasDesglose(d)).join('');
+    const htmlManana = '';
     cont.innerHTML = `
       <h3 style="font-size:15px;margin:0 0 8px;">Preparados</h3>
-      ${demanda.length ? `<table class="prod">
+      ${demanda.length || paraManana.length ? `<table class="prod">
         <thead><tr><th>Preparado</th><th class="num">Cantidad</th><th class="num">Ollas</th></tr></thead>
         <tbody>
           ${demanda.map(d => {
             const o = ollasPorNombre[normalizarFicha(d.preparado)];
-            return `<tr><td><strong>${d.preparado}</strong></td><td class="num"><strong>${cantIng(d.cantidad)} ${d.unidad}</strong></td><td class="num">${o ? `<strong>${o.ollas}</strong>` : '—'}</td></tr>` + filasDesglose(d);
+            return `<tr><td><strong>${d.preparado}</strong>${d.paraManana ? ' <span class="marca-manana">para mañana</span>' : ''}</td><td class="num"><strong>${cantIng(d.cantidad)} ${d.unidad}</strong></td><td class="num">${o ? `<strong>${o.ollas}</strong>` : '—'}</td></tr>` + filasDesglose(d);
           }).join('')}
+          ${filasManana}
         </tbody>
       </table>` : '<div class="empty">Hoy no hay preparados para los rellenos.</div>'}
       ${htmlManana}
@@ -3292,22 +3495,9 @@ async function pintarRegistroCocinaSector(){
   ]);
   if((SECTOR_REGISTRO_ACTIVO === 'postres' ? 'postres' : 'cocina') !== modo) return; // cambió de pestaña mientras cargaba
   const ollasData = (ollasResp && !ollasResp.error) ? ollasResp : { preparados: [], rellenos: [] };
-  // URGENTE FUERA DE PLAN (04/11/2026): los rellenos urgentes para el envío de
-  // hoy que no están en el plan de Cocina aparecen solos, con los kg puestos.
-  // Si el relleno ya se cocina hoy (para mañana), se suman a ese bloque.
-  const urgentesFuera = ((urgResp && urgResp.cocina) || []).filter(c => !c.plan && c.kg > 0);
-  // 19/11/2026: urgentes que YA están en el plan de hoy -> "Total del día | Para hoy"
-  ((urgResp && urgResp.cocina) || []).filter(c => c.plan && c.kg > 0).forEach(u => {
-    const f = cocina.find(x => normalizarFicha(x.relleno) === normalizarFicha(u.relleno));
-    if(f) f.kgParaHoy = u.kg;
-  });
-  const urgentesAparte = [];
-  urgentesFuera.forEach(u => {
-    const enPlan = cocina.find(f => normalizarFicha(f.relleno) === normalizarFicha(u.relleno));
-    if(enPlan){ enPlan.kgUrgente = u.kg; enPlan.kilosDeRelleno = Math.round((enPlan.kilosDeRelleno + u.kg) * 100) / 100; }
-    else urgentesAparte.push(u);
-  });
-
+  // ORDEN DE COCINA (28/11/2026): los mismos 2 bloques que "Qué producir hoy"
+  // (ver ordenarCocina). Lo urgente se suma a la receta del día (una sola).
+  const { b1: cocinaB1, b2: cocinaB2 } = ordenarCocina(cocina, (urgResp && urgResp.cocina) || []);
   // lo ya guardado hoy por ingrediente (para repintar los inputs con el
   // valor real cargado, en vez de arrancar en blanco cada vez que se entra o
   // recarga la pantalla) y las recetas ya "enviadas final" hoy (que quedan
@@ -3559,7 +3749,7 @@ async function pintarRegistroCocinaSector(){
   // Preparados que se cocinan en olla (Relleno Carne, Pollo Grille): el
   // registro de insumos va sobre el TOTAL de ESE preparado.
   // 16/11/2026: "lo usan" con los kg de cada relleno (total y desglose)
-  const usanTxt = o => (o.porRelleno || []).length ? o.porRelleno.map(x => `${x.relleno} ${cantIng(x.cantidad)} kg${x.urgente > 0 ? ` (incluye ${cantIng(x.urgente)} urgentes)` : ''}`).join(' · ') : (o.usan || []).join(', ');
+  const usanTxt = o => (o.porRelleno || []).length ? o.porRelleno.map(x => `${x.relleno} ${cantIng(x.cantidad)} kg${x.paraManana ? ' (para mañana)' : ''}${x.urgente > 0 ? ` (incluye ${cantIng(x.urgente)} para hoy)` : ''}`).join(' · ') : (o.usan || []).join(', ');
   (ollasData.preparados || []).forEach(o => {
     const infoOllasHtml = `<strong>🍲 Ollas: ${o.ollas}</strong>` + bloqueGramajeOllas([o]);
     if(bloqueRegistroReceta(o.nombre, o.kilos, 'KG', ` — Preparado (lo usan: ${usanTxt(o)})`, infoOllasHtml, destPrep)) algunBloque = true;
@@ -3569,18 +3759,28 @@ async function pintarRegistroCocinaSector(){
     if(bloqueRegistroReceta(o.nombre, o.kilos, 'KG', ` — PARA MAÑANA (${String(o.paraDia || '').toLowerCase()}): ${usanTxt(o)}`, '', destPrep)) algunBloque = true;
   });
 
-  // Rellenos que se cocinan hoy (19/11/2026: los que tienen algo urgente, primero)
-  cocina.sort((a, b) => ((b.kgUrgente || b.kgParaHoy) ? 1 : 0) - ((a.kgUrgente || a.kgParaHoy) ? 1 : 0));
-  cocina.forEach(f => {
+  // RELLENOS en 2 bloques (28/11/2026, Carolina): "en el registro de cocina
+  // hacer lo mismo, en orden de prioridades igual que la orden de producción"
+  const cabBloqueReg = (t, n) => { const d = document.createElement('div'); d.className = 'reg-bloque-coc'; d.innerHTML = `${t}${n ? ` <span>${n}</span>` : ''}`; destRell.appendChild(d); };
+  const pintarRellenoReg = (f, bloque) => {
+    const alerta = bloque === 2 && f.kgUrgente > 0;
+    const enfr = bloque === 1 && f.enfriar;
+    const marcarEnfr = (ok) => { if(ok && enfr && destRell.lastElementChild) destRell.lastElementChild.classList.add('bloque-enfriar'); return ok; };
+    if(f.aparte){
+      const guardadoTotal = totalesGuardados[normalizarFicha(f.relleno)];
+      const kg = guardadoTotal && Number(guardadoTotal.cantidad) > 0 ? Number(guardadoTotal.cantidad) : f.kgUrgente;
+      if(bloqueRegistroReceta(f.relleno, kg, 'KG', ` — ⚠ ALERTA: SE NECESITA DE ESTE RELLENO PARA HOY · Necesarios para hoy ${cantIng(f.kgUrgente)} kg · para: ${f.sabores.map(x => `${x.sabor} ${ent(x.unidades)}`).join(' · ')}`, '', destRell, { editable: true })) algunBloque = true;
+      return;
+    }
     const infoOllas = (ollasData.rellenos || []).find(o => o.nombre === f.relleno);
-    const infoOllasHtml = infoOllas ? `<strong>🍲 Ollas: ${infoOllas.ollas}</strong>` + bloqueGramajeOllas([infoOllas]) : '';
-    const kgHoy = f.kgUrgente || f.kgParaHoy;
+    const infoOllasHtml = (infoOllas ? `<strong>🍲 Ollas: ${infoOllas.ollas}</strong>` + bloqueGramajeOllas([infoOllas]) : '') + htmlPrepCarneDetalle(f);
     const subtEsp = f.kilosEspecial > 0 ? ` — día ${cantIng(f.kilosDia)} kg | ★ pedido especial ${(f.especialDetalle || []).map(x => `${NOMBRE_LOCAL_VISTA[x.local] || x.local} ${cantIng(x.kg)} kg (${x.producto} ${ent(x.cantidad)}, entrega ${diaCorto(x.fechaEntrega)})`).join(' · ')}` : '';
-    // 27/11/2026 (Carolina): sin "URGENTE" en cada receta — solo Total del día | Para hoy
-    const subt = (kgHoy ? ` — Total del día ${cantIng(f.kilosDeRelleno)} kg | Para hoy ${cantIng(kgHoy)} kg (hacer primero)` : '') + subtEsp;
+    const subt = (enfr ? ' — PRIORIDAD: SE TIENE QUE ENFRIAR' : '')
+      + (alerta ? ` — ⚠ ALERTA: SE NECESITA DE ESTE RELLENO PARA HOY · Total producción ${cantIng(f.kilosDeRelleno)} kg | Necesarios para hoy ${cantIng(f.kgUrgente)} kg` : '')
+      + subtEsp;
     const kg1 = divisiones[normalizarFicha(f.relleno)];
     if(!(kg1 > 0)){
-      if(bloqueRegistroReceta(f.relleno, f.kilosDeRelleno, 'KG', subt, infoOllasHtml, destRell, { dividir: { total: f.kilosDeRelleno, sugerido: f.kgUrgente } })) algunBloque = true;
+      if(marcarEnfr(bloqueRegistroReceta(f.relleno, f.kilosDeRelleno, 'KG', subt, infoOllasHtml, destRell, { dividir: { total: f.kilosDeRelleno, sugerido: f.kgUrgente } }))) algunBloque = true;
       return;
     }
     // preparación dividida: una línea con la división y las 2 recetas
@@ -3613,29 +3813,9 @@ async function pintarRegistroCocinaSector(){
     if(bV) bV.onclick = () => { if(confirm(`¿Volver a hacer ${f.relleno} en una sola preparación de ${cantIng(f.kilosDeRelleno)} kg?`)) enviarDivision(0); };
     if(bloqueRegistroReceta(f.relleno, k1, 'KG', subt, infoOllasHtml, destRell, { titulo: `${f.relleno} — 1ª parte: ${cantIng(k1)} kg` })) algunBloque = true;
     bloqueRegistroReceta(parte2, k2, 'KG', '', '', destRell, { titulo: `${f.relleno} — 2ª parte: ${cantIng(k2)} kg`, ficha: f.relleno });
-  });
-
-  // URGENTES FUERA DE PLAN: bloque propio con los kg ya puestos. 27/11/2026
-  // (Carolina): el título "FUERA DEL PLAN: URGENTE PARA HOY" arriba, una vez
-  const sumados = cocina.filter(f => f.kgUrgente > 0);
-  if(urgentesAparte.length || sumados.length){
-    const hU = document.createElement('h4');
-    hU.className = 'cat-heading';
-    hU.style.cssText = 'margin-top:8px;color:var(--alert);font-size:15px;';
-    hU.textContent = '⚠ FUERA DEL PLAN: URGENTE PARA HOY (hacerlo primero)';
-    contUrgentes.appendChild(hU);
-    if(sumados.length){
-      const nota = document.createElement('div');
-      nota.className = 'urg-nota';
-      nota.textContent = 'Sumado a la receta de hoy (más abajo): ' + sumados.map(f => `${f.relleno} +${cantIng(f.kgUrgente)} kg`).join(' · ');
-      contUrgentes.appendChild(nota);
-    }
-    urgentesAparte.forEach(u => {
-      const guardadoTotal = totalesGuardados[normalizarFicha(u.relleno)];
-      const kg = guardadoTotal && Number(guardadoTotal.cantidad) > 0 ? Number(guardadoTotal.cantidad) : u.kg;
-      if(bloqueRegistroReceta(u.relleno, kg, 'KG', ` — para: ${u.sabores.map(x => `${x.sabor} ${ent(x.unidades)}`).join(' · ')}`, '', contUrgentes, { editable: true })) algunBloque = true;
-    });
-  }
+  };
+  if(cocinaB1.length){ cabBloqueReg('BLOQUE 1 · DEL DÍA PARA EL DÍA', 'se cocina y se arma hoy'); cocinaB1.forEach(f => pintarRellenoReg(f, 1)); }
+  if(cocinaB2.length){ cabBloqueReg('BLOQUE 2 · PLAN DEL DÍA', ''); cocinaB2.forEach(f => pintarRellenoReg(f, 2)); }
 
   // Dips y Postres: se miden en UNIDADES — la ficha escala contra el rinde en UN.
   // SALSA FILETTO (24/11/2026, Carolina): en Preparados, discriminada (locales | dip Picante)
@@ -4359,7 +4539,11 @@ async function pintarRegistroProduccionSector(){
   // 27/11/2026 (Carolina): "el urgente en todos lados confunde" — sin etiqueta
   // por sabor: lo fuera de plan va en su grupo con el título arriba, y lo del
   // plan solo muestra "Total del día | Para hoy"
-  const etiquetaUrg = n => etiquetaEsp(n);
+  // 28/11/2026 (Carolina): lo que no está en el plan lleva solo la marca
+  // "fuera del plan del día" al lado del sabor y va en su paso
+  const etiquetaUrg = n => (urgFuera[n] > 0 && !(porSabor[n] && Number(porSabor[n].aHacerUnidades) > 0) ? ' <span class="marca-fuera">fuera del plan del día</span>' : '') + etiquetaEsp(n);
+  const urgPaso = {};
+  ((urg && urg.produccion) || []).forEach(p => { urgPaso[p.sabor] = Math.min(urgPaso[p.sabor] || 9, Number(p.paso) || 9); });
   // 19/11/2026 (Carolina): lo urgente que YA está en el plan muestra "Total del día | Para hoy"
   const urgPlan = {};
   ((urg && urg.produccion) || []).filter(p => p.plan).forEach(p => { urgPlan[p.sabor] = (urgPlan[p.sabor] || 0) + (Number(p.unidades) || 0); });
@@ -4433,21 +4617,19 @@ async function pintarRegistroProduccionSector(){
     }
     tbody.appendChild(tr);
   };
-  // FUERA DE PLAN PRIMERO (19/11/2026, Carolina): lo urgente que no está en
-  // el plan de hoy va arriba de todo, en su propio grupo
-  const fueraHoy = todasEmpanadas.filter(n => urgFuera[n] > 0).sort(compararTexto);
-  if(fueraHoy.length){
-    filaGrupo('⚠ FUERA DEL PLAN: URGENTE PARA HOY', '<strong>armarlo primero</strong> — es para el envío de hoy');
-    tbody.lastElementChild.classList.add('fila-grupo-urg');
-    fueraHoy.forEach(nombre => filaSabor(nombre, categoriaPorSabor[nombre] === 'Canasta'));
-  }
-  const yaArriba = n => urgFuera[n] > 0;
-  [['Empanadas Horno', saboresHorno], ['Empanadas Frito', saboresFrito]].forEach(([titulo, lista]) => {
-    const l = lista.filter(esDeHoy).filter(n => !yaArriba(n));
+  // PASOS POR RELLENO (28/11/2026, Carolina): mismo orden que la orden de
+  // producción — 1 relleno en cámara, 2 rellenos fríos (a medida que Cocina
+  // los saca), 3 cuando Cocina lo tenga frío. Lo fuera del plan va en su paso.
+  const pasoDe = n => (porSabor[n] && porSabor[n].pasoArmado) || urgPaso[n] || 2;
+  const titPaso = { 1: '1 · Relleno en cámara — se arma primero', 2: '2 · Rellenos fríos — a medida que Cocina los saca', 3: '3 · Cuando Cocina lo tenga frío' };
+  const deHoyMaquina = saboresHorno.concat(saboresFrito).filter(esDeHoy);
+  [1, 2, 3].forEach(k => {
+    const l = deHoyMaquina.filter(n => pasoDe(n) === k);
     if(!l.length) return;
-    filaGrupo(titulo);
+    filaGrupo(titPaso[k]);
     l.sort(compararTexto).forEach(nombre => filaSabor(nombre, false));
   });
+  const yaArriba = () => false;
 
   // Canastas completas: hoy arman la canasta entera (disco + relleno + el
   // molde que dejaron listo el día anterior). Responsable en vez de Máquina.
@@ -5052,32 +5234,18 @@ async function renderEnvios(){
     <button class="back" onclick="irA('home')">← Volver</button>
     <header class="top" style="margin-bottom:6px;"><h1>Despacho</h1></header>
     ${htmlSolapasDespacho('diario')}
-    <div class="fab-toolbar">
-      <div class="field-row">
-        <label>Fecha</label>
-        <input type="date" id="fechaEnvios" value="${hoyISO()}">
-      </div>
+    <div class="env-cab">
+      <div class="field-row"><label>Fecha</label><input type="date" id="fechaEnvios" value="${hoyISO()}"></div>
+      <div class="field-row"><label>¿Quién despacha?</label><select id="inpResponsableEnvio"><option value="">Cargando…</option></select></div>
+      <div class="field-row"><label>Repartidor</label><select id="inpRepartidorEnvio"><option value="">Cargando…</option></select></div>
+      <div class="field-row"><label>Acompañante</label><select id="inpAcompananteEnvio"><option value="">Cargando…</option></select></div>
     </div>
-    <div class="fab-toolbar">
-      <div class="field-row">
-        <label>¿Quién despacha?</label>
-        <select id="inpResponsableEnvio"><option value="">Cargando…</option></select>
-      </div>
-      <div class="field-row">
-        <label>Repartidor</label>
-        <select id="inpRepartidorEnvio"><option value="">Cargando…</option></select>
-      </div>
-      <div class="field-row">
-        <label>Acompañante</label>
-        <select id="inpAcompananteEnvio"><option value="">Cargando…</option></select>
-      </div>
-    </div>
-    <p style="color:var(--ink-soft);font-size:12.5px;max-width:600px;">
+    <details class="env-ayuda no-print"><summary>ⓘ Cómo se carga</summary>
       Completá "Enviado (real)" y vencimiento solo en lo que mandás hoy. "Orden calculada" es de referencia
       (venta proyectada de ese local menos su stock cargado). Si un producto sale con más de un vencimiento,
       usá el botón <strong>+</strong>. En <strong>Traspaso entre locales</strong> se carga la mercadería que
-      fábrica retira de un local para llevarla a otro.
-    </p>
+      fábrica retira de un local para llevarla a otro. En rojo: productos con stock 0 en el local.
+    </details>
     <div id="barraPlanEnvios"></div>
     <div class="tabs" id="tabsEnvios" style="display:none;"></div>
     <div id="contenidoEnvios" class="loading">Calculando…</div>
@@ -5461,7 +5629,14 @@ function pintarPanelEnvio({ origen, destino, nro, itemsCalculados, data, categor
 
   const nav = document.createElement('div');
   nav.className = 'cat-nav';
-  div.appendChild(nav);
+  // LOCAL FIJO (28/11/2026, Carolina: "que permita inmovilizar en qué local
+  // está trabajando"): el nombre del local y los botones de clasificación
+  // quedan fijos arriba mientras se baja por la lista.
+  const cabFija = document.createElement('div');
+  cabFija.className = 'envio-fija';
+  cabFija.appendChild(fijo);
+  cabFija.appendChild(nav);
+  div.insertBefore(cabFija, div.firstChild);
 
   const tablas = document.createElement('div');
   seguirCambios(tablas);
@@ -5519,20 +5694,35 @@ function pintarPanelEnvio({ origen, destino, nro, itemsCalculados, data, categor
       const sumStock = filas.reduce((a, tr) => a + (Number(tr.dataset.stock) || 0), 0);
       const ss = table.querySelector('.sub-stock'); if(ss) ss.textContent = conDec ? dec(sumStock) : ent(sumStock);
       table.querySelector('.sub-enviado').textContent = conDec ? dec(sumEnv) : ent(sumEnv);
-      // CHIP EN ROJO (27/11/2026, Carolina): mientras haya algún producto con
-      // orden y sin "Enviado (real)" cargado, hasta que se manda el despacho
-      if(conOrden && !cierre){
-        const porItem = {};
-        filas.forEach(tr => { const k = tr.dataset.item; const o = porItem[k] || (porItem[k] = { orden: 0, env: 0 }); o.orden += Number(tr.dataset.orden) || 0; o.env += Number(tr.querySelector('.inp-cant').value) || 0; });
-        const pend = Object.values(porItem).filter(o => o.orden > 0 && o.env <= 0).length;
-        a.classList.toggle('chip-falta', pend > 0);
-        a.textContent = cat + (pend > 0 ? ` · ${pend} sin cargar` : '');
-        a.title = pend > 0 ? `${pend} producto(s) con orden y sin "Enviado (real)"` : '';
-      }
     };
     tbody.addEventListener('input', actualizarSubtotal);
     tbody.addEventListener('click', () => setTimeout(actualizarSubtotal, 0)); // al quitar un lote
     actualizarSubtotal();
+    // SIN STOCK EN EL LOCAL (28/11/2026, Carolina: "la alerta es sobre
+    // productos sin stock en el local… que reparto vea si tiene stock en cero
+    // y que envíe lo que falte: sea topping, empanadas, postres, etc."): el
+    // botón de la clasificación dice "EMPANADAS HORNO: 3 PRODUCTOS SIN STOCK"
+    // y la celda de stock de esos productos va en rojo, hasta que se envía el
+    // despacho. Si no tiene orden calculada, avisa "mandar si hay en fábrica".
+    let sinStock = 0;
+    if(conOrden && !faltantes && !cierre){
+      categorias[cat].forEach(nombre => {
+        if(!porSabor[nombre]) return;
+        // solo lo que ese local vende esta semana (ver productosQueSeVenden)
+        const sv = data && data.seVende && data.seVende[destino];
+        if(sv && !sv[nombre]) return;
+        const tr = tbody.querySelector(`tr[data-item="${CSS.escape(nombre)}"]`);
+        if(!tr || (Number(tr.dataset.stock) || 0) > 0) return;
+        sinStock++;
+        const td = tr.querySelector('.col-stock-local'); if(td) td.classList.add('stock-cero');
+        if(!((Number(tr.dataset.orden) || 0) > 0)) tr.cells[0].insertAdjacentHTML('beforeend', '<div class="sin-stock-nota">sin stock — mandar si hay en fábrica</div>');
+      });
+    }
+    if(sinStock > 0){
+      a.classList.add('chip-falta');
+      a.textContent = `${cat.toUpperCase()}: ${sinStock} PRODUCTO${sinStock === 1 ? '' : 'S'} SIN STOCK`;
+      a.title = 'Productos con stock 0 en el local';
+    }
     tablas.appendChild(table);
     nav.appendChild(a);
     // NADA PARA ENVIAR (27/11/2026, Carolina): si la clasificación no tiene
@@ -5541,7 +5731,7 @@ function pintarPanelEnvio({ origen, destino, nro, itemsCalculados, data, categor
       const rows = [...tbody.querySelectorAll('tr[data-item]')];
       const hayOrden = rows.some(tr => (Number(tr.dataset.orden) || 0) > 0);
       const hayCargado = rows.some(tr => tr.dataset.guardado || (Number(tr.querySelector('.inp-cant').value) || 0) > 0);
-      if(!hayOrden && !hayCargado){
+      if(!hayOrden && !hayCargado && !sinStock){
         const n = categorias[cat].length;
         const tog = document.createElement('button');
         tog.type = 'button'; tog.className = 'cat-band-tog no-print';
@@ -5571,7 +5761,7 @@ function pintarPanelEnvio({ origen, destino, nro, itemsCalculados, data, categor
         avisar(`${origen ? 'Traspaso' : 'Despacho'} reabierto — ya se puede editar.`);
         cargarEnvios();
       }catch(err){ avisar('✗ No se pudo reabrir: ' + err.message, 'err'); }
-    }), nav);
+    }), cabFija.nextSibling); // 28/11/2026: el cartel va debajo de la cabecera fija (local + clasificaciones)
     if(!origen){
       actions.className = 'actions no-print';
       actions.innerHTML = `<button class="btn secondary" id="btnImprimirEnvio-${id}">🖶 Imprimir orden de envío</button>`;
@@ -7595,6 +7785,30 @@ const PedidosApp = (function(){
      reabrir. Quién hace cada acción es obligatorio.
      ===================================================================== */
 
+  // UNIDADES DE MEDIDA (28/11/2026, Carolina): el local elige la unidad en
+  // cada producto; la primera vez va en blanco y es obligatoria para enviar;
+  // después queda la última que usó ese local (se puede cambiar). Fábrica
+  // manda por defecto en la unidad del pedido y la puede cambiar.
+  var UNIDADES_PED = ["unidad", "kg", "gramos", "litros", "paquete", "caja", "bolsa", "bidón"];
+  function selUnidad(attr, id, val, falta){
+    var h = '<select class="unit-sel'+(falta?' unit-falta':'')+'" '+attr+'="'+esc(id)+'" title="Unidad">';
+    h += '<option value=""'+(!val?' selected':'')+'>elegir…</option>';
+    UNIDADES_PED.forEach(function(u){ h += '<option value="'+u+'"'+(u===val?' selected':'')+'>'+u+'</option>'; });
+    return h + '</select>';
+  }
+  function conU(cant, u){ cant = String(cant==null?"":cant); return cant && u ? cant+' '+u : cant; }
+  // última unidad que usó ese local para ese producto (pedidos viene del más nuevo al más viejo)
+  function ultimaUnidad(local, itemId, excluirId){
+    if(!local) return "";
+    for(var i = 0; i < pedidos.length; i++){
+      var p = pedidos[i];
+      if(p.local!==local || p.id===excluirId) continue;
+      var it = (p.items||[]).find(function(x){ return x.id===itemId && x.unidad; });
+      if(it) return it.unidad;
+    }
+    return "";
+  }
+
   var TIPOS = [
     {key:"INSUMOS", label:"Insumos"},
     {key:"INGREDIENTES", label:"Ingredientes"}
@@ -7990,11 +8204,11 @@ const PedidosApp = (function(){
       faltan: {}
     };
     if(TIPO_LABEL[f.tipo]==null) f.tipo = "INSUMOS";
-    catalogItems.forEach(function(it){ f.items[it.id] = {id:it.id, category:it.category, name:it.name, qty:""}; });
+    catalogItems.forEach(function(it){ f.items[it.id] = {id:it.id, category:it.category, name:it.name, qty:"", unidad:"", uTocada:false}; });
     if(p){
       (p.items||[]).forEach(function(it){
-        if(!it.isExtra && f.items[it.id]) f.items[it.id].qty = it.pedidoCant;
-        else f.extra.push({tempId:it.id, category:it.category, name:it.name, qty:it.pedidoCant});
+        if(!it.isExtra && f.items[it.id]){ f.items[it.id].qty = it.pedidoCant; if(it.unidad){ f.items[it.id].unidad = it.unidad; f.items[it.id].uTocada = true; } }
+        else f.extra.push({tempId:it.id, category:it.category, name:it.name, qty:it.pedidoCant, unidad:it.unidad||""});
       });
     }
     return f;
@@ -8031,7 +8245,9 @@ const PedidosApp = (function(){
   function renderNuevo(main){
     if(!state.newOrderForm){ state.newOrderForm = buildForm(null); }
     var f = state.newOrderForm;
-    catalogItems.forEach(function(it){ if(!f.items[it.id]) f.items[it.id] = {id:it.id, category:it.category, name:it.name, qty:""}; });
+    catalogItems.forEach(function(it){ if(!f.items[it.id]) f.items[it.id] = {id:it.id, category:it.category, name:it.name, qty:"", unidad:"", uTocada:false}; });
+    // unidad propuesta: la última que usó este local (si el usuario no la tocó)
+    Object.keys(f.items).forEach(function(id){ var x = f.items[id]; if(!x.uTocada) x.unidad = ultimaUnidad(f.local, id, f.pedidoId); });
     var byCat = groupByCategory(catalogItems);
 
     var html = '';
@@ -8063,16 +8279,19 @@ const PedidosApp = (function(){
       html += '<div class="panel"><div class="cat-block">';
       html += '<div class="cat-title">'+esc(c.label)+'</div>';
       list.forEach(function(it){
-        var val = f.items[it.id] ? f.items[it.id].qty : "";
+        var fi = f.items[it.id] || {};
+        var val = fi.qty || "";
         html += '<div class="item-row'+(f.faltan[it.id]?" st-falta":"")+'">';
         html += '<div class="item-name">'+esc(it.name)+'</div>';
         html += '<input class="qty-input" type="text" inputmode="decimal" placeholder="cant." data-item-id="'+esc(it.id)+'" value="'+esc(val)+'">';
+        html += selUnidad('data-unit-id', it.id, fi.unidad, String(val).trim()!=="" && !fi.unidad);
         html += '</div>';
       });
       extraList.forEach(function(e){
         html += '<div class="item-row'+(f.faltan[e.tempId]?" st-falta":"")+'">';
         html += '<div class="item-name">'+esc(e.name)+'<span class="tag-extra">nuevo</span></div>';
         html += '<input class="qty-input" type="text" inputmode="decimal" placeholder="cant." data-extra-id="'+esc(e.tempId)+'" value="'+esc(e.qty)+'">';
+        html += selUnidad('data-unit-extra', e.tempId, e.unidad, String(e.qty||"").trim()!=="" && !e.unidad);
         html += '<button class="rm-btn" data-rm-extra="'+esc(e.tempId)+'" title="Quitar" type="button">×</button>';
         html += '</div>';
       });
@@ -8105,18 +8324,32 @@ const PedidosApp = (function(){
     main.querySelectorAll("#segTipo [data-tipo]").forEach(function(b){
       b.addEventListener("click", function(){ f.tipo = b.getAttribute("data-tipo"); f.faltan = {}; renderNuevo(main); });
     });
-    main.querySelector("#f_local").addEventListener("change", function(e){ f.local = e.target.value; document.getElementById("avisosNuevo").innerHTML = avisosLocal(f); });
+    main.querySelector("#f_local").addEventListener("change", function(e){ f.local = e.target.value; renderNuevo(main); });
     main.querySelector("#f_fecha").addEventListener("change", function(e){ f.fecha = e.target.value; });
     main.querySelector("#f_quien").addEventListener("input", function(e){ f.quienPide = e.target.value; });
     main.querySelector("#f_notas").addEventListener("input", function(e){ f.notas = e.target.value; });
     var limpio = main.querySelector("#nuevoLimpio");
     if(limpio) limpio.addEventListener("click", function(){ state.newOrderForm = buildForm(null); renderNuevo(main); });
 
+    function marcarUnidad(sel, qty, u){ if(sel) sel.classList.toggle("unit-falta", String(qty||"").trim()!=="" && !u); }
     main.querySelectorAll("[data-item-id]").forEach(function(inp){
       inp.addEventListener("input", function(){
         var id = inp.getAttribute("data-item-id");
         if(f.items[id]) f.items[id].qty = inp.value;
+        marcarUnidad(main.querySelector('[data-unit-id="'+id+'"]'), inp.value, f.items[id] && f.items[id].unidad);
         actualizarProg();
+      });
+    });
+    main.querySelectorAll("[data-unit-id]").forEach(function(sel){
+      sel.addEventListener("change", function(){
+        var id = sel.getAttribute("data-unit-id");
+        if(f.items[id]){ f.items[id].unidad = sel.value; f.items[id].uTocada = true; marcarUnidad(sel, f.items[id].qty, sel.value); }
+      });
+    });
+    main.querySelectorAll("[data-unit-extra]").forEach(function(sel){
+      sel.addEventListener("change", function(){
+        var e = f.extra.find(function(x){ return x.tempId===sel.getAttribute("data-unit-extra"); });
+        if(e){ e.unidad = sel.value; marcarUnidad(sel, e.qty, sel.value); }
       });
     });
     main.querySelectorAll("[data-extra-id]").forEach(function(inp){
@@ -8124,6 +8357,7 @@ const PedidosApp = (function(){
         var id = inp.getAttribute("data-extra-id");
         var e = f.extra.find(function(x){return x.tempId===id;});
         if(e) e.qty = inp.value;
+        marcarUnidad(main.querySelector('[data-unit-extra="'+id+'"]'), inp.value, e && e.unidad);
         actualizarProg();
       });
     });
@@ -8140,7 +8374,7 @@ const PedidosApp = (function(){
         var input = main.querySelector('[data-extra-name-cat="'+cat+'"]');
         var name = (input.value||"").trim();
         if(!name){ input.focus(); toast("Escribí el nombre del ítem"); return; }
-        f.extra.push({tempId:uid(), category:cat, name:name, qty:""});
+        f.extra.push({tempId:uid(), category:cat, name:name, qty:"", unidad:""});
         renderNuevo(main);
       });
     });
@@ -8196,11 +8430,11 @@ const PedidosApp = (function(){
     Object.keys(f.items).forEach(function(id){
       var it = f.items[id];
       if(!cats[it.category]) return;
-      out.push({id:it.id, name:it.name, category:it.category, extra:false, raw:it.qty, q:num(it.qty)});
+      out.push({id:it.id, name:it.name, category:it.category, extra:false, raw:it.qty, q:num(it.qty), u:it.unidad||""});
     });
     f.extra.forEach(function(e){
       if(!cats[e.category]) return;
-      out.push({id:e.tempId, name:e.name, category:e.category, extra:true, raw:e.qty, q:num(e.qty)});
+      out.push({id:e.tempId, name:e.name, category:e.category, extra:true, raw:e.qty, q:num(e.qty), u:e.unidad||""});
     });
     return out;
   }
@@ -8239,6 +8473,14 @@ const PedidosApp = (function(){
     var ceros = items.filter(function(x){ return x.q===0; });
     var validos = items.filter(function(x){ return x.q!=="" && x.q>0; });
     if(!validos.length){ avisar("El pedido está vacío", "Cargá al menos una cantidad."); return; }
+    // UNIDAD (28/11/2026): obligatoria para enviar a fábrica
+    var sinUnidad = validos.filter(function(x){ return !x.u; });
+    if(final && sinUnidad.length){
+      sinUnidad.forEach(function(x){ f.faltan[x.id]=true; });
+      renderNuevo(main);
+      avisar("Falta la unidad", "Completá la unidad de:"+lista(sinUnidad.map(function(x){ return x.name; })));
+      return;
+    }
 
     var pasos = Promise.resolve(true);
     if(ceros.length){
@@ -8285,7 +8527,7 @@ const PedidosApp = (function(){
         pedidoId: f.pedidoId, tipo: f.tipo, local: f.local, fecha: f.fecha,
         quienPide: f.quienPide.trim(), notas: (f.notas||"").trim(), final: final,
         items: validos.map(function(x){
-          return x.extra ? {id:x.id, c:x.category, n:x.name, x:1, q:String(x.q)} : {id:x.id, q:String(x.q)};
+          return x.extra ? {id:x.id, c:x.category, n:x.name, x:1, q:String(x.q), u:x.u} : {id:x.id, q:String(x.q), u:x.u};
         })
       };
       correr("guardarPedidoLocal", payload, {
@@ -8438,10 +8680,10 @@ const PedidosApp = (function(){
     // Los rechazados y los guardados sin enviar no se exportan.
     var exportable = (list||[]).filter(function(p){ return p.estado!=="rechazado" && p.estado!=="borrador"; });
     if(exportable.length===0){ toast("No hay pedidos para exportar"); return; }
-    var rows = [["Local","Fecha","Ítem","Cant. solicitada","Cant. enviada","Cant. recibida","Tipo"]];
+    var rows = [["Local","Fecha","Ítem","Cant. solicitada","Unidad","Cant. enviada","Unidad enviada","Cant. recibida","Tipo"]];
     exportable.forEach(function(p){
       (p.items||[]).forEach(function(it){
-        rows.push([LOCAL_LABEL[p.local]||p.local, fmtDate(p.fecha), it.name, it.pedidoCant||"", it.envioCant||"", it.recibidoCant||"", TIPO_LABEL[tipoDe(p)]]);
+        rows.push([LOCAL_LABEL[p.local]||p.local, fmtDate(p.fecha), it.name, it.pedidoCant||"", it.unidad||"", it.envioCant||"", it.envioCant ? (it.unidadEnviada||it.unidad||"") : "", it.recibidoCant||"", TIPO_LABEL[tipoDe(p)]]);
       });
     });
     var csv = "﻿" + rows.map(function(r){ return r.map(csvField).join(","); }).join("\r\n");
@@ -8486,7 +8728,8 @@ const PedidosApp = (function(){
             noEnviado: it.estadoItem==="no_enviado",
             rechazado: it.estadoItem==="rechazado",
             enviado: it.estadoItem==="enviado",
-            motivo: it.motivo||"", fechaEstimada: it.fechaEstimada||""
+            motivo: it.motivo||"", fechaEstimada: it.fechaEstimada||"",
+            unidad: it.unidad||"", unidadEnviada: it.unidadEnviada||it.unidad||""
           };
         })
       };
@@ -8542,12 +8785,13 @@ const PedidosApp = (function(){
         if(mode==="recepcion" && it.enviado) stCls = f.faltan[it.id] ? "st-falta" : (String(it.recibidoCant).trim()!=="" ? "st-enviado" : "");
         html += '<div class="item-detail-row '+stCls+'" data-row="'+esc(it.id)+'">';
         html += '<div class="idr-top">';
-        html += '<div class="idr-name">'+esc(it.name)+(it.isExtra?'<span class="tag-extra">nuevo</span>':'')+'<div class="idr-pedido">Pedido: <span class="mono">'+esc(it.pedidoCant)+'</span></div></div>';
+        html += '<div class="idr-name">'+esc(it.name)+(it.isExtra?'<span class="tag-extra">nuevo</span>':'')+'<div class="idr-pedido">Pedido: <span class="mono">'+esc(conU(it.pedidoCant, it.unidad))+'</span></div></div>';
         html += '</div>';
 
         if(mode==="envio"){
           html += '<div class="idr-controls">';
           html += '<input class="qty-input" type="text" inputmode="decimal" placeholder="cant." data-envio="'+esc(it.id)+'" value="'+esc(it.envioCant)+'" '+((it.noEnviado||it.rechazado)?"disabled":"")+'>';
+          html += selUnidad('data-unit-envio', it.id, it.unidadEnviada, false);
           html += '<label class="chk"><input type="checkbox" data-noenv="'+esc(it.id)+'" '+(it.noEnviado?"checked":"")+'> Más tarde</label>'+tip("No se manda ahora pero sí después (por ejemplo, sin stock). Queda a la vista para mandarlo con «Ya se mandó».");
           html += '<label class="chk"><input type="checkbox" data-rechazar="'+esc(it.id)+'" '+(it.rechazado?"checked":"")+'> Rechazar</label>'+tip("No se va a mandar (por ejemplo, no corresponde). Es definitivo.");
           html += '</div>';
@@ -8567,7 +8811,8 @@ const PedidosApp = (function(){
           else if(it.noEnviado) html += noEnviadoHtml(it, true);
           else if(it.enviado){
             html += '<div class="idr-controls">';
-            html += '<span class="idr-readonly">Enviado: <b>'+esc(it.envioCant)+'</b></span>';
+            html += '<span class="idr-readonly">Enviado: <b>'+esc(conU(it.envioCant, it.unidadEnviada))+'</b></span>';
+            if(it.unidad && it.unidadEnviada && it.unidad!==it.unidadEnviada) html += '<div class="idr-readonly unit-cambio">Pediste '+esc(conU(it.pedidoCant, it.unidad))+' · te mandaron '+esc(conU(it.envioCant, it.unidadEnviada))+'</div>';
             html += '<input class="qty-input" type="text" inputmode="decimal" placeholder="cant." data-recibido="'+esc(it.id)+'" value="'+esc(it.recibidoCant)+'">';
             html += '<span class="idr-readonly">recibido</span> <span class="dif" data-dif="'+esc(it.id)+'"></span>';
             html += '</div>';
@@ -8577,10 +8822,11 @@ const PedidosApp = (function(){
         } else {
           if(it.rechazado) html += rechazadoHtml(it);
           else if(it.noEnviado) html += noEnviadoHtml(it, mode==="resumen");
-          else if(mode==="borrador" || mode==="rechazado") html += it.envioCant ? '<div class="idr-readonly">Fábrica había cargado: <b>'+esc(it.envioCant)+'</b></div>' : '';
+          else if(mode==="borrador" || mode==="rechazado") html += it.envioCant ? '<div class="idr-readonly">Fábrica había cargado: <b>'+esc(conU(it.envioCant, it.unidadEnviada))+'</b></div>' : '';
           else {
             var dif = it.recibidoCant!=="" && it.envioCant!=="" && Number(String(it.recibidoCant).replace(",","."))!==Number(String(it.envioCant).replace(",","."));
-            html += '<div class="idr-readonly">Enviado: <b>'+esc(it.envioCant||"—")+'</b> &nbsp;·&nbsp; Recibido: <b>'+esc(it.recibidoCant||"—")+'</b>'+(dif?' <span class="dif">≠ diferencia</span>':'')+'</div>';
+            html += '<div class="idr-readonly">Enviado: <b>'+esc(conU(it.envioCant, it.unidadEnviada)||"—")+'</b> &nbsp;·&nbsp; Recibido: <b>'+esc(conU(it.recibidoCant, it.unidadEnviada)||"—")+'</b>'+(dif?' <span class="dif">≠ diferencia</span>':'')+'</div>';
+            if(it.unidad && it.unidadEnviada && it.unidad!==it.unidadEnviada) html += '<div class="idr-readonly unit-cambio">Pidió '+esc(conU(it.pedidoCant, it.unidad))+' · le mandaron en '+esc(it.unidadEnviada)+'</div>';
           }
         }
         html += '</div>';
@@ -8641,6 +8887,9 @@ const PedidosApp = (function(){
     if((b = main.querySelector("#rejectBtn"))) b.addEventListener("click", function(){ rechazarPedido(p); });
 
     function itemDe(attr, el){ var id = el.getAttribute(attr); return f.items.find(function(x){ return x.id===id; }); }
+    main.querySelectorAll("[data-unit-envio]").forEach(function(sel){
+      sel.addEventListener("change", function(){ var it = itemDe("data-unit-envio", sel); if(it) it.unidadEnviada = sel.value; });
+    });
     main.querySelectorAll("[data-envio]").forEach(function(inp){
       inp.addEventListener("input", function(){ var it = itemDe("data-envio", inp); if(it){ it.envioCant = inp.value; delete f.faltan[it.id]; } progreso(); });
     });
@@ -8719,7 +8968,7 @@ const PedidosApp = (function(){
       if(estado==="pendiente") faltan.push(it);
       if((estado==="no_enviado"||estado==="rechazado") && !String(it.motivo).trim()) sinMotivo.push(it);
       var o = {id:it.id, s:estado};
-      if(estado==="enviado") o.e = String(cant);
+      if(estado==="enviado"){ o.e = String(cant); o.ue = it.unidadEnviada || it.unidad || ""; }
       if(estado==="no_enviado"||estado==="rechazado"){ if(String(it.motivo).trim()) o.m = it.motivo.trim(); }
       if(estado==="no_enviado" && it.fechaEstimada) o.f = it.fechaEstimada;
       return o;
@@ -8855,7 +9104,7 @@ const PedidosApp = (function(){
 
   function reenviarItem(p, it){
     pedirNombre("Mandar ítem pendiente",
-      '<b>'+esc(it.name)+'</b> (pedido: '+esc(it.pedidoCant)+'). Había quedado para más tarde'+(it.motivo?' — '+esc(it.motivo):'')+'.<br>El pedido vuelve a «Esperando recepción» para que el local confirme este ítem.',
+      '<b>'+esc(it.name)+'</b> (pedido: '+esc(conU(it.pedidoCant, it.unidad))+'). Había quedado para más tarde'+(it.motivo?' — '+esc(it.motivo):'')+'.<br>El pedido vuelve a «Esperando recepción» para que el local confirme este ítem.',
       "dc_quien_envia", "Ya se mandó",
       [{id:"cant", label:"Cantidad que se manda", value:String(it.pedidoCant||""), required:true, numeric:true, requiredMsg:"Cargá la cantidad que se manda."}]
     ).then(function(v){
@@ -8933,7 +9182,7 @@ const PedidosApp = (function(){
       if(list.length===0) return;
       html += '<div class="ps-cat">'+esc(CAT_LABEL[ck]||ck)+'</div>';
       list.forEach(function(it){
-        html += '<div class="ps-item"><span class="ps-check"></span><span class="ps-name">'+esc(it.name)+(it.isExtra?' (nuevo)':'')+'</span><span class="ps-qty">'+esc(it.pedidoCant)+'</span></div>';
+        html += '<div class="ps-item"><span class="ps-check"></span><span class="ps-name">'+esc(it.name)+(it.isExtra?' (nuevo)':'')+'</span><span class="ps-qty">'+esc(conU(it.pedidoCant, it.unidad))+'</span></div>';
       });
     });
     html += '<div class="ps-meta" style="margin-top:22px">Preparado por: _______________________ &nbsp;&nbsp; Fecha: ___/___/___</div>';
