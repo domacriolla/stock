@@ -728,7 +728,13 @@ function guardarDispositivo(d){
 function normSector(t){ return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase(); }
 const SECTOR_A_LOCAL = { 'centro': 'Centro', 'patagonia': 'Patagonia', 'zelarrayan': 'Zelarrayan' };
 const SECTOR_A_FABRICA = { 'cocina': 'cocina', 'produccion': 'produccion', 'discos': 'discos', 'postres': 'postres' };
+// MENÚ POR SECTOR (27/11/2026, Carolina: "por el momento prefiero que todos
+// vean todo"): en false, todos los dispositivos ven el inicio completo. Cada
+// tablet igual abre con su sector / local ya elegido (se puede cambiar).
+// Para volver a separar el inicio por sector: poner true.
+const MENU_POR_SECTOR = false;
 function tipoDispositivo(){
+  if(!MENU_POR_SECTOR) return 'todo';
   const s = normSector(DISPOSITIVO.sector);
   if(SECTOR_A_LOCAL[s]) return 'local';
   if(SECTOR_A_FABRICA[s]) return 'fabrica';
@@ -1380,8 +1386,10 @@ function renderHome(){
     <div class="home-grid">
       ${tarjetaHome('stockLocales', 'Cargar stock del local', 'Registrar cuánto queda de cada sabor, con su fecha de vencimiento.')}
       ${tarjetaHome('recepcion', 'Confirmar recepción', 'Registrar cuánto llegó realmente de lo que fábrica despachó hoy.')}
-      ${tarjetaHome('pedidosInsumos', 'Pedidos de insumos e ingredientes', 'Pedir, preparar y recibir insumos e ingredientes (lo que antes era la app Pedidos de Locales).', true)}
+      ${tarjetaHome('pedirInsumos', 'Pedir insumos o ingredientes', 'Lo que antes era la app Pedidos de Locales. Insumos los martes; ingredientes domingo y miércoles.', true)}
+      ${tarjetaHome('misPedidos', 'Recibir insumos e ingredientes', 'Confirmar lo que llegó de los pedidos de insumos e ingredientes.', true, { idNum: 'numHomeRecibir' })}
       ${tarjetaHome('pedidosEspeciales', 'Pedidos especiales', 'Pedir empanadas, copetín o postres para un día y hora (mínimo de un día para el otro).')}
+      ${tarjetaHome('pedidosInsumos', 'Pedidos de insumos e ingredientes — los 3 locales', 'Ver todos los pedidos de los locales, prepararlos y exportarlos.')}
       ${tarjetaHome('historial', 'Historial de envíos', 'Comparar lo enviado contra lo recibido, por local y sabor.')}
       ${tarjetaHome('informeStock', 'Informe: Stock por local', 'Última carga de stock de cada local, con semáforo de vencimientos.')}
     </div>` + fabrica(true) + despacho(false) + ajustes(true);
@@ -1394,7 +1402,9 @@ function renderHome(){
 // números de pedidos de insumos/ingredientes en las tarjetas del inicio
 async function pintarNumerosPedidosHome(tipo, local){
   try{
-    if(tipo === 'local'){
+    // 28/11/2026: con el inicio completo para todos, la tablet de un local
+    // igual ve cuántos pedidos tiene para recibir
+    if(tipo === 'local' || (local && document.getElementById('numHomeRecibir'))){
       const n = await PedidosApp.porRecibir(localPedidos(local), true);
       const el = document.getElementById('numHomeRecibir');
       if(el && n){ el.textContent = n; el.style.display = 'inline-block'; }
