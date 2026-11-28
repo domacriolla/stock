@@ -1,12 +1,12 @@
 <!DOCTYPE html>
-<!-- versión 20/11/2026 — dispositivos autorizados (base: 19/11/2026) -->
+<!-- versión 27/11/2026 — app unificada: Pedidos de Locales adentro, inicio por sector, Despacho con solapas y velocidad (base: 24/11/2026) -->
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Doma Criolla — Stock y Producción</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@500;600;700&family=Poppins:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <style>
   /* Paleta e identidad tomadas del Manual de Marca Doma Criolla:
@@ -160,6 +160,7 @@
   /* 18/11/2026: urgente en verde sin número + vence hoy/mañana en rojo */
   .fila-grupo-urg td{background:#fff4d6 !important;color:#8a5a00;}
   .badge-urg.plan{background:#e7f3ea;color:#2a6a3a;border-color:#9fcaa9;}
+  .urg-tit-fuera, .urg-paso h4.urg-tit-fuera{color:#b3261e;text-transform:uppercase;} .urg-sub-plan{margin:14px 0 2px;font-size:13px;font-weight:700;color:#2a6a3a;}
   .reg-totdia{font-size:12px;line-height:1.3;color:var(--ink);}
   .urg-tot{white-space:nowrap;font-size:12.5px;} .urg-hoy{white-space:nowrap;font-size:12.5px;color:var(--herb);}
   .urg-sep{margin:0 6px;color:var(--ink-soft);}
@@ -331,6 +332,19 @@
   .cat-nav a{font-size:11.5px;color:var(--ink-soft);border:1px solid var(--line);
     padding:4px 9px;border-radius:12px;text-decoration:none;}
   .cat-nav a:hover{border-color:var(--crust);color:var(--crust-dark);}
+  /* Despachar (27/11/2026): clasificación en franja de color, chips en rojo */
+  .ctrl-alertas{margin-top:8px;font-size:12.5px;background:#fff6e0;border:1px solid #e3c27a;border-radius:8px;padding:6px 10px;}
+  .ctrl-alertas summary{cursor:pointer;font-weight:700;color:#8a5a00;} .ctrl-alertas ul{margin:6px 0 4px 18px;padding:0;} .ctrl-alertas li{margin:2px 0;}
+  .ctrl-al-dia{display:inline-block;min-width:34px;color:var(--ink-soft);font-size:11.5px;}
+  .traspaso-sug{background:#eef5fa;border:1px solid #9fbfd6;border-radius:10px;padding:10px 14px;margin:8px 0 12px;font-size:13.5px;}
+  h4.cat-heading.cat-band{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    background:#8a5a3c;color:#fff;font-size:17px;font-weight:700;letter-spacing:.05em;padding:9px 12px;border-radius:7px;margin:26px 0 6px;}
+  .cat-band-tog{background:rgba(255,255,255,.16);color:#fff;border:1px solid rgba(255,255,255,.55);border-radius:14px;
+    font-size:12.5px;font-weight:600;letter-spacing:0;text-transform:none;padding:4px 11px;cursor:pointer;}
+  table.lotes.cat-plegada{display:none;}
+  .cat-nav a.chip-falta{background:#fde3e1;border-color:#c0392b;color:#a3261b;font-weight:700;}
+  .cat-nav a.chip-nada{opacity:.6;}
+  @media print{ h4.cat-heading.cat-band{background:none;color:#000;border-bottom:2px solid #000;border-radius:0;} table.lotes.cat-plegada{display:none;} }
 
   .actions{margin-top:22px;display:flex;gap:10px;align-items:center;}
   .msg{font-size:13px;margin-top:14px;padding:10px 12px;border-radius:3px;display:none;}
@@ -476,6 +490,192 @@
   table.corte .corte-num{font-size:22px;font-weight:700;color:#65341A;}
   .det-discos{margin-top:6px;}
   .det-discos > summary{cursor:pointer;color:var(--ink-soft);font-size:13px;margin:6px 0;}
+
+  /* ===== 27/11/2026 — INICIO POR SECTOR y DESPACHO CON SOLAPAS ===== */
+  .home-hola{font-size:13px;color:var(--ink-soft);margin:-4px 0 10px;}
+  .home-hola strong{color:var(--crust);}
+  .home-card.principal{border:2px solid var(--accent);}
+  .home-card .tarj-num{display:inline-block;margin-left:6px;background:var(--accent);color:#fff;border-radius:99px;font-size:12px;font-weight:700;padding:1px 8px;vertical-align:middle;font-family:'Poppins',sans-serif;}
+  .home-chico{display:flex;flex-wrap:wrap;gap:8px;margin:6px 0 18px;}
+  .home-chico button{background:var(--panel);border:1px solid var(--line);border-radius:99px;padding:8px 14px;font-family:'Poppins',sans-serif;font-size:13px;color:var(--ink);cursor:pointer;}
+  .home-chico button:active{background:var(--accent-bg);}
+  .solapas-desp{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:4px 0 14px;}
+  .solapas-desp .solapa{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;background:var(--panel);border:1px solid var(--line);border-bottom:4px solid var(--line);border-radius:10px;padding:10px 12px;cursor:pointer;font-family:'Poppins',sans-serif;color:var(--ink);}
+  .solapas-desp .solapa .s-tit{font-family:'Cinzel',serif;font-weight:700;font-size:16px;letter-spacing:.02em;color:var(--crust);}
+  .solapas-desp .solapa .s-sub{font-size:11.5px;color:var(--ink-soft);}
+  .solapas-desp .solapa.activa{background:var(--accent-bg);border-color:var(--accent);border-bottom-color:var(--crust);}
+  .solapas-desp .s-num{display:inline-block;min-width:20px;text-align:center;background:var(--alert);color:#fff;border-radius:99px;font-family:'Poppins',sans-serif;font-size:11.5px;font-weight:700;padding:1px 7px;margin-left:4px;vertical-align:middle;}
+  .solapas-desp .s-num:empty{display:none;}
+  @media (max-width:560px){ .solapas-desp{grid-template-columns:1fr;} }
+  .ctrl-hora{font-size:11px;color:var(--ink-soft);font-weight:400;margin-left:6px;}
+
+  /* ===== 27/11/2026 — PEDIDOS DE LOCALES dentro de la app (insumos e ingredientes).
+     Mismos estilos que tenía su página, encerrados en .ped-app para que no se
+     mezclen con los del resto de la app. ===== */
+  .ped-app{--bg:#F4EDE1; --surface:#FFFDF9; --surface-alt:#F1E5D2; --border:#E1D0B4; --border-strong:#C9AF88; --ink:#311B10; --ink-soft:#6E5645; --ink-faint:#A6907A; --accent:#65341A; --accent-ink:#FFFFFF; --accent-soft:#EFDCBE; --accent-soft-ink:#65341A; --danger:#A83A2C; --danger-soft:#F2DAD3; --danger-ink:#7A2A1F; --success:#4C7A43; --success-soft:#DDEAD4; --success-ink:#345C2C; --pending:#B06B1C; --pending-soft:#F3DFB8; --pending-ink:#7A4B12; --shadow: 0 1px 2px rgba(43,38,33,0.06), 0 4px 14px rgba(43,38,33,0.06); --radius: 10px; color-scheme: light;}
+  .ped-app{color:var(--ink);
+    font-family:'Poppins', system-ui, sans-serif;
+    -webkit-font-smoothing:antialiased;}
+  .ped-app .wrap{max-width:760px; margin:0 auto; padding:0 16px 80px;}
+  .ped-app h1, .ped-app h2, .ped-app h3{font-family:'Cinzel','Poppins',serif; margin:0; letter-spacing:.01em;}
+  .ped-app .mono{font-family:'IBM Plex Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums;}
+  .ped-app .ped-head{position:sticky; top:0; z-index:20; background:var(--bg); padding:16px 16px 0; border-bottom:1px solid var(--border);}
+  .ped-app .ped-head .head-row{max-width:760px; margin:0 auto; display:flex; align-items:baseline; justify-content:space-between; gap:12px; flex-wrap:wrap; padding-bottom:12px;}
+  .ped-app .ped-head h1{font-size:20px; font-weight:800; letter-spacing:-0.01em;}
+  .ped-app .ped-head .sub{font-size:12.5px; color:var(--ink-soft); margin-top:2px;}
+  .ped-app .ped-head .refresh{background:none; border:1px solid var(--border-strong); border-radius:99px; color:var(--ink-soft); font-size:12px; font-weight:600; padding:6px 12px; cursor:pointer; font-family:'Poppins',sans-serif; display:flex; align-items:center; gap:5px;}
+  .ped-app nav.ped-tabs{max-width:760px; margin:0 auto; display:flex; gap:4px; overflow-x:auto; scrollbar-width:none;}
+  .ped-app nav.ped-tabs::-webkit-scrollbar{display:none;}
+  .ped-app nav.ped-tabs button{appearance:none; border:none; background:none; font-family:'Poppins',sans-serif; font-weight:700; font-size:13.5px; color:var(--ink-soft); padding:10px 12px 12px; cursor:pointer; border-bottom:2.5px solid transparent; white-space:nowrap; display:flex; align-items:center; gap:6px;}
+  .ped-app nav.ped-tabs button.active{color:var(--ink); border-bottom-color:var(--accent);}
+  .ped-app nav.ped-tabs button .count{font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; background:var(--pending-soft); color:var(--pending-ink); border-radius:99px; padding:1px 6px; min-width:16px; text-align:center;}
+  .ped-app main{padding-top:18px;}
+  .ped-app .panel{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); margin-bottom:16px;}
+  .ped-app .panel-head{padding:14px 16px; border-bottom:1px dashed var(--border-strong); display:flex; align-items:center; justify-content:space-between; gap:10px;}
+  .ped-app .panel-head h3{font-size:14.5px; font-weight:700; letter-spacing:.02em; text-transform:uppercase; color:var(--ink-soft);}
+  .ped-app .panel-body{padding:14px 16px;}
+  .ped-app label.field{display:block; margin-bottom:12px;}
+  .ped-app label.field .lbl{display:block; font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:5px;}
+  .ped-app input[type=text], .ped-app input[type=password], .ped-app input[type=date], .ped-app select, .ped-app textarea{width:100%; font-family:'Poppins',sans-serif; font-size:15px; padding:10px 11px; border-radius:8px; border:1px solid var(--border-strong); background:var(--surface-alt); color:var(--ink); min-height:42px;}
+  .ped-app input[type=text]:focus, .ped-app input[type=password]:focus, .ped-app input[type=date]:focus, .ped-app select:focus, .ped-app textarea:focus{outline:2px solid var(--accent); outline-offset:1px;}
+  .ped-app .user-box{display:flex; align-items:center; gap:8px; flex-wrap:wrap; justify-content:flex-end;}
+  .ped-app .row2{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
+  @media (max-width:480px){
+    .ped-app .row2{grid-template-columns:1fr;}
+  }
+  .ped-app .btn{appearance:none; border:none; cursor:pointer; font-family:'Poppins',sans-serif; font-weight:700; font-size:14px; padding:11px 18px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:44px;}
+  .ped-app .btn-primary{background:var(--accent); color:var(--accent-ink);}
+  .ped-app .btn-primary:disabled{opacity:.45; cursor:not-allowed;}
+  .ped-app .btn-ghost{background:transparent; color:var(--ink-soft); border:1px solid var(--border-strong);}
+  .ped-app .btn-sm{padding:7px 11px; min-height:34px; font-size:12.5px;}
+  .ped-app .btn-block{width:100%;}
+  .ped-app .cat-block{border-top:1px dashed var(--border-strong);}
+  .ped-app .cat-block:first-child{border-top:none;}
+  .ped-app .cat-title{padding:12px 16px 4px; font-size:12.5px; font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--accent-soft-ink); background:var(--accent-soft);}
+  .ped-app .item-row{display:flex; align-items:center; gap:10px; padding:8px 16px; border-top:1px solid var(--border);}
+  .ped-app .item-row:first-of-type{border-top:none;}
+  .ped-app .item-name{flex:1; font-size:14px; line-height:1.3;}
+  .ped-app .item-name .tag-extra{font-size:10px; font-weight:700; color:var(--success-ink); background:var(--success-soft); border-radius:4px; padding:1px 5px; margin-left:6px; vertical-align:middle;}
+  .ped-app input[type=text].qty-input{width:54px; flex:none; text-align:center; font-family:'IBM Plex Mono',monospace; font-weight:600; font-size:15px; padding:8px 4px; min-height:38px;}
+  .ped-app .rm-btn{flex:none; width:30px; height:30px; border-radius:7px; border:1px solid var(--border-strong); background:var(--surface-alt); color:var(--danger); cursor:pointer; font-size:15px; line-height:1;}
+  .ped-app .extra-add{display:flex; gap:8px; padding:10px 16px 14px;}
+  .ped-app .extra-add input[type=text]{flex:1;}
+  .ped-app .extra-add input[type=text].qty-input{width:54px;}
+  .ped-app .badge{font-family:'IBM Plex Mono',monospace; font-size:11px; font-weight:600; padding:3px 8px; border-radius:99px; white-space:nowrap;}
+  .ped-app .badge-pending{background:var(--pending-soft); color:var(--pending-ink);}
+  .ped-app .badge-sent{background:var(--accent-soft); color:var(--accent-soft-ink);}
+  .ped-app .badge-closed{background:var(--success-soft); color:var(--success-ink);}
+  .ped-app .badge-rejected{background:var(--danger-soft); color:var(--danger-ink);}
+  .ped-app .idr-readonly{font-size:13px; color:var(--ink-soft); padding:2px 0;}
+  .ped-app .idr-readonly b{color:var(--ink); font-weight:600;}
+  .ped-app .filters{display:flex; gap:8px; flex-wrap:wrap; align-items:center; padding:12px 16px; border-bottom:1px solid var(--border);}
+  .ped-app .filters select{width:auto; min-height:36px; padding:6px 10px; font-size:13px;}
+  .ped-app .filters .btn{margin-left:auto;}
+  .ped-app .order-card{padding:13px 16px; border-top:1px solid var(--border); display:flex; align-items:center; gap:12px; cursor:pointer;}
+  .ped-app .order-card:first-child{border-top:none;}
+  .ped-app .order-card:hover{background:var(--surface-alt);}
+  .ped-app .order-card .oc-main{flex:1; min-width:0;}
+  .ped-app .order-card .oc-local{font-family:'Cinzel',serif; font-weight:700; font-size:14.5px;}
+  .ped-app .order-card .oc-sub{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .ped-app .order-card .oc-arrow{color:var(--ink-faint); font-size:16px;}
+  .ped-app .empty{padding:34px 16px; text-align:center; color:var(--ink-soft); font-size:14px;}
+  .ped-app .empty .big{font-size:26px; margin-bottom:6px;}
+  .ped-app .toast{position:fixed; left:50%; bottom:22px; transform:translateX(-50%); background:var(--ink); color:var(--bg); font-size:13.5px; font-weight:600; padding:11px 18px; border-radius:99px; box-shadow:var(--shadow); z-index:50; opacity:0; pointer-events:none; transition:opacity .2s, transform .2s;}
+  .ped-app .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px);}
+  .ped-app .detail-head{padding:14px 16px; border-bottom:1px dashed var(--border-strong);}
+  .ped-app .detail-head .back{background:none; border:none; color:var(--ink-soft); font-family:'Poppins',sans-serif; font-size:13px; cursor:pointer; padding:0 0 10px; display:flex; align-items:center; gap:4px;}
+  .ped-app .detail-grid{display:flex; flex-wrap:wrap; gap:8px 18px; font-size:13px; color:var(--ink-soft);}
+  .ped-app .detail-grid b{color:var(--ink); font-weight:600;}
+  .ped-app .item-detail-row{padding:11px 16px; border-top:1px solid var(--border);}
+  .ped-app .item-detail-row:first-of-type{border-top:none;}
+  .ped-app .item-detail-row .idr-top{display:flex; align-items:center; gap:10px; margin-bottom:8px;}
+  .ped-app .item-detail-row .idr-name{flex:1; font-size:14px;}
+  .ped-app .item-detail-row .idr-pedido{font-size:12px; color:var(--ink-soft);}
+  .ped-app .item-detail-row.st-enviado{background:var(--success-soft);}
+  .ped-app .item-detail-row.st-no_enviado{background:var(--danger-soft);}
+  .ped-app .idr-controls{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+  .ped-app .idr-controls .qty-input{min-height:38px;}
+  .ped-app .chk{display:flex; align-items:center; gap:6px; font-size:12.5px; color:var(--ink-soft); cursor:pointer; user-select:none;}
+  .ped-app .chk input{width:16px; height:16px;}
+  .ped-app .idr-motivo{margin-top:8px; display:grid; grid-template-columns:1fr auto; gap:8px;}
+  .ped-app .idr-motivo input[type=text]{font-size:13px;}
+  .ped-app .idr-motivo input[type=date]{font-size:13px; width:150px;}
+  @media (max-width:480px){
+    .ped-app .idr-motivo{grid-template-columns:1fr;}
+    .ped-app .idr-motivo input[type=date]{width:100%;}
+  }
+  .ped-app .save-bar{position:sticky; bottom:0; background:var(--bg); padding:12px 0 4px; border-top:1px solid var(--border); display:flex; gap:10px;}
+  .ped-app .catalog-item{display:flex; align-items:center; gap:10px; padding:7px 16px; border-top:1px solid var(--border); flex-wrap:wrap;}
+  .ped-app .catalog-item:first-of-type{border-top:none;}
+  .ped-app .catalog-item .ci-name{flex:1; font-size:14px; min-width:120px;}
+  .ped-app .catalog-item .ci-controls{display:flex; align-items:center; gap:6px; margin-left:auto;}
+  .ped-app select.ci-cat-select{width:auto; min-height:30px; padding:4px 6px; font-size:12px;}
+  .ped-app .catalog-add{display:flex; gap:8px; padding:10px 16px 14px;}
+  .ped-app .catalog-add input{flex:1;}
+  .ped-app .banner{background:var(--accent-soft); color:var(--accent-soft-ink); border-radius:var(--radius); padding:11px 14px; font-size:13px; margin-bottom:14px; border:1px solid var(--border-strong);}
+  .ped-app .success-screen{padding:40px 20px; text-align:center;}
+  .ped-app .success-screen .big{font-size:34px; margin-bottom:10px;}
+  .ped-app .success-screen h2{font-size:18px; margin-bottom:6px;}
+  .ped-app .success-screen p{color:var(--ink-soft); font-size:14px; margin:0 0 20px;}
+  .ped-app ::selection{background:var(--accent-soft);}
+  .ped-app .print-sheet{display:none;}
+  .ped-app .req{color:var(--danger); font-weight:700;}
+  .ped-app .banner-warn{background:var(--pending-soft); color:var(--pending-ink); border-color:var(--pending);}
+  .ped-app .banner-danger{background:var(--danger-soft); color:var(--danger-ink); border-color:var(--danger);}
+  .ped-app .banner-ok{background:var(--success-soft); color:var(--success-ink); border-color:var(--success);}
+  .ped-app .banner .b-actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;}
+  .ped-app .banner .b-actions .btn{background:var(--surface);}
+  .ped-app .badge-draft{background:var(--surface-alt); color:var(--ink-soft); border:1px dashed var(--border-strong);}
+  .ped-app .chip-tipo{font-size:10.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; padding:2px 7px; border-radius:5px; background:var(--surface-alt); color:var(--ink-soft); border:1px solid var(--border); margin-left:6px; vertical-align:middle; font-family:'Poppins',sans-serif;}
+  .ped-app .chip-tipo.ing{background:var(--success-soft); color:var(--success-ink); border-color:var(--success);}
+  .ped-app .oc-warn{color:var(--danger); font-weight:600;}
+  .ped-app .tip{appearance:none; border:1px solid var(--border-strong); background:var(--surface); color:var(--ink-soft); width:19px; height:19px; border-radius:50%; font-size:11px; font-weight:700; font-family:'IBM Plex Mono',monospace; line-height:1; padding:0; cursor:pointer; vertical-align:middle; margin-left:5px; display:inline-flex; align-items:center; justify-content:center; flex:none;}
+  .ped-app .ped-tipbox{position:fixed; z-index:60; max-width:280px; background:var(--ink); color:var(--bg); font-size:12.5px; line-height:1.45; padding:9px 12px; border-radius:8px; box-shadow:var(--shadow); display:none;}
+  .ped-app .seg{display:flex; gap:0; border:1px solid var(--border-strong); border-radius:8px; overflow:hidden;}
+  .ped-app .seg button{flex:1; appearance:none; border:none; background:var(--surface-alt); color:var(--ink-soft); font-family:'Poppins',sans-serif; font-weight:700; font-size:14px; padding:10px; cursor:pointer; min-height:42px;}
+  .ped-app .seg button.on{background:var(--accent); color:var(--accent-ink);}
+  .ped-app .group-title{font-family:'Cinzel',serif; font-size:15px; font-weight:700; margin:20px 2px 10px; color:var(--ink);}
+  .ped-app .btn-row{display:flex; gap:10px; flex-wrap:wrap;}
+  .ped-app .btn-row .btn{flex:1;}
+  .ped-app .head-actions{display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end;}
+  .ped-app .btn-danger-txt{color:var(--danger) !important;}
+  .ped-app .item-detail-row.st-falta{background:var(--pending-soft); box-shadow:inset 4px 0 0 var(--danger);}
+  .ped-app .item-row.st-falta{background:var(--pending-soft); box-shadow:inset 4px 0 0 var(--danger);}
+  .ped-app .progreso{font-size:12.5px; color:var(--ink-soft); margin:0 0 10px;}
+  .ped-app .progreso b{color:var(--ink);}
+  .ped-app .dif{font-size:11.5px; font-weight:700; color:var(--danger);}
+  .ped-app details.historial{padding:12px 16px; border-top:1px dashed var(--border-strong); font-size:12.5px; color:var(--ink-soft);}
+  .ped-app details.historial summary{cursor:pointer; font-weight:600;}
+  .ped-app details.historial div{padding:3px 0; border-bottom:1px dotted var(--border);}
+  .ped-app .dlg-ov{position:fixed; inset:0; background:rgba(20,12,6,.45); z-index:70; display:flex; align-items:center; justify-content:center; padding:16px;}
+  .ped-app .dlg{background:var(--surface); color:var(--ink); border-radius:12px; box-shadow:0 10px 40px rgba(0,0,0,.25); width:100%; max-width:440px; max-height:90vh; overflow:auto; padding:18px 18px 14px;}
+  .ped-app .dlg h3{font-size:16px; margin-bottom:10px;}
+  .ped-app .dlg .dlg-txt{font-size:13.5px; line-height:1.5; margin-bottom:12px;}
+  .ped-app .dlg .dlg-txt ul{margin:6px 0 0; padding-left:18px;}
+  .ped-app .dlg .dlg-err{color:var(--danger); font-size:12.5px; font-weight:600; min-height:0; margin:-4px 0 8px;}
+  .ped-app .dlg .dlg-btns{display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end;}
+  .ped-app .dlg .dlg-btns .btn{flex:1; min-width:120px;}
+  .ped-app .btn-danger{background:var(--danger); color:#fff;}
+  .ped-app{background:var(--bg);border-radius:10px;}
+  .ped-app .wrap-ped{max-width:760px;margin:0 auto;}
+  .ped-app .ped-bar{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:4px 0 8px;}
+  .ped-app .ped-bar .refresh{background:none;border:1px solid var(--border-strong);border-radius:99px;color:var(--ink-soft);font-size:12px;font-weight:600;padding:6px 12px;cursor:pointer;font-family:'Poppins',sans-serif;}
+  .ped-app nav.ped-tabs{border-bottom:1px solid var(--border);margin-bottom:4px;}
+  .ped-app .ped-main{padding-top:12px;}
+  .ped-app .dlg-ov{z-index:200;}
+  .ped-app .toast{z-index:210;}
+  #pedPrint{display:none;}
+  @media print{
+    body.imprimiendo-ped > *:not(#pedPrint){display:none !important;}
+    body.imprimiendo-ped #pedPrint{display:block !important;padding:10px;color:#111;font-family:'Poppins',sans-serif;}
+    #pedPrint h1{font-size:18px;margin:0 0 6px;font-family:'Cinzel',serif;}
+    #pedPrint .ps-meta{font-size:12.5px;color:#333;margin-bottom:4px;}
+    #pedPrint .ps-cat{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;margin:16px 0 4px;border-bottom:1px solid #999;padding-bottom:3px;}
+    #pedPrint .ps-item{display:flex;align-items:center;gap:10px;padding:5px 0;font-size:13px;border-bottom:1px dotted #ccc;}
+    #pedPrint .ps-check{width:13px;height:13px;border:1.4px solid #333;flex:none;}
+    #pedPrint .ps-name{flex:1;}
+    #pedPrint .ps-qty{font-weight:700;font-family:'IBM Plex Mono',monospace;min-width:30px;text-align:right;}
+  }
 </style>
 </head>
 <body>
@@ -518,14 +718,121 @@ function guardarDispositivo(d){
   DISPOSITIVO = { codigo: d.codigo || '', llave: d.llave || '', nombre: d.nombre || '', sector: d.sector || '' };
   try{ localStorage.setItem(CLAVE_DISPOSITIVO, JSON.stringify(DISPOSITIVO)); }catch(e){}
 }
+// INICIO POR SECTOR (27/11/2026, Carolina): según el Sector del dispositivo
+// (hoja Dispositivos) el inicio muestra lo de ese lugar. Es para que cada uno
+// encuentre lo suyo rápido (ocultar pantallas), no es seguridad.
+//   local    = tablets de Centro / Patagonia / Zelarrayán
+//   fabrica  = tablets de Cocina / Producción / Discos / Postres
+//   despacho = tablet de Despacho o Reparto
+//   todo     = PC de oficina, celular de Carolina, "Todos" o sin código
+function normSector(t){ return String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase(); }
+const SECTOR_A_LOCAL = { 'centro': 'Centro', 'patagonia': 'Patagonia', 'zelarrayan': 'Zelarrayan' };
+const SECTOR_A_FABRICA = { 'cocina': 'cocina', 'produccion': 'produccion', 'discos': 'discos', 'postres': 'postres' };
+function tipoDispositivo(){
+  const s = normSector(DISPOSITIVO.sector);
+  if(SECTOR_A_LOCAL[s]) return 'local';
+  if(SECTOR_A_FABRICA[s]) return 'fabrica';
+  if(s === 'despacho' || s === 'reparto') return 'despacho';
+  return 'todo';
+}
+function localDelDispositivo(){ return SECTOR_A_LOCAL[normSector(DISPOSITIVO.sector)] || ''; }
+// sector de fábrica con el que abre "Producción de hoy" y "Registrar producción"
+function sectorInicialFabrica(){ return SECTOR_A_FABRICA[normSector(DISPOSITIVO.sector)] || 'produccion'; }
+// lugar de "Cargar stock" que viene elegido según el dispositivo
+function lugarDelDispositivo(){
+  const s = normSector(DISPOSITIVO.sector);
+  if(SECTOR_A_LOCAL[s]) return SECTOR_A_LOCAL[s];
+  if(s === 'cocina') return 'Fábrica - Cocina';
+  if(s === 'discos') return 'Fábrica - Discos';
+  if(s === 'produccion') return 'Fábrica - Producción';
+  return '';
+}
+function opcionSel(valor, elegido){ return valor === elegido ? ' selected' : ''; }
+// clave del local en la planilla de Pedidos (CENTRO / PATAGONIA / ZELARRAYAN)
+function localPedidos(local){ return String(local || '').toUpperCase(); }
+
 function conCodigoDispositivo(url){
   if(!DISPOSITIVO.codigo) return url;
   const s = String(url);
   return s + (s.indexOf('?') === -1 ? '?' : '&') + 'disp=' + encodeURIComponent(DISPOSITIVO.codigo) + '&dtok=' + encodeURIComponent(DISPOSITIVO.llave || '');
 }
 
+/* ---------------------------------------------------------------------
+   PEDIDOS AGRUPADOS (27/11/2026, velocidad): cuando una pantalla pide varias
+   cosas de LECTURA a la vez (plan, urgentes, ollas, preparados…), se mandan
+   juntas en un solo pedido "varios". El servidor calcula el plan una sola vez
+   y lee cada hoja una sola vez. Cada pantalla recibe exactamente la misma
+   respuesta que antes. Si el servidor todavía no conoce "varios" (Code.gs
+   viejo) o algo falla, se piden de a uno como siempre.
+   --------------------------------------------------------------------- */
+const ACCIONES_AGRUPABLES = ['calcularTodo', 'calcularEnvios', 'calcularPrepDiaAnterior', 'calcularOllas',
+  'calcularDemandaPreparados', 'calcularInsumosRealesDia', 'obtenerStockAnalisisLocal', 'informePedidoVsHecho',
+  'informeEnvios', 'informeTiemposMaquina', 'calcularMateriaPrimaDia', 'calcularUrgentes', 'calcularPlanDiscos',
+  'estadoRegistrosDia', 'obtenerEnviosDia', 'listarPedidosEspeciales', 'obtenerRegistroProduccionDia',
+  'listarTrazabilidadCocinaDia', 'listarRecetasFinalizadas', 'obtenerStockCargadoDia', 'obtenerRegistroDiscosDia',
+  'listarEnviosPendientes', 'obtenerStockCongelado', 'calcularProduccionSemanal', 'listarHistorialEnvios',
+  'consultarTrazabilidad', 'historialStock', 'obtenerCongelados', 'resumenProyeccionFechas'];
+const ESPERA_LOTE_MS = 40;   // se juntan los pedidos que salen en el mismo momento
+const MAX_LOTE = 10;
+let LOTE_PEDIDOS = null;
+let SERVIDOR_SIN_VARIOS = false; // Code.gs viejo: se deja de agrupar
+function accionDeUrl(url){ try{ return new URL(url).searchParams.get('action') || ''; }catch(e){ return ''; } }
+function esAgrupable(url, opts){
+  if(SERVIDOR_SIN_VARIOS) return false;
+  if(opts && (opts.body || (opts.method && opts.method.toUpperCase() !== 'GET'))) return false;
+  return ACCIONES_AGRUPABLES.indexOf(accionDeUrl(url)) !== -1;
+}
+function respuestaJSON(obj){ return new Response(JSON.stringify(obj), { status: 200, headers: { 'Content-Type': 'application/json' } }); }
+async function pedirSolo(url, opts){
+  const accion = accionDeUrl(url);
+  const t0 = performance.now();
+  const resp = await _fetchOriginal(conCodigoDispositivo(url), opts);
+  try{
+    resp.clone().json().then(d => {
+      registrarTiempo(accion, performance.now() - t0, d && d._ms, d && d._cache);
+      if(d && d.noAutorizado) mostrarActivarDispositivo({ motivo: 'bloqueado' });
+    }).catch(() => registrarTiempo(accion, performance.now() - t0));
+  }catch(e){}
+  return resp;
+}
+function pedirEnLote(url){
+  return new Promise((resolve, reject) => {
+    if(!LOTE_PEDIDOS){ LOTE_PEDIDOS = []; setTimeout(enviarLote, ESPERA_LOTE_MS); }
+    LOTE_PEDIDOS.push({ url, resolve, reject });
+    if(LOTE_PEDIDOS.length >= MAX_LOTE){ const l = LOTE_PEDIDOS; LOTE_PEDIDOS = null; enviarLote(l); }
+  });
+}
+async function enviarLote(listaDada){
+  const lista = listaDada || LOTE_PEDIDOS;
+  if(!listaDada) LOTE_PEDIDOS = null;
+  if(!lista || !lista.length) return;
+  const deAUno = () => lista.forEach(it => pedirSolo(it.url).then(it.resolve, it.reject));
+  if(lista.length === 1) return deAUno();
+  const q = lista.map(it => { try{ return new URL(it.url).search.slice(1); }catch(e){ return ''; } });
+  const t0 = performance.now();
+  try{
+    const resp = await _fetchOriginal(conCodigoDispositivo(`${APPS_SCRIPT_URL}?action=varios&q=${encodeURIComponent(JSON.stringify(q))}`));
+    const d = await resp.json();
+    if(d && d.noAutorizado){ mostrarActivarDispositivo({ motivo: 'bloqueado' }); lista.forEach(it => it.resolve(respuestaJSON(d))); return; }
+    if(!d || !Array.isArray(d.resultados) || d.resultados.length !== lista.length){
+      if(d && d.error && /no reconocida|desconocida/i.test(d.error)) SERVIDOR_SIN_VARIOS = true;
+      return deAUno();
+    }
+    const total = performance.now() - t0;
+    lista.forEach((it, i) => {
+      const r = d.resultados[i];
+      registrarTiempo(accionDeUrl(it.url), total, r && r._ms, r && r._cache);
+      it.resolve(respuestaJSON(r));
+    });
+  }catch(err){
+    deAUno();
+  }
+}
+
 window.fetch = async function(url, opts){
   if(!String(url).startsWith(APPS_SCRIPT_URL)) return _fetchOriginal(url, opts);
+  if(esAgrupable(url, opts)) return pedirEnLote(String(url));
+  if(opts && opts.body){ try{ localStorage.removeItem('doma:' + MEMORIA_VERSION + ':controlRegistros'); }catch(e){} }
   let accion = '';
   try{ accion = opts && opts.body ? JSON.parse(opts.body).action : new URL(url).searchParams.get('action'); }catch(e){}
   const t0 = performance.now();
@@ -749,12 +1056,20 @@ function irA(pantalla){
   if(pantalla === 'informePedido') renderInformePedido();
   if(pantalla === 'informeEnviosRecepcion') renderInformeEnvios();
   if(pantalla === 'informeTiempos') renderInformeTiempos();
+  // 27/11/2026: Pedidos de Locales (insumos e ingredientes) dentro de la app
+  if(pantalla === 'pedirInsumos') renderPedidosLocal('nuevo');
+  if(pantalla === 'misPedidos') renderPedidosLocal('lista');
+  if(pantalla === 'pedidosInsumos') renderPedidosTodo();
+  if(pantalla === 'despachoIngredientes') renderDespachoPedidos('INGREDIENTES');
+  if(pantalla === 'despachoInsumos') renderDespachoPedidos('INSUMOS');
+  if(pantalla === 'catalogoPedidos') renderCatalogoPedidos();
 }
 
-function tarjetaHome(destino, titulo, texto, nueva){
+function tarjetaHome(destino, titulo, texto, nueva, extra){
+  const o = extra || {};
   return `
-      <button class="home-card" onclick="irA('${destino}')">
-        <h2>${titulo}${nueva ? '<span class="etiqueta-nueva">NUEVO</span>' : ''}</h2>
+      <button class="home-card${o.principal ? ' principal' : ''}" onclick="irA('${destino}')">
+        <h2>${titulo}${o.idNum ? `<span class="tarj-num" id="${o.idNum}" style="display:none;"></span>` : ''}${nueva ? '<span class="etiqueta-nueva">NUEVO</span>' : ''}</h2>
         <p>${texto}</p>
       </button>`;
 }
@@ -975,52 +1290,21 @@ function renderTiempos(){
 
 function renderHome(){
   precalentar();
-  app.innerHTML = `
+  const tipo = tipoDispositivo();
+  const local = localDelDispositivo();
+  const cab = `
     <header class="top">
       <h1>Doma Criolla</h1>
-      <div class="sub">Stock y producción<span class="sub-disp" id="subDispositivo">${escHtml(DISPOSITIVO.nombre || '')}</span></div>
-    </header>
-
-    <div class="control-reg" id="controlRegistros"><h3>Control de registros</h3><div class="loading" style="font-size:12.5px;">Revisando…</div></div>
-
-    <h3 class="home-seccion">Locales</h3>
+      <div class="sub">${tipo === 'local' ? 'Local ' + escHtml(NOMBRE_LOCAL_VISTA[local] || local) : 'Stock y producción'}<span class="sub-disp" id="subDispositivo">${escHtml(DISPOSITIVO.nombre || '')}</span></div>
+    </header>`;
+  const control = `<div class="control-reg" id="controlRegistros"><h3>Control de registros</h3><div class="loading" style="font-size:12.5px;">Revisando…</div></div>`;
+  const ajustes = (todo) => `
+    <h3 class="home-seccion">${todo ? 'Configuración' : 'Este equipo'}</h3>
     <div class="home-grid">
-      ${tarjetaHome('stockLocales', 'Cargar stock del local', 'Registrar cuánto queda de cada sabor, con su fecha de vencimiento.')}
-      ${tarjetaHome('recepcion', 'Confirmar recepción', 'Registrar cuánto llegó realmente de lo que fábrica despachó hoy.')}
-      ${tarjetaHome('historial', 'Historial de envíos', 'Comparar lo enviado contra lo recibido, por local y sabor.')}
-      ${tarjetaHome('pedidosEspeciales', 'Pedidos especiales', 'Pedir empanadas, copetín o postres para un día y hora (mínimo de un día para el otro).', true)}
-      ${tarjetaHome('informeStock', 'Informe: Stock por local', 'Última carga de stock de cada local, con semáforo de vencimientos.')}
-    </div>
-
-    <h3 class="home-seccion">Fábrica</h3>
-    <div class="home-bloque">
-      <div class="home-sub"><span class="num-paso">1</span>Producción del día</div>
-      <div class="home-grid">
-        ${tarjetaHome('fabrica', 'Ver qué producir hoy', 'Cocina, Producción y Discos: calculado con el stock cargado y la venta proyectada.')}
-        ${tarjetaHome('envios', 'Despachar envíos', 'Cuánto mandarle hoy a cada local, con lo que vende y lo que ya tiene.')}
-      </div>
-      <div class="home-sub"><span class="num-paso">2</span>Registros</div>
-      <div class="home-grid">
-        ${tarjetaHome('stockFabrica', 'Cargar stock de fábrica', 'Stock del día de Producción, Cocina (rellenos en kilos) y Discos.')}
-        ${tarjetaHome('stockCongelado', '❄ Stock congelado', 'Freezer: rellenos, preparados, copetín, cajitas, toppings y masas de cookies. Queda la última carga.', true)}
-        ${tarjetaHome('registro', 'Registrar producción', 'Cocina, Producción y Discos: quién, cuánto, máquina, horas y trazabilidad.')}
-      </div>
-      <div class="home-sub"><span class="num-paso">3</span>Informes</div>
-      <div class="home-grid compacta">
-        ${tarjetaHome('informePedido', 'Pedido vs hecho', 'Día por día: lo que pidió la app y lo que hicieron Cocina, Producción y Discos.', true)}
-        ${tarjetaHome('informeEnviosRecepcion', 'Envíos y recepción', 'Pidió, envió y recibió cada local, con quién preparó, repartió y recibió.', true)}
-        ${tarjetaHome('informeTiempos', 'Tiempos de máquina', 'Personal, tiempos, unidades por hora, relleno y calidad del registro.', true)}
-        ${tarjetaHome('informeStockFabrica', 'Stock de fábrica', 'Última carga de Producción, Cocina y Discos, con semáforo de vencimientos.')}
-        ${tarjetaHome('informeInsumos', 'Consumo de insumos', 'Consumo real de insumos de Cocina por día.')}
-        ${tarjetaHome('trazabilidad', 'Consultar trazabilidad', 'Por fecha de armado y sabor: relleno, discos, máquina, personal y reparto.')}
-      </div>
-    </div>
-
-    <h3 class="home-seccion">Actualizar datos</h3>
-    <div class="home-grid">
-      ${tarjetaHome('fichas', 'Fichas técnicas', 'Importar y actualizar las recetas (Rellenos, Preparados, Postres, Dips, Edición Limitada).')}
-      ${tarjetaHome('planificacion', 'Editar venta proyectada', 'Actualizar, por local, cuánto se espera vender de cada sabor cada día de la semana.')}
-      ${tarjetaHome('tiempos', 'Tiempos de carga', 'Cuánto tarda cada pantalla en esta tablet (para detectar lentitud).')}
+      ${todo ? tarjetaHome('fichas', 'Fichas técnicas', 'Importar y actualizar las recetas (Rellenos, Preparados, Postres, Dips, Edición Limitada).') : ''}
+      ${todo ? tarjetaHome('planificacion', 'Editar venta proyectada', 'Actualizar, por local, cuánto se espera vender de cada sabor cada día de la semana.') : ''}
+      ${todo ? tarjetaHome('catalogoPedidos', 'Catálogo de insumos e ingredientes', 'Lo que los locales pueden pedir (con clave para editar).', true) : ''}
+      ${tarjetaHome('tiempos', 'Tiempos de carga', 'Cuánto tarda cada pantalla en este equipo (para detectar lentitud).')}
       <button class="home-card" onclick="mostrarActivarDispositivo({ motivo: 'cambiar' })">
         <h2>Este dispositivo</h2>
         <p>${DISPOSITIVO.nombre ? `Activado como <strong>${escHtml(DISPOSITIVO.nombre)}</strong>${DISPOSITIVO.sector ? ' · ' + escHtml(DISPOSITIVO.sector) : ''}. Tocá para cambiar el código.` : 'Cargar el código de esta tablet o PC.'}</p>
@@ -1029,10 +1313,162 @@ function renderHome(){
         <h2>Refrescar datos de la planilla</h2>
         <p>Usalo si cambiaste algo a mano en la planilla (sabores, calendario, empleados) y la app todavía no lo muestra.</p>
       </button>
+    </div>`;
+  const despacho = (principal) => `
+    <h3 class="home-seccion">Despacho</h3>
+    <div class="home-grid">
+      ${tarjetaHome('envios', '🚚 Envío diario', 'Empanadas, dips, postres, huevos y toppings: cuánto mandarle hoy a cada local.', false, { principal })}
+      ${tarjetaHome('despachoIngredientes', '🥫 Ingredientes', 'Preparar los pedidos de ingredientes de los locales (lunes y jueves).', true, { idNum: 'numHomeIng' })}
+      ${tarjetaHome('despachoInsumos', '📦 Insumos', 'Preparar los pedidos de insumos de los locales (miércoles).', true, { idNum: 'numHomeIns' })}
+    </div>`;
+  const fabrica = (conInformes) => `
+    <h3 class="home-seccion">Fábrica</h3>
+    <div class="home-bloque">
+      <div class="home-sub"><span class="num-paso">1</span>Producción del día</div>
+      <div class="home-grid">
+        ${tarjetaHome('fabrica', 'Ver qué producir hoy', 'Cocina, Producción, Postres y Discos: calculado con el stock cargado y la venta proyectada.', false, { principal: tipo === 'fabrica' })}
+      </div>
+      <div class="home-sub"><span class="num-paso">2</span>Registros</div>
+      <div class="home-grid">
+        ${tarjetaHome('registro', 'Registrar producción', 'Cocina, Producción, Postres y Discos: quién, cuánto, máquina, horas y trazabilidad.')}
+        ${tarjetaHome('stockFabrica', 'Cargar stock de fábrica', 'Stock del día de Producción, Cocina (rellenos en kilos) y Discos.')}
+        ${tarjetaHome('stockCongelado', '❄ Stock congelado', 'Freezer: rellenos, preparados, copetín, cajitas, toppings y masas de cookies. Queda la última carga.')}
+      </div>
+      <div class="home-sub"><span class="num-paso">3</span>${conInformes ? 'Informes' : 'Consultas'}</div>
+      <div class="home-grid compacta">
+        ${conInformes ? tarjetaHome('informePedido', 'Pedido vs hecho', 'Día por día: lo que pidió la app y lo que hicieron Cocina, Producción y Discos.') : ''}
+        ${conInformes ? tarjetaHome('informeEnviosRecepcion', 'Envíos y recepción', 'Pidió, envió y recibió cada local, con quién preparó, repartió y recibió.') : ''}
+        ${conInformes ? tarjetaHome('informeTiempos', 'Tiempos de máquina', 'Personal, tiempos, unidades por hora, relleno y calidad del registro.') : ''}
+        ${tarjetaHome('informeStockFabrica', 'Stock de fábrica', 'Última carga de Producción, Cocina y Discos, con semáforo de vencimientos.')}
+        ${conInformes ? tarjetaHome('informeInsumos', 'Consumo de insumos', 'Consumo real de insumos de Cocina por día.') : ''}
+        ${tarjetaHome('trazabilidad', 'Consultar trazabilidad', 'Por fecha de armado y sabor: relleno, discos, máquina, personal y reparto.')}
+      </div>
+    </div>`;
+  let cuerpo;
+  if(tipo === 'local'){
+    cuerpo = `
+    <h3 class="home-seccion">Hoy</h3>
+    <div class="home-grid">
+      ${tarjetaHome('recepcion', 'Recibir envío de fábrica', 'Empanadas, dips, postres, huevos y toppings: cuánto llegó realmente.', false, { principal: true })}
+      ${tarjetaHome('misPedidos', 'Recibir insumos e ingredientes', 'Confirmar lo que llegó de tus pedidos de insumos e ingredientes.', true, { idNum: 'numHomeRecibir' })}
+      ${tarjetaHome('stockLocales', 'Cargar stock de cierre', 'Registrar cuánto queda de cada sabor a la noche, con su vencimiento.')}
     </div>
-    <footer class="note">Doma Criolla — herramienta interna de planificación de producción.</footer>
-  `;
-  pintarControlRegistros();
+    <h3 class="home-seccion">Pedidos</h3>
+    <div class="home-grid">
+      ${tarjetaHome('pedirInsumos', 'Pedir insumos o ingredientes', 'Insumos los martes; ingredientes domingo y miércoles.', true)}
+      ${tarjetaHome('pedidosEspeciales', 'Pedido especial', 'Empanadas, copetín o postres para un día y hora.')}
+    </div>
+    <h3 class="home-seccion">Consultas</h3>
+    <div class="home-grid compacta">
+      ${tarjetaHome('historial', 'Historial de envíos', 'Lo enviado contra lo recibido, por sabor.')}
+      ${tarjetaHome('informeStock', 'Stock por local', 'Última carga de stock de cada local, con semáforo de vencimientos.')}
+    </div>
+    ${ajustes(false)}`;
+  } else if(tipo === 'fabrica'){
+    cuerpo = control + fabrica(false) + despacho(false) + ajustes(false);
+  } else if(tipo === 'despacho'){
+    cuerpo = control + despacho(true) + `
+    <h3 class="home-seccion">Locales</h3>
+    <div class="home-grid compacta">
+      ${tarjetaHome('historial', 'Historial de envíos', 'Comparar lo enviado contra lo recibido, por local y sabor.')}
+      ${tarjetaHome('pedidosEspeciales', 'Pedidos especiales', 'Los pedidos especiales de los locales, con día y hora.')}
+      ${tarjetaHome('informeStock', 'Stock por local', 'Última carga de stock de cada local.')}
+    </div>` + fabrica(false) + ajustes(false);
+  } else {
+    cuerpo = control + `
+    <h3 class="home-seccion">Locales</h3>
+    <div class="home-grid">
+      ${tarjetaHome('stockLocales', 'Cargar stock del local', 'Registrar cuánto queda de cada sabor, con su fecha de vencimiento.')}
+      ${tarjetaHome('recepcion', 'Confirmar recepción', 'Registrar cuánto llegó realmente de lo que fábrica despachó hoy.')}
+      ${tarjetaHome('pedidosInsumos', 'Pedidos de insumos e ingredientes', 'Pedir, preparar y recibir insumos e ingredientes (lo que antes era la app Pedidos de Locales).', true)}
+      ${tarjetaHome('pedidosEspeciales', 'Pedidos especiales', 'Pedir empanadas, copetín o postres para un día y hora (mínimo de un día para el otro).')}
+      ${tarjetaHome('historial', 'Historial de envíos', 'Comparar lo enviado contra lo recibido, por local y sabor.')}
+      ${tarjetaHome('informeStock', 'Informe: Stock por local', 'Última carga de stock de cada local, con semáforo de vencimientos.')}
+    </div>` + fabrica(true) + despacho(false) + ajustes(true);
+  }
+  app.innerHTML = cab + cuerpo + `<footer class="note">Doma Criolla — herramienta interna de planificación de producción.</footer>`;
+  if(tipo !== 'local') pintarControlRegistros();
+  pintarNumerosPedidosHome(tipo, local);
+}
+
+// números de pedidos de insumos/ingredientes en las tarjetas del inicio
+async function pintarNumerosPedidosHome(tipo, local){
+  try{
+    if(tipo === 'local'){
+      const n = await PedidosApp.porRecibir(localPedidos(local), true);
+      const el = document.getElementById('numHomeRecibir');
+      if(el && n){ el.textContent = n; el.style.display = 'inline-block'; }
+      return;
+    }
+    const r = await PedidosApp.resumen(true);
+    [['numHomeIng', r.INGREDIENTES], ['numHomeIns', r.INSUMOS]].forEach(([id, n]) => {
+      const el = document.getElementById(id);
+      if(el && n){ el.textContent = n; el.style.display = 'inline-block'; }
+    });
+  }catch(e){}
+}
+
+/* ---------------------------------------------------------------------
+   PEDIDOS DE LOCALES (insumos e ingredientes) — 27/11/2026, app unificada.
+   Pantallas que abren la sección de Pedidos según quién la usa.
+   --------------------------------------------------------------------- */
+function renderPedidosLocal(vista){
+  const local = localDelDispositivo();
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <header class="top"><h1>Insumos e ingredientes</h1></header>
+    <div id="pedCont"></div>`;
+  PedidosApp.abrir(document.getElementById('pedCont'), {
+    vista, modo: 'local', local: local ? localPedidos(local) : '',
+    estado: vista === 'lista' ? 'enviado' : '',
+    subtitulo: local ? 'Local ' + (NOMBRE_LOCAL_VISTA[local] || local) : ''
+  });
+}
+function renderPedidosTodo(){
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <header class="top"><h1>Pedidos de insumos e ingredientes</h1></header>
+    <div id="pedCont"></div>`;
+  PedidosApp.abrir(document.getElementById('pedCont'), { vista: 'lista', modo: 'todo', subtitulo: 'Todos los locales' });
+}
+function renderCatalogoPedidos(){
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <header class="top"><h1>Catálogo de insumos e ingredientes</h1></header>
+    <div id="pedCont"></div>`;
+  PedidosApp.abrir(document.getElementById('pedCont'), { vista: 'catalogo', modo: 'catalogo' });
+}
+// DESPACHO CON SOLAPAS (27/11/2026, Carolina): "diferenciado por solapa o por un
+// título sobresaliente". Cada clase de envío tiene su solapa; cada una se puede
+// mandar en uno, dos o más envíos (empanadas: "Envío 2"; pedidos: «Más tarde»
+// y «Ya se mandó»).
+function htmlSolapasDespacho(activa){
+  const s = (id, destino, tit, sub, idNum) => `<button type="button" class="solapa${activa === id ? ' activa' : ''}" onclick="irA('${destino}')"><span class="s-tit">${tit}${idNum ? ` <span class="s-num" id="${idNum}"></span>` : ''}</span><span class="s-sub">${sub}</span></button>`;
+  return `<div class="solapas-desp" role="tablist">
+    ${s('diario', 'envios', '🚚 Envío diario', 'Empanadas, dips, postres, huevos y toppings')}
+    ${s('ingredientes', 'despachoIngredientes', '🥫 Ingredientes', 'Pedidos de los locales · lun y jue', 'numSolIng')}
+    ${s('insumos', 'despachoInsumos', '📦 Insumos', 'Pedidos de los locales · miércoles', 'numSolIns')}
+  </div>`;
+}
+async function pintarNumerosSolapas(){
+  try{
+    const r = await PedidosApp.resumen();
+    const a = document.getElementById('numSolIng'), b = document.getElementById('numSolIns');
+    if(a) a.textContent = r.INGREDIENTES || '';
+    if(b) b.textContent = r.INSUMOS || '';
+  }catch(e){}
+}
+function renderDespachoPedidos(tipo){
+  const ing = tipo === 'INGREDIENTES';
+  app.innerHTML = `
+    <button class="back" onclick="irA('home')">← Volver</button>
+    <header class="top"><h1>Despacho</h1></header>
+    ${htmlSolapasDespacho(ing ? 'ingredientes' : 'insumos')}
+    <div id="pedCont"></div>`;
+  PedidosApp.abrir(document.getElementById('pedCont'), {
+    vista: 'lista', modo: 'fabrica', tipo,
+    subtitulo: ing ? 'Pedidos de ingredientes de los locales · se mandan lunes y jueves, junto con los toppings' : 'Pedidos de insumos de los locales · se mandan los miércoles'
+  }).then(pintarNumerosSolapas, pintarNumerosSolapas);
 }
 
 // CONTROL DE REGISTROS DEL DÍA (16/10/2026, Carolina): semáforo de lo que se
@@ -1044,10 +1480,28 @@ async function pintarControlRegistros(){
   const cont = document.getElementById('controlRegistros');
   if(!cont) return;
   const hoy = hoyISO(), ayer = sumarDiasISO(hoy, -1);
+  // 27/11/2026 (velocidad): se muestra al instante lo último que vio esta
+  // tablet (con la hora) y se actualiza en segundo plano; si se volvió al
+  // inicio hace menos de 2 minutos, no se vuelve a pedir.
+  const mem = leerMemoria('controlRegistros');
+  const memSirve = mem && mem.hoy === hoy && mem.rAyer && mem.rHoy;
+  if(memSirve) pintarControlCon(cont, mem.rAyer, mem.rHoy, mem.hora);
+  if(memSirve && Date.now() - mem.t < 2 * 60 * 1000) return;
   try{
     const [rAyer, rHoy] = await Promise.all([ayer, hoy].map(f => fetch(`${APPS_SCRIPT_URL}?action=estadoRegistrosDia&fecha=${f}`).then(x => x.json())));
     if(rAyer.error) throw new Error(rAyer.error);
-    if(!document.getElementById('controlRegistros')) return;
+    if(rHoy.error) throw new Error(rHoy.error);
+    guardarMemoria('controlRegistros', { hoy, rAyer, rHoy, t: Date.now(), hora: horaCorta() });
+    const c2 = document.getElementById('controlRegistros');
+    if(!c2) return;
+    pintarControlCon(c2, rAyer, rHoy, horaCorta());
+  }catch(err){
+    if(memSirve) return; // queda lo último que se vio
+    cont.innerHTML = `<h3>Control de registros</h3><p style="font-size:12px;color:var(--ink-soft);margin:0;">No se pudo revisar: ${err.message}</p>`;
+  }
+}
+function pintarControlCon(cont, rAyer, rHoy, horaDato){
+  {
     const hora = horaArgentina();
     const limite = n => { const k = Object.keys(HORA_LIMITE_REGISTRO).find(x => n === x || n.startsWith(x + ' ')); return k ? HORA_LIMITE_REGISTRO[k] : 99; };
     const chip = (it, esHoy) => {
@@ -1064,9 +1518,13 @@ async function pintarControlRegistros(){
       return chip(it, esHoy);
     }).join('')}</div>`;
     const faltanAyer = rAyer.items.filter(i => i.aplica && !i.hecho).length;
-    cont.innerHTML = `<h3>Control de registros ${faltanAyer ? `<span class="chip falta" style="margin-left:6px;">ayer faltaron ${faltanAyer}</span>` : '<span class="chip ok" style="margin-left:6px;">ayer completo</span>'}</h3>${fila(rAyer, 'Ayer', false)}${fila(rHoy, 'Hoy', true)}`;
-  }catch(err){
-    cont.innerHTML = `<h3>Control de registros</h3><p style="font-size:12px;color:var(--ink-soft);margin:0;">No se pudo revisar: ${err.message}</p>`;
+    // ALERTAS DE CUMPLIMIENTO (27/11/2026): Cocina < 90% del plan, armado
+    // fuera del plan y stock de Producción de la noche que no cierra
+    const alertas = (r, lbl) => (r.alertas || []).map(a => `<li><span class="ctrl-al-dia">${lbl}</span> <strong>${a.sector}</strong> — ${escHtml(a.texto)}</li>`).join('');
+    const nAl = (rAyer.alertas || []).length + (rHoy.alertas || []).length;
+    const bloqueAl = nAl ? `<details class="ctrl-alertas"><summary>⚠ ${nAl} alerta${nAl === 1 ? '' : 's'} de cumplimiento del plan (tocá para ver)</summary><ul>${alertas(rAyer, 'Ayer')}${alertas(rHoy, 'Hoy')}</ul>
+      <div class="ae-nota">Cocina: receta enviada con menos del 90% de lo planificado, o un relleno que no estaba en el plan. Producción: un sabor armado fuera del plan o una bandeja o más de lo planificado. Stock Producción: lo cargado a la noche no cierra con stock de anoche + armado − enviado.</div></details>` : '';
+    cont.innerHTML = `<h3>Control de registros ${faltanAyer ? `<span class="chip falta" style="margin-left:6px;">ayer faltaron ${faltanAyer}</span>` : '<span class="chip ok" style="margin-left:6px;">ayer completo</span>'}${horaDato ? `<span class="ctrl-hora">a las ${horaDato}</span>` : ''}</h3>${fila(rAyer, 'Ayer', false)}${fila(rHoy, 'Hoy', true)}${bloqueAl}`;
   }
 }
 
@@ -1306,7 +1764,7 @@ async function renderLocal(bloque){
     <div class="field-row">
       <label>${esBloqueFabrica ? '¿De qué sector estás cargando este stock?' : '¿Dónde estás cargando este stock?'}</label>
       <select id="selLocal">
-        ${opcionesSector.map(l => `<option value="${l}">${l}</option>`).join('')}
+        ${opcionesSector.map(l => `<option value="${l}"${opcionSel(l, lugarDelDispositivo())}>${l}</option>`).join('')}
       </select>
     </div>
     <div class="field-row">
@@ -1690,7 +2148,7 @@ async function cargarCalculo(){
     [...document.querySelectorAll('.tab-btn')].forEach(b => {
       b.onclick = () => { TAB_ACTIVA = b.dataset.tab; marcarTabActiva(); pintarTabActiva(); };
     });
-    TAB_ACTIVA = 'produccion';
+    TAB_ACTIVA = sectorInicialFabrica(); // 27/11/2026: cada tablet abre en su sector
     marcarTabActiva();
     pintarTabActiva();
   }catch(err){
@@ -1936,28 +2394,29 @@ function htmlUrgOcultas(u){
 }
 function htmlUrgentesCocina(u){
   const filas = u.cocina || [];
-  const titulo = `<h3>Urgente para el envío de hoy — ${String(u.dia || '').toLowerCase()} ${fmtFecha(u.fecha).slice(0, 5)}</h3>`;
+  const titulo = `<h3>Para el envío de hoy — ${String(u.dia || '').toLowerCase()} ${fmtFecha(u.fecha).slice(0, 5)}</h3>`;
   if(!filas.length) return `<div class="urg-card">${titulo}${htmlPorVencer(u, 'cocina')}${htmlEstadoCargasUrgentes(u)}<div class="urg-nota">No hace falta ningún relleno urgente: con lo armado en fábrica y lo que hay en cámara alcanza para lo que piden hoy los locales. Seguí con la planificación habitual.</div></div>`;
   const tabla = lista => `<table class="urg"><thead><tr><th>Relleno</th><th style="text-align:center;">Kg</th><th>Para</th><th></th></tr></thead><tbody>${lista.map(c => `
     <tr class="${c.plan ? '' : 'fuera'}">
       <td><strong>${c.relleno}</strong>${c.kgCamara > 0 ? `<div style="font-size:11.5px;color:var(--ink-soft);">ya descontado lo de cámara (${dec(c.kgCamara)} kg)</div>` : ''}${htmlUrgEspecial(c.especiales)}</td>
       <td class="num">${c.plan ? htmlTotalParaHoy(c.totalDia, c.kg, true) : dec(c.kg)}</td>
       <td style="font-size:12.5px;">${c.sabores.map(x => `${x.sabor} ${ent(x.unidades)}`).join(' · ')}</td>
-      <td>${badgePlanUrg(c.plan)}${c.hecha ? ' <span class="urg-hecho">✓ enviada</span>' : ''}</td>
+      <td>${c.hecha ? '<span class="urg-hecho">✓ enviada</span>' : ''}</td>
     </tr>`).join('')}</tbody></table>`;
   // 19/11/2026: primero lo FUERA DE PLAN (en su propio bloque), después lo del plan por pasos
   const fuera = filas.filter(c => !c.plan), enPlan = filas.filter(c => c.plan);
   const p1 = enPlan.filter(c => c.paso === 1), p2 = enPlan.filter(c => c.paso === 2);
   return `<div class="urg-card">${titulo}${htmlPorVencer(u, 'cocina')}${htmlEstadoCargasUrgentes(u)}
-    <div class="urg-nota">${conAyuda('Lo que piden hoy los locales − armadas en fábrica − relleno en cámara, en bandejas enteras.', 'Amarillo = fuera de plan: es extra, va primero y ya aparece solo en Registrar producción → Cocina. Verde = en tu plan: "Total del día" es lo que cocinás hoy; "Para hoy" es la parte que hay que tener primero. No se suma nada. Lo que falta por menos de una bandeja (50 comunes / 60 canastas) no aparece, salvo que un local quede en 0 o sea un pedido especial.')}</div>
-    ${fuera.length ? `<div class="urg-paso"><div class="urg-num urg-num-fuera">!</div><h4>Fuera de plan — hacerlo primero${fuera.some(c => c.paso === 1) ? ' (los que se enfrían, a primera hora)' : ''}</h4></div>${tabla(fuera)}` : ''}
-    ${p1.length ? `<div class="urg-paso"><div class="urg-num">1</div><h4>Primera hora — rellenos que hay que enfriar (hacerlos primero)</h4></div>${tabla(p1)}` : ''}
+    <div class="urg-nota">${conAyuda('Lo que piden hoy los locales − armadas en fábrica − relleno en cámara, en bandejas enteras.', 'FUERA DEL PLAN (amarillo): es extra, va primero y ya aparece solo en Registrar producción → Cocina. Del plan de hoy: "Total del día" es lo que cocinás hoy; "Para hoy" es la parte que hay que tener primero. No se suma nada. Lo que falta por menos de una bandeja (50 comunes / 60 canastas) no aparece, salvo que un local quede en 0 o sea un pedido especial.')}</div>
+    ${fuera.length ? `<div class="urg-paso"><div class="urg-num urg-num-fuera">!</div><h4 class="urg-tit-fuera">FUERA DEL PLAN: URGENTE PARA HOY — hacerlo primero${fuera.some(c => c.paso === 1) ? ' (los que se enfrían, a primera hora)' : ''}</h4></div>${tabla(fuera)}` : ''}
+    ${enPlan.length ? `<div class="urg-sub-plan">Del plan de hoy — "Para hoy" es la parte que hay que tener primero (ya está dentro del total, no se suma)</div>` : ''}
+    ${p1.length ? `<div class="urg-paso"><div class="urg-num">1</div><h4>Primera hora — rellenos que hay que enfriar</h4></div>${tabla(p1)}` : ''}
     ${p2.length ? `<div class="urg-paso"><div class="urg-num">${p1.length ? 2 : 1}</div><h4>Después — rellenos que no se enfrían (se arman enseguida)</h4></div>${tabla(p2)}` : ''}
     <div class="urg-resto"><strong>Después</strong>, el resto del día con la planificación habitual (abajo).</div></div>`;
 }
 function htmlUrgentesProduccion(u){
   const filas = u.produccion || [];
-  const titulo = `<h3>Urgente para el envío de hoy — ${String(u.dia || '').toLowerCase()} ${fmtFecha(u.fecha).slice(0, 5)}</h3>`;
+  const titulo = `<h3>Para el envío de hoy — ${String(u.dia || '').toLowerCase()} ${fmtFecha(u.fecha).slice(0, 5)}</h3>`;
   const franco = u.francoProduccion ? `<div class="urg-nota" style="color:var(--alert);font-weight:600;">Hoy es franco de Producción.</div>` : '';
   if(!filas.length) return `<div class="urg-card">${titulo}${htmlPorVencer(u, 'produccion')}${htmlEstadoCargasUrgentes(u)}${franco}<div class="urg-nota">No hay empanadas urgentes: lo armado en fábrica alcanza para lo que piden hoy los locales (o falta menos de una bandeja). Seguí con la planificación habitual.</div>${htmlUrgOcultas(u)}</div>`;
   const vistos = new Set(); // el detalle (bandejas, sin stock, pedido especial) una sola vez por sabor
@@ -1967,7 +2426,7 @@ function htmlUrgentesProduccion(u){
       <td><strong>${p.sabor}</strong>${p._det ? htmlUrgEspecial(p.especiales) + htmlUrgCero(p) : ''}</td>
       <td class="num">${p.plan ? htmlTotalParaHoy(p.totalDia, p.unidades, false) : ent(p.unidades)}${p._det ? htmlUrgBandejas(p) : ''}</td>
       <td style="font-size:12.5px;">${p.detalle || p.relleno || ''}</td>
-      <td>${badgePlanUrg(p.plan)}${p.armadasHoy > 0 ? ` <span class="urg-hecho">✓ ${ent(p.armadasHoy)} armadas hoy</span>` : ''}</td>
+      <td>${p.armadasHoy > 0 ? `<span class="urg-hecho">✓ ${ent(p.armadasHoy)} armadas hoy</span>` : ''}</td>
     </tr>`).join('')}</tbody></table>`;
   const titulos = { 1: 'Arrancar — relleno frío que ya está en cámara / rollos armados', 2: 'A medida que Cocina termina los rellenos que no se enfrían', 3: 'Al final — cuando estén fríos los rellenos calientes' };
   // 19/11/2026: primero lo FUERA DE PLAN (un bloque, con el momento de cada uno), después lo del plan por pasos
@@ -1975,8 +2434,9 @@ function htmlUrgentesProduccion(u){
   let n = 0;
   const pasos = [1, 2, 3].map(k => { const l = filas.filter(p => p.plan && p.paso === k); if(!l.length) return ''; n++; return `<div class="urg-paso"><div class="urg-num">${n}</div><h4>${titulos[k]}</h4></div>${tabla(l)}`; }).join('');
   return `<div class="urg-card">${titulo}${htmlPorVencer(u, 'produccion')}${htmlEstadoCargasUrgentes(u)}${franco}
-    <div class="urg-nota">${conAyuda('Empanadas que tienen que estar armadas antes del reparto, en bandejas enteras.', 'Amarillo = fuera de plan (no se arma hoy en la planificación): va primero y ya aparece solo en Registrar producción. Verde = en tu plan: "Total del día" es lo que armás hoy de ese sabor; "Para hoy" es la parte que tiene que estar antes del reparto. No se suma nada. Lo que falta por menos de una bandeja (50 comunes / 60 canastas, sumando los 3 locales) no aparece, salvo que un local quede en 0 o sea un pedido especial.')}</div>
-    ${fuera.length ? `<div class="urg-paso"><div class="urg-num urg-num-fuera">!</div><h4>Fuera de plan — armarlo primero (respetando cuándo está el relleno)</h4></div>${tabla(fuera, true)}` : ''}
+    <div class="urg-nota">${conAyuda('Empanadas que tienen que estar armadas antes del reparto, en bandejas enteras.', 'FUERA DEL PLAN (amarillo): no se arma hoy en la planificación, va primero y ya aparece solo en Registrar producción. Del plan de hoy: "Total del día" es lo que armás hoy de ese sabor; "Para hoy" es la parte que tiene que estar antes del reparto. No se suma nada. Lo que falta por menos de una bandeja (50 comunes / 60 canastas, sumando los 3 locales) no aparece, salvo que un local quede en 0 o sea un pedido especial.')}</div>
+    ${fuera.length ? `<div class="urg-paso"><div class="urg-num urg-num-fuera">!</div><h4 class="urg-tit-fuera">FUERA DEL PLAN: URGENTE PARA HOY — armarlo primero (respetando cuándo está el relleno)</h4></div>${tabla(fuera, true)}` : ''}
+    ${pasos ? `<div class="urg-sub-plan">Del plan de hoy — "Para hoy" es la parte que tiene que estar antes del reparto (ya está dentro del total, no se suma)</div>` : ''}
     ${pasos}
     <div class="urg-resto"><strong>Después</strong>, el resto de la tanda con la planificación habitual (abajo). Lo verde ya está incluido ahí: no se arma dos veces.</div>${htmlUrgOcultas(u)}</div>`;
 }
@@ -2230,7 +2690,30 @@ function tablaSimpleCocina(data, rubro, titulo){
   {
     // 'Salsas' = productos en litros (SALSA FILETTO), que en la planilla son Toppings
     const items = (data.produccion || []).filter(f => f.aHacerUnidades > 0 && (rubro === 'Salsas' ? esDecimal(f.sabor) : (f.rubro === rubro && !esDecimal(f.sabor))));
+    // DIPS EL DÍA ANTERIOR (27/11/2026): desde el envío del martes 01/12 los
+    // dips se hacen el día antes (lun/mié/vie) — ver calcularDipCocina
+    if(rubro === 'Dips' && items.length === 0 && (data.produccion || []).some(f => f.rubro === 'Dips' && f.dipHechoAyer))
+      return `<h3 style="font-size:15px;margin:20px 0 8px;">${titulo}</h3><div class="empty">Los dips del envío de hoy se hicieron ayer.</div>`;
     if(items.length === 0) return '';
+    const dipManana = rubro === 'Dips' ? items.find(f => f.paraManana) : null;
+    if(dipManana){
+      titulo = `Salsas para dips — para el envío de mañana (${dipManana.diaEnvio.toLowerCase()} ${fmtFecha(dipManana.fechaEnvio).slice(0, 5)})`;
+      return `
+      <h3 style="font-size:15px;margin:20px 0 8px;">${titulo}</h3>
+      <table class="prod">
+        <thead><tr><th>Dip</th><th class="num">Envío de mañana</th><th class="num">Stock en fábrica</th><th class="num">${conAyuda('Stock en locales (estimado)', 'Lo que cargaron los locales anoche menos lo que se espera que vendan hoy. Es una estimación: mañana el Despacho manda según el stock real.')}</th><th class="num">A hacer hoy (u.)</th></tr></thead>
+        <tbody>
+          ${items.map(f => `
+            <tr>
+              <td>${f.sabor}${f.especial > 0 ? ' <span class="badge-especial">★ pedido especial</span>' : ''}</td>
+              <td class="num">${ent(f.objetivoUnidades)}</td>
+              <td class="num">${ent(f.stockFabricaUnidades)}</td>
+              <td class="num">≈ ${ent(f.stockLocalesUnidades)}<div style="font-size:11px;color:var(--ink-soft);">${ent(f.stockLocalesCargado)} cargado − ${ent(f.ventaHoyEstimada)} venta de hoy</div></td>
+              <td class="num"><strong>${ent(f.aHacerUnidades)}</strong>${htmlSplitEspecial(f)}</td>
+            </tr>`).join('')}
+        </tbody>
+      </table>`;
+    }
     if(rubro === 'Salsas') return `
       <h3 style="font-size:15px;margin:20px 0 8px;">${titulo}</h3>
       <table class="prod">
@@ -2499,9 +2982,9 @@ async function cargarPreparadosCocina(fecha){
     // hace el total y después se divide para cada relleno. Las ollas, sobre
     // el total. El desglose se muestra cuando lo usa más de un relleno.
     const filasDesglose = d => ((d.porRelleno || []).length > 1 || /FILETTO/i.test(d.preparado))
-      ? d.porRelleno.map(x => `<tr class="fila-desglose"><td style="padding-left:22px;color:var(--ink-soft);">↳ para ${/^PICANTE$/i.test(x.relleno) ? 'dip Picante' : x.relleno}${x.urgente > 0 ? ` <span class="mal-txt" style="font-size:11.5px;">(incluye ${cantIng(x.urgente)} ${d.unidad} urgentes)</span>` : ''}</td><td class="num" style="color:var(--ink-soft);">${cantIng(x.cantidad)} ${d.unidad}</td><td></td></tr>`).join('')
+      ? d.porRelleno.map(x => `<tr class="fila-desglose"><td style="padding-left:22px;color:var(--ink-soft);">↳ para ${/^PICANTE$/i.test(x.relleno) ? 'dip Picante' : x.relleno}${x.urgente > 0 ? ` <span class="mal-txt" style="font-size:11.5px;">(incluye ${cantIng(x.urgente)} ${d.unidad} fuera del plan)</span>` : ''}</td><td class="num" style="color:var(--ink-soft);">${cantIng(x.cantidad)} ${d.unidad}</td><td></td></tr>`).join('')
       : ((d.porRelleno || [])[0] && d.porRelleno[0].urgente > 0
-        ? `<tr class="fila-desglose"><td colspan="3" style="padding-left:22px;font-size:11.5px;" class="mal-txt">incluye ${cantIng(d.porRelleno[0].urgente)} ${d.unidad} urgentes (${d.porRelleno[0].relleno})</td></tr>` : '');
+        ? `<tr class="fila-desglose"><td colspan="3" style="padding-left:22px;font-size:11.5px;" class="mal-txt">incluye ${cantIng(d.porRelleno[0].urgente)} ${d.unidad} fuera del plan (${d.porRelleno[0].relleno})</td></tr>` : '');
 
     // ojo: acá NO se muestra "Gramaje por olla" de los Preparados en olla —
     // los 8 kg de la olla son de la MATERIA PRIMA cruda (ej. recortes de
@@ -2672,7 +3155,7 @@ let CATEGORIAS_REGISTRO = null;
 let CATEGORIA_POR_SABOR_REGISTRO = null;
 let EMPLEADOS_REGISTRO = null;
 let PREP_REGISTRO = null;
-let SECTOR_REGISTRO_ACTIVO = 'produccion';
+let SECTOR_REGISTRO_ACTIVO = sectorInicialFabrica(); // 27/11/2026: cada tablet abre en su sector
 let PREPEDIDO_REGISTRO = null;
 const CATEGORIA_EXTRAS_PRODUCCION = 'Extras de producción';
 const NOMBRE_ROLLOS_JYQ = 'Rollos de Jamón y Queso';
@@ -2706,6 +3189,8 @@ async function renderRegistroProduccion(){
       pintarSectorRegistro(b.dataset.sector);
     };
   });
+  // la solapa marcada es la del sector que se está viendo (27/11/2026)
+  [...document.querySelectorAll('#tabsRegistro .tab-btn')].forEach(x => x.classList.toggle('active', x.dataset.sector === SECTOR_REGISTRO_ACTIVO));
   document.getElementById('fechaRegistro').onchange = cargarRegistroProduccion;
   cargarRegistroProduccion();
 }
@@ -3081,7 +3566,8 @@ async function pintarRegistroCocinaSector(){
     const infoOllasHtml = infoOllas ? `<strong>🍲 Ollas: ${infoOllas.ollas}</strong>` + bloqueGramajeOllas([infoOllas]) : '';
     const kgHoy = f.kgUrgente || f.kgParaHoy;
     const subtEsp = f.kilosEspecial > 0 ? ` — día ${cantIng(f.kilosDia)} kg | ★ pedido especial ${(f.especialDetalle || []).map(x => `${NOMBRE_LOCAL_VISTA[x.local] || x.local} ${cantIng(x.kg)} kg (${x.producto} ${ent(x.cantidad)}, entrega ${diaCorto(x.fechaEntrega)})`).join(' · ')}` : '';
-    const subt = (kgHoy ? ` — URGENTE envío de hoy: Total del día ${cantIng(f.kilosDeRelleno)} kg | Para hoy ${cantIng(kgHoy)} kg (hacer primero)` : '') + subtEsp;
+    // 27/11/2026 (Carolina): sin "URGENTE" en cada receta — solo Total del día | Para hoy
+    const subt = (kgHoy ? ` — Total del día ${cantIng(f.kilosDeRelleno)} kg | Para hoy ${cantIng(kgHoy)} kg (hacer primero)` : '') + subtEsp;
     const kg1 = divisiones[normalizarFicha(f.relleno)];
     if(!(kg1 > 0)){
       if(bloqueRegistroReceta(f.relleno, f.kilosDeRelleno, 'KG', subt, infoOllasHtml, destRell, { dividir: { total: f.kilosDeRelleno, sugerido: f.kgUrgente } })) algunBloque = true;
@@ -3119,18 +3605,25 @@ async function pintarRegistroCocinaSector(){
     bloqueRegistroReceta(parte2, k2, 'KG', '', '', destRell, { titulo: `${f.relleno} — 2ª parte: ${cantIng(k2)} kg`, ficha: f.relleno });
   });
 
-  // URGENTES FUERA DE PLAN: bloque propio con los kg ya puestos
-  if(urgentesAparte.length){
+  // URGENTES FUERA DE PLAN: bloque propio con los kg ya puestos. 27/11/2026
+  // (Carolina): el título "FUERA DEL PLAN: URGENTE PARA HOY" arriba, una vez
+  const sumados = cocina.filter(f => f.kgUrgente > 0);
+  if(urgentesAparte.length || sumados.length){
     const hU = document.createElement('h4');
     hU.className = 'cat-heading';
-    hU.style.cssText = 'margin-top:22px;color:var(--alert);';
-    hU.textContent = '⚠ Urgente para el envío de hoy — fuera de plan (hacerlo primero)';
-    hU.style.marginTop = '8px';
+    hU.style.cssText = 'margin-top:8px;color:var(--alert);font-size:15px;';
+    hU.textContent = '⚠ FUERA DEL PLAN: URGENTE PARA HOY (hacerlo primero)';
     contUrgentes.appendChild(hU);
+    if(sumados.length){
+      const nota = document.createElement('div');
+      nota.className = 'urg-nota';
+      nota.textContent = 'Sumado a la receta de hoy (más abajo): ' + sumados.map(f => `${f.relleno} +${cantIng(f.kgUrgente)} kg`).join(' · ');
+      contUrgentes.appendChild(nota);
+    }
     urgentesAparte.forEach(u => {
       const guardadoTotal = totalesGuardados[normalizarFicha(u.relleno)];
       const kg = guardadoTotal && Number(guardadoTotal.cantidad) > 0 ? Number(guardadoTotal.cantidad) : u.kg;
-      if(bloqueRegistroReceta(u.relleno, kg, 'KG', ` — urgente: ${u.sabores.map(x => `${x.sabor} ${ent(x.unidades)}`).join(' · ')}`, '', contUrgentes, { editable: true })) algunBloque = true;
+      if(bloqueRegistroReceta(u.relleno, kg, 'KG', ` — para: ${u.sabores.map(x => `${x.sabor} ${ent(x.unidades)}`).join(' · ')}`, '', contUrgentes, { editable: true })) algunBloque = true;
     });
   }
 
@@ -3148,7 +3641,8 @@ async function pintarRegistroCocinaSector(){
     if(items.length === 0) return;
     const hRubro = document.createElement('h4');
     hRubro.className = 'cat-heading';
-    hRubro.textContent = rubro === 'Dips' ? 'Salsas para dips' : rubro;
+    const dm = rubro === 'Dips' ? dipsPostres.find(f => f.paraManana) : null;
+    hRubro.textContent = rubro === 'Dips' ? 'Salsas para dips' + (dm ? ' — para el envío de mañana (' + dm.diaEnvio.toLowerCase() + ')' : '') : rubro;
     (rubro === 'Dips' ? destPrep : cont).appendChild(hRubro);
     items.forEach(f => {
       const subE = f.especial > 0 ? ` — día ${ent(f.aHacerDia)} | ★ pedido especial ${lineaPedidosEsp(f.especialDetalle, ent).replace(/<[^>]+>/g, '')}` : '';
@@ -3852,7 +4346,10 @@ async function pintarRegistroProduccionSector(){
   const urgFuera = {};
   ((urg && urg.produccion) || []).filter(p => !p.plan).forEach(p => { urgFuera[p.sabor] = (urgFuera[p.sabor] || 0) + (Number(p.unidades) || 0); });
   const etiquetaEsp = n => { const f = porSabor[n]; return f && f.especial > 0 ? `<div class="split-esp reg"><span class="sp-dia">día ${ent(f.aHacerDia)}</span><span class="split-sep">|</span><span class="sp-esp">★ pedido especial ${lineaPedidosEsp(f.especialDetalle, ent)}</span></div>` : ''; };
-  const etiquetaUrg = n => (urgFuera[n] ? ' <span class="badge-urg">URGENTE envío de hoy · fuera de plan</span>' : (urgPlan[n] ? ' <span class="badge-urg plan">URGENTE envío de hoy · en tu plan</span>' : '')) + etiquetaEsp(n);
+  // 27/11/2026 (Carolina): "el urgente en todos lados confunde" — sin etiqueta
+  // por sabor: lo fuera de plan va en su grupo con el título arriba, y lo del
+  // plan solo muestra "Total del día | Para hoy"
+  const etiquetaUrg = n => etiquetaEsp(n);
   // 19/11/2026 (Carolina): lo urgente que YA está en el plan muestra "Total del día | Para hoy"
   const urgPlan = {};
   ((urg && urg.produccion) || []).filter(p => p.plan).forEach(p => { urgPlan[p.sabor] = (urgPlan[p.sabor] || 0) + (Number(p.unidades) || 0); });
@@ -3895,7 +4392,7 @@ async function pintarRegistroProduccionSector(){
     const horaCierre = estado.cierre && estado.cierre.hora ? ` a las ${estado.cierre.hora}` : '';
     const itemsCierre = estado.cierre && estado.cierre.items ? ` — ${estado.cierre.items} ítem(s) guardado(s)` : '';
     const puedeReabrir = !(estado.cierre && estado.cierre.puedeReabrir === false);
-    aviso.innerHTML = `<span>✓ Turno enviado${horaCierre}${itemsCierre} — todo el registro de Producción de este día quedó bloqueado.${puedeReabrir ? '' : ' (Solo se puede reabrir el último turno enviado.)'}</span>${puedeReabrir ? '<button type="button" class="btn secondary" id="btnReabrirTurno" style="font-size:12px;padding:5px 9px;">Reabrir</button>' : ''}`;
+    aviso.innerHTML = `<span>✓ Turno enviado${horaCierre}${itemsCierre} — el registro de Producción del ${diaParaAviso(fecha)} quedó bloqueado.${puedeReabrir ? '' : ' (Solo se puede reabrir el último turno enviado.)'}</span>${puedeReabrir ? '<button type="button" class="btn secondary" id="btnReabrirTurno" style="font-size:12px;padding:5px 9px;">Reabrir</button>' : ''}`;
     cont.appendChild(aviso);
     const bRe = cont.querySelector('#btnReabrirTurno');
     if(bRe) bRe.onclick = () => reabrirTurnoProduccion(fecha);
@@ -3930,7 +4427,7 @@ async function pintarRegistroProduccionSector(){
   // el plan de hoy va arriba de todo, en su propio grupo
   const fueraHoy = todasEmpanadas.filter(n => urgFuera[n] > 0).sort(compararTexto);
   if(fueraHoy.length){
-    filaGrupo('⚠ Urgente fuera de plan', '<strong>armarlo primero</strong> — es para el envío de hoy');
+    filaGrupo('⚠ FUERA DEL PLAN: URGENTE PARA HOY', '<strong>armarlo primero</strong> — es para el envío de hoy');
     tbody.lastElementChild.classList.add('fila-grupo-urg');
     fueraHoy.forEach(nombre => filaSabor(nombre, categoriaPorSabor[nombre] === 'Canasta'));
   }
@@ -4142,7 +4639,8 @@ async function guardarRegistroProduccion(enviar){
   if(horasMal.length && !confirm(`OJO — revisá estas horas:\n\n${horasMal.join('\n')}\n\n¿Están bien así? "Cancelar" para corregirlas.`)) return;
   if(raras.length && !confirm(`OJO — estas fechas parecen mal (posteriores al armado del ${fmtFecha(fecha)} o de hace más de 7 días):\n\n${raras.join('\n')}\n\n¿Están bien así? "Cancelar" para corregirlas.`)) return;
   if(enviar && faltan.length && !confirm(`Faltan fechas de trazabilidad en:\n\n${faltan.join('\n')}\n\nSin esas fechas no se puede rastrear el relleno o los discos. ¿Enviar igual?`)) return;
-  if(enviar && !confirm('¿Guardar y enviar final el registro del turno? Se va a bloquear todo el registro de Producción de este día.')) return;
+  // 27/11/2026 (Carolina): el aviso dice QUÉ día se bloquea (se confundía con hoy)
+  if(enviar && !confirm(`¿Guardar y enviar final el registro del turno del ${diaParaAviso(fecha)}?\n\nSe va a bloquear el registro de Producción del ${diaParaAviso(fecha)} (solo ese día; los otros días no se tocan).`)) return;
 
   const btn = document.getElementById(enviar ? 'btnGuardarRegistro' : 'btnProvisorioRegistro');
   const textoOriginal = btn.textContent;
@@ -4173,7 +4671,7 @@ async function guardarRegistroProduccion(enviar){
 }
 
 async function reabrirTurnoProduccion(fecha){
-  if(!confirm('¿Reabrir el registro de Producción de este día? Se va a destrabar toda la tabla.')) return;
+  if(!confirm(`¿Reabrir el registro de Producción del ${diaParaAviso(fecha)}? Se va a destrabar toda la tabla de ese día.`)) return;
   try{
     const r = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
@@ -4497,7 +4995,7 @@ async function guardarTodoDiscos(fecha, enviar){
   if(enviar){
     if(!d.cortes.some(c => Number(c.docenas) > 0) && !confirm('No hay ninguna tanda de corte con docenas. ¿Enviar igual?')) return;
     if(avisos.length && !confirm(`Hay datos a medio cargar:\n\n${avisos.map(a => '• ' + a).join('\n')}\n\n¿Enviar igual?`)) return;
-    if(!confirm('¿Guardar y enviar final el registro de discos de este día? Queda bloqueado.')) return;
+    if(!confirm(`¿Guardar y enviar final el registro de discos del ${diaParaAviso(fecha)}? Queda bloqueado ese día.`)) return;
   }
   const responsable = (d.cortes.find(c => c.responsable) || {}).responsable || (d.masas.find(m => m.responsable) || {}).responsable || d.dia.empaste.responsable || '';
   const btn = document.getElementById(enviar ? 'btnEnviarDiscos' : 'btnProvisorioDiscos');
@@ -4542,8 +5040,9 @@ function claveDespacho(origen, destino){ return origen ? `${origen}>${destino}` 
 async function renderEnvios(){
   app.innerHTML = `
     <button class="back" onclick="irA('home')">← Volver</button>
+    <header class="top" style="margin-bottom:6px;"><h1>Despacho</h1></header>
+    ${htmlSolapasDespacho('diario')}
     <div class="fab-toolbar">
-      <header class="top" style="margin:0;"><h1>Despachar envíos</h1></header>
       <div class="field-row">
         <label>Fecha</label>
         <input type="date" id="fechaEnvios" value="${hoyISO()}">
@@ -4576,6 +5075,7 @@ async function renderEnvios(){
   `;
   document.getElementById('fechaEnvios').onchange = cargarEnvios;
   cargarEnvios();
+  pintarNumerosSolapas();
 }
 
 async function cargarEnvios(){
@@ -4616,6 +5116,14 @@ async function cargarEnvios(){
     let avisoVence = document.getElementById('avisoVenceEnvios');
     if(!avisoVence){ avisoVence = document.createElement('div'); avisoVence.id = 'avisoVenceEnvios'; avisoVence.className = 'no-print'; tabsEnviosAntes().before(avisoVence); }
     avisoVence.innerHTML = htmlSobranPorVencer(data.sobranPorVencer, fecha);
+    // 27/11/2026: lo que fábrica no llega a cubrir y a otro local le sobra (solo aviso)
+    let avisoTr = document.getElementById('avisoTraspasosEnvios');
+    if(!avisoTr){ avisoTr = document.createElement('div'); avisoTr.id = 'avisoTraspasosEnvios'; avisoTr.className = 'no-print'; tabsEnviosAntes().before(avisoTr); }
+    avisoTr.innerHTML = '';
+    fetch(`${APPS_SCRIPT_URL}?action=traspasosSugeridos&fecha=${fecha}`).then(x => x.json()).then(t => {
+      const el = document.getElementById('avisoTraspasosEnvios');
+      if(el && !t.error && document.getElementById('fechaEnvios') && document.getElementById('fechaEnvios').value === fecha) el.innerHTML = htmlTraspasosSugeridos(t.traspasos);
+    }).catch(() => {});
     pintarBarraPlan('barraPlanEnvios', fecha, data.plan, cargarEnvios, data.proyeccion);
     // quién despacha / repartidor: los del envío abierto más nuevo (si ya tiene), si no los del primero
     const todosEnvios = LOCALES_VENTA.flatMap(l => enviosPorLocal[l]);
@@ -4855,6 +5363,17 @@ function stockLocalVista(nombre, n){
 }
 const AYUDA_STOCK_LOCAL = 'Lo que cargó el local en su último stock (sin lo vencido). La orden calculada ya lo descuenta. Si el local no cargó, es 0.';
 
+// TRASPASOS SUGERIDOS (27/11/2026): fábrica no llega a cubrir la orden de
+// un local y a otro local le sobra (stock cargado − lo que necesita hoy).
+// Solo aviso: se carga en la solapa "Traspaso entre locales".
+function htmlTraspasosSugeridos(lista){
+  if(!lista || !lista.length) return '';
+  const nom = l => NOMBRE_LOCAL_VISTA[l] || l;
+  return `<div class="traspaso-sug"><strong>↔ Traspasos sugeridos</strong> — fábrica no llega a cubrir estas órdenes y a otro local le sobra
+    <div>${lista.map(x => `<div>${nombreFabrica(x.sabor)}: <strong>${ent(x.cantidad)}</strong> de ${nom(x.de)} → ${nom(x.a)} <span class="gris-txt">(a ${nom(x.de)} le sobran ${ent(x.sobraOrigen)}; a ${nom(x.a)} le faltan ${ent(x.faltaFabrica)})</span></div>`).join('')}</div>
+    <div class="ae-nota">Se carga en la solapa "Traspaso entre locales". Es una sugerencia: no cambia ninguna orden.</div></div>`;
+}
+
 // VENCE HOY O MAÑANA (18/11/2026, Carolina — opción b): lo que sobra en
 // fábrica después de cubrir las órdenes de hoy y vence hoy o mañana. Solo
 // aviso: no se suma a ningún envío.
@@ -4939,8 +5458,13 @@ function pintarPanelEnvio({ origen, destino, nro, itemsCalculados, data, categor
   Object.keys(categorias).forEach((cat, i) => {
     const catId = `cat-envio-${id}-${i}`;
     const h = document.createElement('h4');
-    h.className = 'cat-heading'; h.id = catId; h.textContent = cat;
+    // DESPACHAR (27/11/2026, Carolina): la clasificación como franja de
+    // color, más grande que los totales
+    h.className = 'cat-heading cat-band'; h.id = catId;
+    h.innerHTML = `<span class="cat-band-nom">${cat}</span>`;
     tablas.appendChild(h);
+    const a = document.createElement('a');
+    a.href = `#${catId}`; a.textContent = cat;
     const table = document.createElement('table');
     table.className = 'lotes';
     table.innerHTML = `
@@ -4985,14 +5509,40 @@ function pintarPanelEnvio({ origen, destino, nro, itemsCalculados, data, categor
       const sumStock = filas.reduce((a, tr) => a + (Number(tr.dataset.stock) || 0), 0);
       const ss = table.querySelector('.sub-stock'); if(ss) ss.textContent = conDec ? dec(sumStock) : ent(sumStock);
       table.querySelector('.sub-enviado').textContent = conDec ? dec(sumEnv) : ent(sumEnv);
+      // CHIP EN ROJO (27/11/2026, Carolina): mientras haya algún producto con
+      // orden y sin "Enviado (real)" cargado, hasta que se manda el despacho
+      if(conOrden && !cierre){
+        const porItem = {};
+        filas.forEach(tr => { const k = tr.dataset.item; const o = porItem[k] || (porItem[k] = { orden: 0, env: 0 }); o.orden += Number(tr.dataset.orden) || 0; o.env += Number(tr.querySelector('.inp-cant').value) || 0; });
+        const pend = Object.values(porItem).filter(o => o.orden > 0 && o.env <= 0).length;
+        a.classList.toggle('chip-falta', pend > 0);
+        a.textContent = cat + (pend > 0 ? ` · ${pend} sin cargar` : '');
+        a.title = pend > 0 ? `${pend} producto(s) con orden y sin "Enviado (real)"` : '';
+      }
     };
     tbody.addEventListener('input', actualizarSubtotal);
     tbody.addEventListener('click', () => setTimeout(actualizarSubtotal, 0)); // al quitar un lote
     actualizarSubtotal();
     tablas.appendChild(table);
-    const a = document.createElement('a');
-    a.href = `#${catId}`; a.textContent = cat;
     nav.appendChild(a);
+    // NADA PARA ENVIAR (27/11/2026, Carolina): si la clasificación no tiene
+    // orden ni nada cargado, queda solo el título con el botón para desplegar
+    if(conOrden && !faltantes){
+      const rows = [...tbody.querySelectorAll('tr[data-item]')];
+      const hayOrden = rows.some(tr => (Number(tr.dataset.orden) || 0) > 0);
+      const hayCargado = rows.some(tr => tr.dataset.guardado || (Number(tr.querySelector('.inp-cant').value) || 0) > 0);
+      if(!hayOrden && !hayCargado){
+        const n = categorias[cat].length;
+        const tog = document.createElement('button');
+        tog.type = 'button'; tog.className = 'cat-band-tog no-print';
+        const pintarTog = () => { tog.textContent = table.classList.contains('cat-plegada') ? `Nada para enviar hoy · ▸ Ver (${n} producto${n === 1 ? '' : 's'})` : '▾ Ocultar'; };
+        table.classList.add('cat-plegada');
+        tog.onclick = () => { table.classList.toggle('cat-plegada'); pintarTog(); };
+        pintarTog();
+        h.appendChild(tog);
+        a.classList.add('chip-nada');
+      }
+    }
     // 2º envío: la categoría en la que no falta nada se oculta con "solo lo que falta"
     if(faltantes && ![...tbody.querySelectorAll('tr[data-item]')].some(tr => !tr.classList.contains('sin-falta'))){
       [h, table, a].forEach(el => el.classList.add('cat-vacia'));
@@ -5202,7 +5752,7 @@ async function renderRecepcion(){
     <div class="field-row">
       <label>¿Qué local sos?</label>
       <select id="selLocalRecepcion">
-        ${LOCALES_VENTA.map(l => `<option value="${l}">${l}</option>`).join('')}
+        ${LOCALES_VENTA.map(l => `<option value="${l}"${opcionSel(l, localDelDispositivo())}>${l}</option>`).join('')}
       </select>
     </div>
     <div class="field-row">
@@ -5520,7 +6070,7 @@ async function renderPedidosEspeciales(){
     <header class="top"><h1>Pedidos especiales</h1></header>
     <p style="color:var(--ink-soft);font-size:12.5px;max-width:620px;">Se carga <strong>como mínimo de un día para el otro</strong>. Va en el envío de ese día. Cada sector de fábrica lo ve en "Qué producir hoy" el día que lo tiene que elaborar.</p>
     <div class="fab-toolbar" style="justify-content:flex-start;align-items:flex-end;flex-wrap:wrap;">
-      <div class="field-row"><label>Local</label><select id="peLocal">${LOCALES_VENTA.map(l => `<option value="${l}">${NOMBRE_LOCAL_VISTA[l] || l}</option>`).join('')}</select></div>
+      <div class="field-row"><label>Local</label><select id="peLocal">${LOCALES_VENTA.map(l => `<option value="${l}"${opcionSel(l, localDelDispositivo())}>${NOMBRE_LOCAL_VISTA[l] || l}</option>`).join('')}</select></div>
       <div class="field-row"><label>¿Quién pide?</label><input type="text" id="peResp" placeholder="Nombre y apellido"></div>
       <div class="field-row"><label>Día que lo necesitan</label><input type="date" id="peFecha" min="${manana}" value="${manana}"></div>
       <div class="field-row"><label>Hora en el local</label><input type="time" id="peHora" value="20:00"></div>
@@ -6451,6 +7001,14 @@ let MES_INFORME = null;
 function mesInforme(){ return MES_INFORME || hoyISO().slice(0, 7); }
 function esFinde(d){ return d.dia === 'Sábado' || d.dia === 'Domingo'; }
 function esFrancoProduccion(d){ return d.dia === DIA_FRANCO_PRODUCCION && d.fecha >= INICIO_LUNES_FRANCO && d.fecha < FIN_LUNES_FRANCO; }
+// "viernes 27/11 (HOY)" — para que los avisos de bloquear/reabrir digan el día (27/11/2026)
+function diaParaAviso(fecha){
+  const d = new Date(fecha + 'T12:00:00');
+  const nom = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'][d.getDay()];
+  const h = hoyISO();
+  const extra = fecha === h ? ' (HOY)' : fecha === sumarDiasISO(h, -1) ? ' (AYER)' : '';
+  return `${nom} ${fecha.slice(8, 10)}/${fecha.slice(5, 7)}${extra}`;
+}
 function escHtml(t){ return String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
 // "GARCIA LUIS" -> "Garcia L." (los nombres de la hoja Empleados); el resto, tal cual
 function nombreCorto(n){
@@ -6999,6 +7557,1549 @@ function sumarDiasISO(iso, n){
   const dia = String(d.getDate()).padStart(2, '0');
   return `${d.getFullYear()}-${mes}-${dia}`;
 }
+
+// (27/11/2026: el arranque pasó al final del archivo, después de Pedidos de Locales)
+
+
+/* =======================================================================
+   PEDIDOS DE LOCALES (insumos e ingredientes) — 27/11/2026, app unificada.
+   Es la misma página que antes estaba en su propio link (versión 05/11),
+   ahora como una sección de esta app. Sigue usando SU planilla y SU Apps
+   Script ("Pedidos Insumos - Doma Criolla"): solo cambió dónde se ve.
+   Entradas: PedidosApp.abrir(contenedor, {vista:'nuevo'|'lista'|'catalogo',
+   modo:'local'|'fabrica'|'todo', local:'CENTRO'…, tipo:'INSUMOS'|'INGREDIENTES'}).
+   ======================================================================= */
+const PedidosApp = (function(){
+  "use strict";
+  var ROOT = null;           // contenedor de la pantalla abierta
+  var ultimaCarga = 0;       // cuándo se leyó la planilla de pedidos por última vez
+  var OPC = {};              // cómo se abrió (local, fábrica, catálogo)
+  function el(n){ return ROOT ? ROOT.querySelector('[data-ped="'+n+'"]') : null; }
+  function abierto(){ return !!(ROOT && document.body.contains(ROOT)); }
+
+  /* =====================================================================
+     PEDIDOS DE INSUMOS E INGREDIENTES — versión 05/11/2026
+     Flujo: el local arma el pedido (guardado provisorio o enviar final) →
+     fábrica prepara el envío (provisorio o enviar final) → el local confirma
+     lo que recibió (provisorio o confirmar final). Cada etapa se puede
+     reabrir. Quién hace cada acción es obligatorio.
+     ===================================================================== */
+
+  var TIPOS = [
+    {key:"INSUMOS", label:"Insumos"},
+    {key:"INGREDIENTES", label:"Ingredientes"}
+  ];
+  var TIPO_LABEL = {};
+  TIPOS.forEach(function(t){ TIPO_LABEL[t.key]=t.label; });
+
+  var CATEGORIES = [
+    {key:"LIMPIEZA", label:"Limpieza", tipo:"INSUMOS"},
+    {key:"LIBRERIA", label:"Librería", tipo:"INSUMOS"},
+    {key:"FARMACIA", label:"Farmacia", tipo:"INSUMOS"},
+    {key:"IMPRESIONES", label:"Impresiones", tipo:"INSUMOS"},
+    {key:"PACKAGING", label:"Packaging", tipo:"INSUMOS"},
+    {key:"INGREDIENTES", label:"Ingredientes", tipo:"INGREDIENTES"}
+  ];
+  var CAT_LABEL = {}, CAT_TIPO = {};
+  CATEGORIES.forEach(function(c){ CAT_LABEL[c.key]=c.label; CAT_TIPO[c.key]=c.tipo; });
+  function catsDeTipo(t){ return CATEGORIES.filter(function(c){ return c.tipo===t; }); }
+
+  var LOCALES = [
+    {key:"CENTRO", label:"Local Centro"},
+    {key:"PATAGONIA", label:"Local Patagonia"},
+    {key:"ZELARRAYAN", label:"Local Zelarrayán"}
+  ];
+  var LOCAL_LABEL = {};
+  LOCALES.forEach(function(l){ LOCAL_LABEL[l.key]=l.label; });
+
+  // Pedidos sin cerrar con fecha de hace más de estos días se marcan como viejos.
+  var DIAS_VIEJO = 7;
+  // Los ítems "para más tarde" se avisan y se cuentan solo de pedidos de los últimos días
+  // (en el detalle del pedido se ven siempre, con «Ya se mandó» / «Ya no se manda»).
+  var DIAS_POR_MANDAR = 30;
+
+  // URL de la implementación de Apps Script (termina en /exec).
+  var API_URL = "https://script.google.com/macros/s/AKfycbw9tFfl_MMsORMq5-4iORIYeCZVagJuhkG0ODPs-upTVvOD60GPldXMr85p3ChT51D_/exec";
+
+  var catalogItems = [];
+  var pedidos = [];
+  var loaded = false;
+  var POLL_MS = 20000;
+
+  var state = {
+    tab: "nuevo",
+    detailId: null,
+    newOrderForm: null,
+    editForm: null,
+    filterEstado: "pendiente",
+    filterLocal: "TODOS",
+    filterTipo: "TODOS",
+    adminUnlocked: false,
+    busy: false
+  };
+
+  var ESTADO_INFO = {
+    borrador:  {cls:"badge-draft",    label:"Guardado sin enviar",  tip:"El local lo guardó (o lo reabrió para agregar cosas) y todavía no lo envió a fábrica. Fábrica no lo puede preparar hasta que el local toque «Guardar y enviar final»."},
+    pendiente: {cls:"badge-pending",  label:"Pendiente",            tip:"El local lo envió. Fábrica tiene que cargar qué manda de cada ítem y tocar «Guardar y enviar final»."},
+    enviado:   {cls:"badge-sent",     label:"Esperando recepción",  tip:"Fábrica lo envió. El local tiene que cargar qué le llegó de cada ítem y tocar «Confirmar recepción final»."},
+    cerrado:   {cls:"badge-closed",   label:"Cerrado",              tip:"El local confirmó lo que recibió. Si algo quedó «para más tarde», sigue a la vista hasta que fábrica lo mande."},
+    rechazado: {cls:"badge-rejected", label:"Rechazado",            tip:"Se descartó (por ejemplo, un pedido duplicado). No se envía nada."}
+  };
+  function estadoInfo(e){ return ESTADO_INFO[e] || ESTADO_INFO.pendiente; }
+
+  /* ---------- servidor ---------- */
+  function apiConfigured(){ return API_URL && API_URL.indexOf("PEGAR_ACA") === -1; }
+
+  // Todo viaja por GET (incluso guardar): Apps Script redirige sus respuestas
+  // y ese redirect descarta el "body" de un POST hecho desde GitHub Pages.
+  function callServer(action, payload){
+    if(!apiConfigured()) return Promise.reject(new Error("Falta configurar API_URL en index.html."));
+    var url = API_URL + "?action=" + encodeURIComponent(action);
+    if(action !== "getData") url += "&payload=" + encodeURIComponent(JSON.stringify(payload||{}));
+    // 27/11/2026: mismo código de dispositivo que el resto de la app (candado)
+    if(typeof DISPOSITIVO !== "undefined" && DISPOSITIVO.codigo){
+      url += "&disp=" + encodeURIComponent(DISPOSITIVO.codigo) + "&dtok=" + encodeURIComponent(DISPOSITIVO.llave || "");
+    }
+    var t0 = performance.now();
+    return fetch(url, {method:"GET"})
+      .then(function(r){ return r; })
+      .catch(function(){ var e = new Error("No hay conexión o Google no respondió."); e.network = true; throw e; })
+      .then(function(r){
+        return r.json().catch(function(){ var e = new Error("Google respondió algo que no se pudo leer."); e.network = true; throw e; });
+      })
+      .then(function(data){
+        try{ if(typeof registrarTiempo === "function") registrarTiempo("pedidos:" + action, performance.now() - t0, data && data._ms, false); }catch(e){}
+        if(data && data.noAutorizado && typeof mostrarActivarDispositivo === "function") mostrarActivarDispositivo({ motivo: "bloqueado" });
+        if(data && data.error){ throw new Error(data.error); }
+        return data;
+      });
+  }
+
+  /**
+   * Corre una acción de guardado: bloquea el botón, evita doble toque y,
+   * si se corta la conexión, revisa si igual se guardó antes de avisar error.
+   */
+  function correr(action, payload, opts){
+    opts = opts || {};
+    if(state.busy){ toast("Esperá, se está guardando…"); return Promise.resolve(null); }
+    state.busy = true;
+    var btn = opts.btn, txt = btn ? btn.textContent : "";
+    if(btn){ btn.disabled = true; btn.textContent = "Guardando…"; }
+    function fin(){ state.busy = false; if(btn && document.body.contains(btn)){ btn.disabled = false; btn.textContent = txt; } }
+    return callServer(action, payload).then(function(res){
+      fin(); return res || {};
+    }).catch(function(err){
+      if(err && err.network && opts.verificar){
+        return loadData(true).then(function(){
+          if(opts.verificar(pedidos)){ fin(); return {verificado:true}; }
+          throw err;
+        });
+      }
+      throw err;
+    }).catch(function(err){
+      fin();
+      var msg = err && err.message ? err.message : "Probá de nuevo.";
+      if(err && err.network) msg += (opts.verificar ? " Revisé y no se guardó." : " Puede que se haya guardado igual: tocá «Actualizar» y fijate antes de repetir.");
+      avisar(opts.tituloError || "No se pudo guardar", esc(msg));
+      if(!err.network) loadData(true);
+      return null;
+    });
+  }
+
+  /* ---------- helpers ---------- */
+  function todayStr(){
+    var d = new Date();
+    return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+  }
+  function fmtDate(s){
+    if(!s) return "";
+    var p = String(s).split("-");
+    if(p.length===3 && p[0].length===4) return p[2].slice(0,2)+"/"+p[1]+"/"+p[0];
+    try{
+      var d = new Date(s);
+      if(isNaN(d.getTime())) return String(s);
+      return d.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit",year:"numeric"});
+    }catch(e){ return String(s); }
+  }
+  function fmtCorta(s){ var f = fmtDate(s); return f.length>=5 ? f.slice(0,5) : f; }
+  function fmtDateTime(iso){
+    try{
+      var d = new Date(iso);
+      if(isNaN(d.getTime())) return "";
+      return d.toLocaleDateString("es-AR",{day:"2-digit",month:"2-digit"}) + " " + d.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"});
+    }catch(e){ return ""; }
+  }
+  function horaDe(iso){
+    try{ var d = new Date(iso); return isNaN(d.getTime()) ? "" : d.toLocaleTimeString("es-AR",{hour:"2-digit",minute:"2-digit"}); }catch(e){ return ""; }
+  }
+  function esHoy(iso){
+    try{ var d = new Date(iso); return !isNaN(d.getTime()) && d.toDateString()===new Date().toDateString(); }catch(e){ return false; }
+  }
+  function diasDesde(fecha){
+    if(!fecha || !/^\d{4}-\d{2}-\d{2}/.test(fecha)) return 0;
+    var d = new Date(fecha.slice(0,10)+"T00:00:00");
+    var h = new Date(todayStr()+"T00:00:00");
+    return Math.round((h - d)/86400000);
+  }
+  function esc(s){
+    return (s==null?"":String(s)).replace(/[&<>"']/g, function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function uid(){ return Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4); }
+  function nuevoId(){
+    try{ if(window.crypto && crypto.randomUUID) return crypto.randomUUID(); }catch(e){}
+    return uid()+"-"+uid();
+  }
+  // "3", "1,5", "2.5" → número; "" → ""; texto → NaN
+  function num(v){
+    var s = String(v==null?"":v).trim().replace(",",".");
+    if(s==="") return "";
+    if(!/^\d+(\.\d+)?$/.test(s)) return NaN;
+    return Number(s);
+  }
+  function lista(arr, max){
+    max = max || 12;
+    var h = '<ul>' + arr.slice(0,max).map(function(x){ return '<li>'+esc(x)+'</li>'; }).join("") + '</ul>';
+    if(arr.length>max) h += '<div>… y '+(arr.length-max)+' más.</div>';
+    return h;
+  }
+  function tipoDe(p){ return p.tipo==="INGREDIENTES" ? "INGREDIENTES" : "INSUMOS"; }
+  function chipTipo(t){ return '<span class="chip-tipo'+(t==="INGREDIENTES"?" ing":"")+'">'+esc(TIPO_LABEL[t]||t)+'</span>'; }
+
+  function toast(msg){
+    var t = el("toast");
+    t.textContent = msg;
+    t.classList.add("show");
+    clearTimeout(toast._h);
+    toast._h = setTimeout(function(){ t.classList.remove("show"); }, 2600);
+  }
+  function safeLS(){ try{ return window.localStorage; }catch(e){ return null; } }
+  function lsGet(k, d){ var ls=safeLS(); if(!ls) return d; try{ var v=ls.getItem(k); return v==null?d:v; }catch(e){ return d; } }
+  function lsSet(k,v){ var ls=safeLS(); if(!ls) return; try{ ls.setItem(k,v); }catch(e){} }
+
+  function groupByCategory(items){
+    var byCat = {};
+    CATEGORIES.forEach(function(c){ byCat[c.key]=[]; });
+    items.forEach(function(it){
+      if(!byCat[it.category]) byCat[it.category]=[];
+      byCat[it.category].push(it);
+    });
+    return byCat;
+  }
+  function ordenCatalogo(list){
+    return list.slice().sort(function(a,b){ return (Number(a.order)||0)-(Number(b.order)||0) || String(a.name).localeCompare(String(b.name)); });
+  }
+
+  function porMandar(p, todos){
+    if(p.estado!=="enviado" && p.estado!=="cerrado") return [];
+    if(!todos && diasDesde(p.fecha) > DIAS_POR_MANDAR) return [];
+    return (p.items||[]).filter(function(it){ return it.estadoItem==="no_enviado"; });
+  }
+  function esViejo(p){
+    return (p.estado==="pendiente" || p.estado==="enviado" || p.estado==="borrador") && diasDesde(p.fecha) > DIAS_VIEJO;
+  }
+
+  /* ---------- ayudas (i) ---------- */
+  function tip(t){ return '<button type="button" class="tip" data-tip="'+esc(t)+'" aria-label="Ayuda">i</button>'; }
+  document.addEventListener("click", function(e){
+    if(!abierto()) return;
+    var box = el("tipBox");
+    var b = e.target.closest ? e.target.closest(".tip") : null;
+    if(b){
+      e.preventDefault(); e.stopPropagation();
+      if(box.style.display==="block" && box._from===b){ box.style.display="none"; return; }
+      box.textContent = b.getAttribute("data-tip");
+      box.style.display = "block";
+      box._from = b;
+      var r = b.getBoundingClientRect();
+      var w = Math.min(280, window.innerWidth-20);
+      box.style.maxWidth = w+"px";
+      var left = Math.max(10, Math.min(r.left - 20, window.innerWidth - box.offsetWidth - 10));
+      var top = r.bottom + 6;
+      if(top + box.offsetHeight > window.innerHeight - 10) top = Math.max(10, r.top - box.offsetHeight - 6);
+      box.style.left = left+"px"; box.style.top = top+"px";
+      return;
+    }
+    if(box && box.style.display==="block") box.style.display="none";
+  }, true);
+  window.addEventListener("scroll", function(){ var box=el("tipBox"); if(box) box.style.display="none"; }, true);
+
+  /* ---------- diálogos ---------- */
+  /**
+   * dialog({title, html, fields:[{id,label,type,value,options,placeholder,required,requiredMsg}],
+   *         buttons:[{id,label,cls,validate}]}) → Promise({btn, values}) o null si cancela.
+   */
+  function dialog(o){
+    return new Promise(function(resolve){
+      var ov = document.createElement("div");
+      ov.className = "dlg-ov";
+      var h = '<div class="dlg" role="dialog" aria-modal="true">';
+      if(o.title) h += '<h3>'+esc(o.title)+'</h3>';
+      if(o.html) h += '<div class="dlg-txt">'+o.html+'</div>';
+      (o.fields||[]).forEach(function(f){
+        h += '<label class="field"><span class="lbl">'+esc(f.label)+(f.required?' <span class="req">*</span>':'')+'</span>';
+        if(f.type==="select"){
+          h += '<select data-f="'+f.id+'"><option value="">Elegir…</option>';
+          (f.options||[]).forEach(function(op){ h += '<option value="'+esc(op)+'"'+(op===f.value?" selected":"")+'>'+esc(op)+'</option>'; });
+          h += '</select>';
+        } else {
+          h += '<input type="text" data-f="'+f.id+'" value="'+esc(f.value||"")+'" placeholder="'+esc(f.placeholder||"")+'"'+(f.numeric?' inputmode="decimal"':'')+'>';
+        }
+        h += '</label>';
+      });
+      h += '<div class="dlg-err"></div><div class="dlg-btns">';
+      (o.buttons||[{id:"ok",label:"Entendido",cls:"btn-primary"}]).forEach(function(b){
+        h += '<button type="button" class="btn '+(b.cls||"btn-ghost")+'" data-b="'+b.id+'">'+esc(b.label)+'</button>';
+      });
+      h += '</div></div>';
+      ov.innerHTML = h;
+      (ROOT || document.body).appendChild(ov);
+      var first = ov.querySelector("[data-f]");
+      if(first) setTimeout(function(){ try{ first.focus(); }catch(e){} }, 50);
+
+      function cerrar(v){ if(ov.parentNode) ov.parentNode.removeChild(ov); resolve(v); }
+      function valores(){
+        var v = {};
+        ov.querySelectorAll("[data-f]").forEach(function(el){ v[el.getAttribute("data-f")] = (el.value||"").trim(); });
+        return v;
+      }
+      ov.addEventListener("click", function(e){
+        if(e.target===ov && o.cancelable!==false){ cerrar(null); return; }
+        var b = e.target.closest("[data-b]");
+        if(!b) return;
+        var id = b.getAttribute("data-b");
+        var def = (o.buttons||[]).find(function(x){ return x.id===id; }) || {};
+        var v = valores();
+        if(def.validate){
+          var err = "";
+          (o.fields||[]).some(function(f){
+            if(f.required && !v[f.id]){ err = f.requiredMsg || ("Falta completar: "+f.label); return true; }
+            if(f.numeric && v[f.id] && (isNaN(num(v[f.id])) || num(v[f.id])<=0)){ err = "«"+f.label+"» tiene que ser un número mayor a 0."; return true; }
+            return false;
+          });
+          if(!err && typeof def.validate==="function") err = def.validate(v) || "";
+          if(err){ ov.querySelector(".dlg-err").textContent = err; return; }
+        }
+        cerrar(id==="cancel" ? null : {btn:id, values:v});
+      });
+    });
+  }
+  function avisar(title, html){
+    return dialog({title:title, html:html, buttons:[{id:"ok", label:"Entendido", cls:"btn-primary"}]});
+  }
+  function confirmar(title, html, okLabel, cancelLabel, peligro){
+    return dialog({title:title, html:html, buttons:[
+      {id:"cancel", label:cancelLabel||"Volver", cls:"btn-ghost"},
+      {id:"ok", label:okLabel||"Sí, seguir", cls:peligro?"btn-danger":"btn-primary"}
+    ]}).then(function(r){ return !!(r && r.btn==="ok"); });
+  }
+  /** Pide el nombre de quien hace la acción (y opcionalmente más campos). */
+  function pedirNombre(title, html, lsKey, okLabel, extraFields, peligro){
+    var fields = [{id:"nombre", label:"¿Quién lo hace?", value:lsGet(lsKey||"dc_quien_accion",""), required:true, requiredMsg:"Falta completar quién lo hace."}].concat(extraFields||[]);
+    return dialog({title:title, html:html, fields:fields, buttons:[
+      {id:"cancel", label:"Volver", cls:"btn-ghost"},
+      {id:"ok", label:okLabel||"Confirmar", cls:peligro?"btn-danger":"btn-primary", validate:true}
+    ]}).then(function(r){
+      if(!r) return null;
+      lsSet(lsKey||"dc_quien_accion", r.values.nombre);
+      return r.values;
+    });
+  }
+
+  /* ---------- carga de datos ---------- */
+  function loadData(silent){
+    if(!apiConfigured()){
+      loaded = true;
+      el("main").innerHTML = '<div class="panel"><div class="panel-body"><div class="banner banner-danger" style="margin:0">Falta configurar API_URL en index.html con el link de Apps Script (termina en <code>/exec</code>).</div></div></div>';
+      return Promise.resolve();
+    }
+    return callServer("getData").then(function(data){
+      catalogItems = data.catalog || [];
+      pedidos = data.pedidos || [];
+      loaded = true;
+      ultimaCarga = Date.now();
+      if(abierto()) render();
+    }).catch(function(err){
+      console.error(err);
+      if(!silent) toast("No se pudo cargar: "+(err&&err.message?err.message:"revisá la conexión."));
+      if(!loaded){ loaded = true; render(); }
+    });
+  }
+
+  setInterval(function(){
+    if(!abierto()) return;
+    if(state.busy || ROOT.querySelector(".dlg-ov")) return;
+    if(state.tab==="pedidos" && !state.detailId){ loadData(true); }
+    else if(state.tab==="catalogo" && !state.adminUnlocked){ loadData(true); }
+  }, POLL_MS);
+
+  /* ---------- render principal ---------- */
+  function render(){
+    var main = el("main");
+    (el("tabs") ? el("tabs").querySelectorAll("button") : []).forEach(function(b){
+      b.classList.toggle("active", b.getAttribute("data-tab")===state.tab);
+    });
+    var pendCount = pedidos.filter(function(p){ return p.estado==="pendiente" || p.estado==="enviado"; }).length;
+    var pc = el("pendingCount");
+    if(pc){ if(pendCount>0){ pc.style.display="inline-block"; pc.textContent=pendCount; } else { pc.style.display="none"; } }
+
+    if(!main) return;
+    if(!loaded){ main.innerHTML = '<div class="empty"><div class="big">🧾</div>Cargando…</div>'; return; }
+    if(state.tab==="nuevo") return state.exito ? pintarExito(main) : renderNuevo(main);
+    if(state.tab==="pedidos"){
+      if(state.detailId) return renderDetail(main, state.detailId);
+      return renderLista(main);
+    }
+    if(state.tab==="catalogo") return renderCatalogo(main);
+  }
+
+  function irA(tab, detailId){
+    state.tab = tab;
+    state.exito = null;
+    state.detailId = detailId || null;
+    state.editForm = null;
+    render();
+    window.scrollTo(0,0);
+  }
+
+  /* =====================================================================
+     NUEVO PEDIDO (local)
+     ===================================================================== */
+  function buildForm(p){
+    var f = {
+      pedidoId: p ? p.id : nuevoId(),
+      existe: !!p,                       // ya está guardado en la planilla (borrador)
+      tipo: p ? tipoDe(p) : lsGet("dc_last_tipo","INSUMOS"),
+      local: p ? p.local : (OPC.local || lsGet("dc_last_local","")),
+      quienPide: p ? (p.quienPide || lsGet("dc_quien_pide","")) : lsGet("dc_quien_pide",""),
+      fecha: p ? (p.fecha || todayStr()) : todayStr(),
+      notas: p ? (p.notas||"") : "",
+      items: {},
+      extra: [],
+      faltan: {}
+    };
+    if(TIPO_LABEL[f.tipo]==null) f.tipo = "INSUMOS";
+    catalogItems.forEach(function(it){ f.items[it.id] = {id:it.id, category:it.category, name:it.name, qty:""}; });
+    if(p){
+      (p.items||[]).forEach(function(it){
+        if(!it.isExtra && f.items[it.id]) f.items[it.id].qty = it.pedidoCant;
+        else f.extra.push({tempId:it.id, category:it.category, name:it.name, qty:it.pedidoCant});
+      });
+    }
+    return f;
+  }
+
+  function avisosLocal(f){
+    if(!f.local) return "";
+    var mios = pedidos.filter(function(p){ return p.local===f.local && tipoDe(p)===f.tipo && p.id!==f.pedidoId; });
+    var tl = TIPO_LABEL[f.tipo].toLowerCase();
+    var h = "";
+    mios.filter(function(p){ return p.estado==="enviado"; }).forEach(function(p){
+      h += '<div class="banner banner-warn">📦 <b>Tenés un pedido de '+tl+' del '+esc(fmtCorta(p.fecha))+' esperando que confirmes la recepción.</b> Fábrica ya lo envió: cargá lo que llegó antes de pedir de nuevo.'+
+           '<div class="b-actions"><button class="btn btn-ghost btn-sm" type="button" data-abrir="'+esc(p.id)+'">Confirmar recepción</button></div></div>';
+    });
+    mios.filter(function(p){ return p.estado==="borrador"; }).forEach(function(p){
+      h += '<div class="banner banner-warn">📝 <b>Tenés un pedido de '+tl+' del '+esc(fmtCorta(p.fecha))+' guardado sin enviar.</b> A fábrica todavía no le llegó.'+
+           '<div class="b-actions"><button class="btn btn-ghost btn-sm" type="button" data-continuar="'+esc(p.id)+'">Seguir cargando ese pedido</button>'+
+           '<button class="btn btn-ghost btn-sm btn-danger-txt" type="button" data-eliminar="'+esc(p.id)+'">Eliminarlo</button></div></div>';
+    });
+    mios.filter(function(p){ return p.estado==="pendiente"; }).forEach(function(p){
+      h += '<div class="banner banner-warn">⏳ <b>Ya hiciste un pedido de '+tl+' el '+esc(fmtCorta(p.fecha))+' que fábrica todavía no envió.</b> Si te olvidaste algo, reabrilo y agregalo ahí en vez de hacer otro pedido.'+
+           '<div class="b-actions"><button class="btn btn-ghost btn-sm" type="button" data-reabrir="'+esc(p.id)+'">Reabrir y agregar</button>'+
+           '<button class="btn btn-ghost btn-sm" type="button" data-abrir="'+esc(p.id)+'">Ver pedido</button></div></div>';
+    });
+    mios.forEach(function(p){
+      var pm = porMandar(p);
+      if(!pm.length) return;
+      h += '<div class="banner">🕓 Del pedido del '+esc(fmtCorta(p.fecha))+', fábrica tiene <b>'+pm.length+' ítem(s) para mandar más tarde</b>: '+
+           esc(pm.map(function(it){ return it.name; }).join(", "))+'. No hace falta volver a pedirlos.</div>';
+    });
+    return h;
+  }
+
+  function renderNuevo(main){
+    if(!state.newOrderForm){ state.newOrderForm = buildForm(null); }
+    var f = state.newOrderForm;
+    catalogItems.forEach(function(it){ if(!f.items[it.id]) f.items[it.id] = {id:it.id, category:it.category, name:it.name, qty:""}; });
+    var byCat = groupByCategory(catalogItems);
+
+    var html = '';
+    if(f.existe){
+      html += '<div class="banner banner-warn"><b>Estás cargando un pedido guardado sin enviar.</b> Cuando termines, tocá «Guardar y enviar final» para que le llegue a fábrica.'+
+              '<div class="b-actions"><button class="btn btn-ghost btn-sm" type="button" id="nuevoLimpio">Empezar un pedido nuevo</button></div></div>';
+    }
+    html += '<div class="panel"><div class="panel-body">';
+    html += '<label class="field"><span class="lbl">¿Qué pedís? '+tip("Insumos: limpieza, librería, farmacia, impresiones y packaging. Ingredientes: ingredientes sueltos para el local. Son pedidos separados.")+'</span><div class="seg" id="segTipo">';
+    TIPOS.forEach(function(t){ html += '<button type="button" data-tipo="'+t.key+'" class="'+(f.tipo===t.key?"on":"")+'">'+esc(t.label)+'</button>'; });
+    html += '</div></label>';
+    html += '<div class="row2">';
+    html += fieldSelect("Local", "f_local", LOCALES.map(function(l){return {v:l.key,l:l.label};}), f.local, true, true);
+    html += fieldInput("Fecha del pedido", "f_fecha", "date", f.fecha, true);
+    html += '</div>';
+    html += fieldInput("¿Quién pide?", "f_quien", "text", f.quienPide, true);
+    html += fieldInput("Notas (opcional)", "f_notas", "text", f.notas, false);
+    html += '</div></div>';
+
+    html += '<div id="avisosNuevo">'+avisosLocal(f)+'</div>';
+
+    var cats = catsDeTipo(f.tipo);
+    var hayCatalogo = cats.some(function(c){ return (byCat[c.key]||[]).length; });
+    if(!hayCatalogo) html += '<div class="banner">Todavía no hay ítems de '+esc(TIPO_LABEL[f.tipo].toLowerCase())+' en el catálogo. Podés agregar ítems puntuales abajo.</div>';
+
+    cats.forEach(function(c){
+      var list = ordenCatalogo(byCat[c.key]||[]);
+      var extraList = f.extra.filter(function(e){ return e.category===c.key; });
+      html += '<div class="panel"><div class="cat-block">';
+      html += '<div class="cat-title">'+esc(c.label)+'</div>';
+      list.forEach(function(it){
+        var val = f.items[it.id] ? f.items[it.id].qty : "";
+        html += '<div class="item-row'+(f.faltan[it.id]?" st-falta":"")+'">';
+        html += '<div class="item-name">'+esc(it.name)+'</div>';
+        html += '<input class="qty-input" type="text" inputmode="decimal" placeholder="cant." data-item-id="'+esc(it.id)+'" value="'+esc(val)+'">';
+        html += '</div>';
+      });
+      extraList.forEach(function(e){
+        html += '<div class="item-row'+(f.faltan[e.tempId]?" st-falta":"")+'">';
+        html += '<div class="item-name">'+esc(e.name)+'<span class="tag-extra">nuevo</span></div>';
+        html += '<input class="qty-input" type="text" inputmode="decimal" placeholder="cant." data-extra-id="'+esc(e.tempId)+'" value="'+esc(e.qty)+'">';
+        html += '<button class="rm-btn" data-rm-extra="'+esc(e.tempId)+'" title="Quitar" type="button">×</button>';
+        html += '</div>';
+      });
+      html += '<div class="extra-add">';
+      html += '<input type="text" placeholder="Agregar ítem que no está en la lista…" data-extra-name-cat="'+c.key+'">';
+      html += '<button class="btn btn-ghost btn-sm" type="button" data-extra-add-cat="'+c.key+'">+ Agregar</button>';
+      html += '</div>';
+      html += '</div></div>';
+    });
+
+    html += '<div class="panel"><div class="panel-body">';
+    html += '<div class="progreso" id="progNuevo"></div>';
+    html += '<div class="btn-row">';
+    html += '<button class="btn btn-ghost" id="saveDraft" type="button">Guardado provisorio</button>';
+    html += '<button class="btn btn-primary" id="submitOrder" type="button">Guardar y enviar final</button>';
+    html += '</div>';
+    html += '<div class="progreso" style="margin:10px 0 0">«Guardado provisorio» lo guarda sin mandarlo (lo podés seguir desde otra tablet). «Guardar y enviar final» se lo manda a fábrica. '+
+            tip("Mientras fábrica no lo envíe, el pedido se puede reabrir para agregar algo que te olvidaste.")+'</div>';
+    html += '</div></div>';
+
+    main.innerHTML = html;
+
+    function actualizarProg(){
+      var n = itemsDelForm(f).filter(function(x){ return x.q!==""; }).length;
+      var el = document.getElementById("progNuevo");
+      if(el) el.innerHTML = n ? 'Cargaste <b>'+n+'</b> ítem(s) de '+esc(TIPO_LABEL[f.tipo].toLowerCase())+'.' : 'Todavía no cargaste ninguna cantidad.';
+    }
+    actualizarProg();
+
+    main.querySelectorAll("#segTipo [data-tipo]").forEach(function(b){
+      b.addEventListener("click", function(){ f.tipo = b.getAttribute("data-tipo"); f.faltan = {}; renderNuevo(main); });
+    });
+    main.querySelector("#f_local").addEventListener("change", function(e){ f.local = e.target.value; document.getElementById("avisosNuevo").innerHTML = avisosLocal(f); });
+    main.querySelector("#f_fecha").addEventListener("change", function(e){ f.fecha = e.target.value; });
+    main.querySelector("#f_quien").addEventListener("input", function(e){ f.quienPide = e.target.value; });
+    main.querySelector("#f_notas").addEventListener("input", function(e){ f.notas = e.target.value; });
+    var limpio = main.querySelector("#nuevoLimpio");
+    if(limpio) limpio.addEventListener("click", function(){ state.newOrderForm = buildForm(null); renderNuevo(main); });
+
+    main.querySelectorAll("[data-item-id]").forEach(function(inp){
+      inp.addEventListener("input", function(){
+        var id = inp.getAttribute("data-item-id");
+        if(f.items[id]) f.items[id].qty = inp.value;
+        actualizarProg();
+      });
+    });
+    main.querySelectorAll("[data-extra-id]").forEach(function(inp){
+      inp.addEventListener("input", function(){
+        var id = inp.getAttribute("data-extra-id");
+        var e = f.extra.find(function(x){return x.tempId===id;});
+        if(e) e.qty = inp.value;
+        actualizarProg();
+      });
+    });
+    main.querySelectorAll("[data-rm-extra]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var id = btn.getAttribute("data-rm-extra");
+        f.extra = f.extra.filter(function(x){ return x.tempId!==id; });
+        renderNuevo(main);
+      });
+    });
+    main.querySelectorAll("[data-extra-add-cat]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var cat = btn.getAttribute("data-extra-add-cat");
+        var input = main.querySelector('[data-extra-name-cat="'+cat+'"]');
+        var name = (input.value||"").trim();
+        if(!name){ input.focus(); toast("Escribí el nombre del ítem"); return; }
+        f.extra.push({tempId:uid(), category:cat, name:name, qty:""});
+        renderNuevo(main);
+      });
+    });
+
+    main.querySelector("#saveDraft").addEventListener("click", function(e){ enviarNuevo(f, false, e.currentTarget); });
+    main.querySelector("#submitOrder").addEventListener("click", function(e){ enviarNuevo(f, true, e.currentTarget); });
+  }
+
+  // Botones de los carteles de aviso (en Nuevo pedido y en la lista).
+  function accionesAviso(e){
+    var b = e.target.closest("[data-abrir],[data-continuar],[data-reabrir],[data-eliminar]");
+    if(!b || !this.contains(b)) return;
+    if(b.hasAttribute("data-abrir")) return irA("pedidos", b.getAttribute("data-abrir"));
+    var p = pedidos.find(function(x){ return x.id===(b.getAttribute("data-continuar")||b.getAttribute("data-reabrir")||b.getAttribute("data-eliminar")); });
+    if(!p){ toast("Ese pedido ya no está. Tocá Actualizar."); return; }
+    if(b.hasAttribute("data-continuar")) return continuarPedido(p);
+    if(b.hasAttribute("data-reabrir")) return reabrirPedido(p);
+    if(b.hasAttribute("data-eliminar")) return eliminarPedido(p);
+  }
+
+  function continuarPedido(p){
+    var actual = state.newOrderForm;
+    var aMedias = actual && actual.pedidoId!==p.id && !actual.existe && itemsDelForm(actual).some(function(x){ return x.q!==""; });
+    var paso = aMedias ? confirmar("Tenés un pedido a medio cargar",
+      "En «Nuevo pedido» hay cantidades cargadas que no guardaste. Si seguís, se pierden.", "Seguir igual", "Volver") : Promise.resolve(true);
+    paso.then(function(ok){
+      if(!ok) return;
+      state.newOrderForm = buildForm(p);
+      irA("nuevo");
+    });
+  }
+
+  function reabrirPedido(p){
+    pedirNombre("Reabrir el pedido",
+      'El pedido del '+esc(fmtCorta(p.fecha))+' vuelve a «Guardado sin enviar» para que agregues o cambies lo que falte. '+
+      '<b>Fábrica no lo va a poder preparar hasta que lo vuelvas a enviar</b> con «Guardar y enviar final».',
+      "dc_quien_pide", "Reabrir").then(function(v){
+      if(!v) return;
+      correr("reabrirPedido", {pedidoId:p.id, nombre:v.nombre}).then(function(res){
+        if(!res) return;
+        loadData(true).then(function(){
+          var p2 = pedidos.find(function(x){ return x.id===p.id; });
+          if(p2){ continuarPedido(p2); toast("Pedido reabierto: agregá lo que falta y envialo de nuevo."); }
+        });
+      });
+    });
+  }
+
+  function itemsDelForm(f){
+    var cats = {};
+    catsDeTipo(f.tipo).forEach(function(c){ cats[c.key]=true; });
+    var out = [];
+    Object.keys(f.items).forEach(function(id){
+      var it = f.items[id];
+      if(!cats[it.category]) return;
+      out.push({id:it.id, name:it.name, category:it.category, extra:false, raw:it.qty, q:num(it.qty)});
+    });
+    f.extra.forEach(function(e){
+      if(!cats[e.category]) return;
+      out.push({id:e.tempId, name:e.name, category:e.category, extra:true, raw:e.qty, q:num(e.qty)});
+    });
+    return out;
+  }
+
+  function fieldInput(label, id, type, val, required){
+    return '<label class="field"><span class="lbl">'+esc(label)+(required?' <span class="req">*</span>':'')+'</span>'+
+      '<input type="'+type+'" id="'+id+'" value="'+esc(val)+'"></label>';
+  }
+  function fieldSelect(label, id, opts, val, withPlaceholder, required){
+    var html = '<label class="field"><span class="lbl">'+esc(label)+(required?' <span class="req">*</span>':'')+'</span><select id="'+id+'">';
+    if(withPlaceholder) html += '<option value=""'+(!val?" selected":"")+' disabled>Elegir…</option>';
+    opts.forEach(function(o){ html += '<option value="'+esc(o.v)+'"'+(o.v===val?" selected":"")+'>'+esc(o.l)+'</option>'; });
+    html += '</select></label>';
+    return html;
+  }
+
+  function enviarNuevo(f, final, btn){
+    var main = el("main");
+    var faltaCampo = [];
+    if(!f.local) faltaCampo.push("Local");
+    if(!f.fecha) faltaCampo.push("Fecha del pedido");
+    if(!(f.quienPide||"").trim()) faltaCampo.push("¿Quién pide?");
+    if(faltaCampo.length){
+      avisar("Faltan datos", "Completá: "+lista(faltaCampo));
+      return;
+    }
+    var items = itemsDelForm(f);
+    var malos = items.filter(function(x){ return x.raw && String(x.raw).trim()!=="" && isNaN(x.q); });
+    f.faltan = {};
+    if(malos.length){
+      malos.forEach(function(x){ f.faltan[x.id]=true; });
+      renderNuevo(main);
+      avisar("Hay cantidades que no son números", "Poné solo números (por ejemplo 2 o 1,5). Revisá:"+lista(malos.map(function(x){ return x.name+": «"+x.raw+"»"; })));
+      return;
+    }
+    var ceros = items.filter(function(x){ return x.q===0; });
+    var validos = items.filter(function(x){ return x.q!=="" && x.q>0; });
+    if(!validos.length){ avisar("El pedido está vacío", "Cargá al menos una cantidad."); return; }
+
+    var pasos = Promise.resolve(true);
+    if(ceros.length){
+      pasos = pasos.then(function(ok){ return ok && confirmar("Ítems en 0", "Estos ítems tienen 0 y no se van a pedir:"+lista(ceros.map(function(x){ return x.name; }))+"¿Seguir?", "Sí, seguir"); });
+    }
+    if(final){
+      var otros = pedidos.filter(function(p){ return p.local===f.local && tipoDe(p)===f.tipo && p.id!==f.pedidoId; });
+      var hoy = otros.filter(function(p){ return p.estado!=="rechazado" && p.estado!=="borrador" && esHoy(p.createdAt); });
+      var pend = otros.filter(function(p){ return p.estado==="pendiente"; });
+      var espera = otros.filter(function(p){ return p.estado==="enviado"; });
+      pasos = pasos.then(function(ok){
+        if(!ok) return false;
+        if(hoy.length){
+          return confirmar("Ya enviaste un pedido hoy",
+            '<b>'+esc(LOCAL_LABEL[f.local])+'</b> ya envió un pedido de '+esc(TIPO_LABEL[f.tipo].toLowerCase())+' hoy a las '+esc(horaDe(hoy[0].createdAt))+
+            (hoy[0].quienPide?' ('+esc(hoy[0].quienPide)+')':'')+'.<br><br>¿Es otro pedido distinto? Si te olvidaste algo del anterior, conviene reabrir ese.',
+            "Sí, es otro pedido", "No, volver");
+        }
+        if(pend.length){
+          return confirmar("Hay un pedido sin enviar por fábrica",
+            'El pedido del '+esc(fmtCorta(pend[0].fecha))+' todavía no lo preparó fábrica. Si es para agregar algo, conviene reabrir ese pedido (cartel de arriba).<br><br>¿Mandar este como pedido aparte?',
+            "Sí, mandar aparte", "No, volver");
+        }
+        return true;
+      }).then(function(ok){
+        if(!ok) return false;
+        if(espera.length){
+          return confirmar("Tenés una recepción sin confirmar",
+            'El pedido del '+esc(fmtCorta(espera[0].fecha))+' ya lo envió fábrica y falta que confirmes lo que llegó. Podés mandar este pedido igual, pero acordate de confirmar esa recepción.',
+            "Mandar igual", "Volver");
+        }
+        return true;
+      }).then(function(ok){
+        if(!ok) return false;
+        return confirmar("¿Enviar el pedido a fábrica?",
+          '<b>'+esc(LOCAL_LABEL[f.local])+'</b> · '+esc(TIPO_LABEL[f.tipo])+' · '+validos.length+' ítem(s).<br><br>'+
+          'Mientras fábrica no lo envíe, lo vas a poder reabrir si te olvidaste algo.', "Enviar a fábrica", "Volver");
+      });
+    }
+
+    pasos.then(function(ok){
+      if(!ok) return;
+      var payload = {
+        pedidoId: f.pedidoId, tipo: f.tipo, local: f.local, fecha: f.fecha,
+        quienPide: f.quienPide.trim(), notas: (f.notas||"").trim(), final: final,
+        items: validos.map(function(x){
+          return x.extra ? {id:x.id, c:x.category, n:x.name, x:1, q:String(x.q)} : {id:x.id, q:String(x.q)};
+        })
+      };
+      correr("guardarPedidoLocal", payload, {
+        btn: btn,
+        verificar: function(ps){
+          return ps.some(function(p){ return p.id===f.pedidoId && p.estado===(final?"pendiente":"borrador") && (p.items||[]).length===validos.length; });
+        }
+      }).then(function(res){
+        if(!res) return;
+        lsSet("dc_last_local", f.local);
+        lsSet("dc_last_tipo", f.tipo);
+        lsSet("dc_quien_pide", payload.quienPide);
+        if(final){
+          state.newOrderForm = null;
+          showOrderSuccess(payload, validos.length);
+        } else {
+          f.existe = true;
+          toast("Guardado provisorio ✓ — todavía no le llegó a fábrica.");
+        }
+        loadData(true);
+      });
+    });
+  }
+
+  // La pantalla de "Pedido enviado" queda fija hasta que tocan «Cargar otro pedido»
+  // (si no, la recarga de datos de fondo la tapaba con el formulario).
+  function showOrderSuccess(payload, n){
+    state.exito = {payload:payload, n:n};
+    pintarExito(el("main"));
+  }
+  function pintarExito(main){
+    var payload = state.exito.payload, n = state.exito.n;
+    main.innerHTML =
+      '<div class="panel"><div class="success-screen">'+
+      '<div class="big">✅</div>'+
+      '<h2>Pedido enviado a fábrica</h2>'+
+      '<p>'+esc(LOCAL_LABEL[payload.local]||payload.local)+' · '+esc(TIPO_LABEL[payload.tipo])+' · '+esc(fmtDate(payload.fecha))+' · '+n+' ítem'+(n===1?"":"s")+'</p>'+
+      '<p>Si te olvidaste algo, lo podés reabrir desde «Pedidos y envíos» mientras fábrica no lo envíe.</p>'+
+      '<button class="btn btn-primary" id="anotherOrder" type="button">Cargar otro pedido</button>'+
+      '</div></div>';
+    main.querySelector("#anotherOrder").addEventListener("click", function(){ state.exito = null; render(); });
+  }
+
+  /* =====================================================================
+     LISTA DE PEDIDOS
+     ===================================================================== */
+  var FILTROS_ESTADO = [
+    ["pendiente","Pendientes (para preparar)"],
+    ["enviado","Esperando recepción"],
+    ["borrador","Guardados sin enviar (local)"],
+    ["pormandar","Con ítems para más tarde"],
+    ["viejos","Sin cerrar hace más de "+DIAS_VIEJO+" días"],
+    ["cerrado","Cerrados"],
+    ["rechazado","Rechazados"],
+    ["todos","Todos"]
+  ];
+
+  function pasaFiltro(p){
+    if(state.filterLocal!=="TODOS" && p.local!==state.filterLocal) return false;
+    if(state.filterTipo!=="TODOS" && tipoDe(p)!==state.filterTipo) return false;
+    switch(state.filterEstado){
+      case "todos": return true;
+      case "pormandar": return porMandar(p).length>0;
+      case "viejos": return esViejo(p);
+      default: return p.estado===state.filterEstado;
+    }
+  }
+
+  function renderLista(main){
+    var html = '';
+    var base = pedidos.filter(function(p){
+      return (state.filterLocal==="TODOS" || p.local===state.filterLocal) && (state.filterTipo==="TODOS" || tipoDe(p)===state.filterTipo);
+    });
+    var nPend = base.filter(function(p){ return p.estado==="pendiente"; }).length;
+    var nEnv = base.filter(function(p){ return p.estado==="enviado"; }).length;
+    var nBor = base.filter(function(p){ return p.estado==="borrador"; }).length;
+    var nTarde = base.reduce(function(a,p){ return a + porMandar(p).length; }, 0);
+    var viejos = base.filter(esViejo);
+
+    var partes = [];
+    if(nPend) partes.push('<b>'+nPend+'</b> para preparar');
+    if(nEnv) partes.push('<b>'+nEnv+'</b> esperando recepción');
+    if(nBor) partes.push('<b>'+nBor+'</b> guardados sin enviar');
+    if(nTarde) partes.push('<b>'+nTarde+'</b> ítem(s) para mandar más tarde');
+    if(partes.length) html += '<div class="banner">'+partes.join(' · ')+'</div>';
+    if(viejos.length){
+      html += '<div class="banner banner-danger">⚠ <b>Hay '+viejos.length+' pedido(s) sin cerrar con fecha de hace más de '+DIAS_VIEJO+' días.</b> Si ya se resolvieron, abrilos y eliminalos o confirmá la recepción.'+
+              '<div class="b-actions"><button class="btn btn-ghost btn-sm" type="button" id="verViejos">Ver cuáles son</button></div></div>';
+    }
+
+    html += '<div class="panel">';
+    html += '<div class="filters">';
+    html += '<select id="filtEstado">';
+    FILTROS_ESTADO.forEach(function(o){ html += '<option value="'+o[0]+'"'+(state.filterEstado===o[0]?" selected":"")+'>'+esc(o[1])+'</option>'; });
+    html += '</select>';
+    html += '<select id="filtLocal"><option value="TODOS"'+(state.filterLocal==="TODOS"?" selected":"")+'>Todos los locales</option>';
+    LOCALES.forEach(function(l){ html += '<option value="'+l.key+'"'+(state.filterLocal===l.key?" selected":"")+'>'+esc(l.label)+'</option>'; });
+    html += '</select>';
+    html += '<select id="filtTipo"><option value="TODOS"'+(state.filterTipo==="TODOS"?" selected":"")+'>Insumos e ingredientes</option>';
+    TIPOS.forEach(function(t){ html += '<option value="'+t.key+'"'+(state.filterTipo===t.key?" selected":"")+'>'+esc(t.label)+'</option>'; });
+    html += '</select>';
+    html += '<button class="btn btn-ghost btn-sm" id="exportCsv" type="button">⭳ Exportar CSV</button>';
+    html += '</div>';
+
+    var list = pedidos.filter(pasaFiltro);
+    if(list.length===0){
+      html += '<div class="empty"><div class="big">📭</div>No hay pedidos con este filtro.</div>';
+    } else {
+      list.forEach(function(p){
+        var its = p.items||[];
+        var sinResolver = p.estado==="pendiente" ? its.filter(function(it){ return it.estadoItem==="pendiente" || !it.estadoItem; }).length : 0;
+        var tarde = porMandar(p).length;
+        var sub = [its.length + " ítems"];
+        if(p.quienPide) sub.push("pidió "+p.quienPide);
+        if(sinResolver && sinResolver<its.length) sub.push(sinResolver+" sin resolver");
+        if(tarde) sub.push(tarde+" para más tarde");
+        html += '<div class="order-card" data-open="'+esc(p.id)+'">';
+        html += '<div class="oc-main">';
+        html += '<div class="oc-local">'+esc(LOCAL_LABEL[p.local]||p.local)+' · '+esc(fmtDate(p.fecha))+chipTipo(tipoDe(p))+'</div>';
+        html += '<div class="oc-sub">'+esc(sub.join(" · "))+(esViejo(p)?' · <span class="oc-warn">⚠ hace '+diasDesde(p.fecha)+' días</span>':'')+'</div>';
+        html += '</div>';
+        html += '<span class="badge '+estadoInfo(p.estado).cls+'">'+esc(estadoInfo(p.estado).label)+'</span>';
+        html += '<span class="oc-arrow">›</span>';
+        html += '</div>';
+      });
+    }
+    html += '</div>';
+    html += '<div class="progreso">Qué significa cada estado: '+
+      Object.keys(ESTADO_INFO).map(function(k){ return esc(ESTADO_INFO[k].label)+tip(ESTADO_INFO[k].tip); }).join(" &nbsp; ")+'</div>';
+    main.innerHTML = html;
+
+    main.querySelector("#filtEstado").addEventListener("change", function(e){ state.filterEstado=e.target.value; render(); });
+    main.querySelector("#filtLocal").addEventListener("change", function(e){ state.filterLocal=e.target.value; render(); });
+    main.querySelector("#filtTipo").addEventListener("change", function(e){ state.filterTipo=e.target.value; render(); });
+    main.querySelector("#exportCsv").addEventListener("click", function(){ exportCsv(list); });
+    var vv = main.querySelector("#verViejos");
+    if(vv) vv.addEventListener("click", function(){ state.filterEstado="viejos"; render(); });
+    main.querySelectorAll("[data-open]").forEach(function(card){
+      card.addEventListener("click", function(){ irA("pedidos", card.getAttribute("data-open")); });
+    });
+  }
+
+  /* ---------- CSV ---------- */
+  function csvField(v){
+    var s = (v==null? "": String(v));
+    if(/[",;\n]/.test(s)) s = '"'+s.replace(/"/g,'""')+'"';
+    return s;
+  }
+  function exportCsv(list){
+    // Los rechazados y los guardados sin enviar no se exportan.
+    var exportable = (list||[]).filter(function(p){ return p.estado!=="rechazado" && p.estado!=="borrador"; });
+    if(exportable.length===0){ toast("No hay pedidos para exportar"); return; }
+    var rows = [["Local","Fecha","Ítem","Cant. solicitada","Cant. enviada","Cant. recibida","Tipo"]];
+    exportable.forEach(function(p){
+      (p.items||[]).forEach(function(it){
+        rows.push([LOCAL_LABEL[p.local]||p.local, fmtDate(p.fecha), it.name, it.pedidoCant||"", it.envioCant||"", it.recibidoCant||"", TIPO_LABEL[tipoDe(p)]]);
+      });
+    });
+    var csv = "﻿" + rows.map(function(r){ return r.map(csvField).join(","); }).join("\r\n");
+    var localTag = state.filterLocal==="TODOS" ? "todos" : state.filterLocal.toLowerCase();
+    var filename = "pedidos_insumos_"+localTag+"_"+todayStr()+".csv";
+    try{
+      var blob = new Blob([csv], {type:"text/csv;charset=utf-8;"});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function(){ URL.revokeObjectURL(url); }, 2000);
+      toast("Historial exportado");
+    }catch(err){
+      console.error(err);
+      toast("No se pudo exportar en este navegador");
+    }
+  }
+
+  /* =====================================================================
+     DETALLE DEL PEDIDO
+     ===================================================================== */
+  function modoDe(p){
+    return ({borrador:"borrador", pendiente:"envio", enviado:"recepcion", cerrado:"resumen", rechazado:"rechazado"})[p.estado] || "envio";
+  }
+
+  function renderDetail(main, id){
+    var p = pedidos.find(function(x){ return x.id===id; });
+    if(!p){ state.detailId = null; toast("Ese pedido ya no existe (lo eliminaron)."); return renderLista(main); }
+    var mode = modoDe(p);
+
+    if(!state.editForm || state.editForm._id!==id || state.editForm._mode!==mode || state.editForm._upd!==p.updatedAt){
+      state.editForm = {
+        _id: id, _mode: mode, _upd: p.updatedAt,
+        quienNombre: mode==="envio" ? lsGet("dc_quien_envia","") : (mode==="recepcion" ? lsGet("dc_quien_recibe","") : ""),
+        faltan: {},
+        items: (p.items||[]).map(function(it){
+          return {
+            id:it.id, category:it.category, name:it.name, isExtra:!!it.isExtra,
+            pedidoCant: it.pedidoCant, envioCant: it.envioCant||"",
+            recibidoCant: it.recibidoCant||"",
+            noEnviado: it.estadoItem==="no_enviado",
+            rechazado: it.estadoItem==="rechazado",
+            enviado: it.estadoItem==="enviado",
+            motivo: it.motivo||"", fechaEstimada: it.fechaEstimada||""
+          };
+        })
+      };
+    }
+    var f = state.editForm;
+    var byCat = {};
+    CATEGORIES.forEach(function(c){ byCat[c.key]=[]; });
+    f.items.forEach(function(it){ (byCat[it.category]=byCat[it.category]||[]).push(it); });
+    var catKeys = CATEGORIES.map(function(c){ return c.key; });
+    Object.keys(byCat).forEach(function(k){ if(catKeys.indexOf(k)===-1) catKeys.push(k); });
+
+    var html = '<div class="panel">';
+    html += '<div class="detail-head">';
+    html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">';
+    html += '<button class="back" id="backBtn" type="button" style="padding-bottom:0">‹ Volver a la lista</button>';
+    html += '<div class="head-actions">';
+    if(mode==="borrador") html += '<button class="btn btn-ghost btn-sm" id="contBtn" type="button">✎ Seguir cargando (local)</button>';
+    if(mode==="envio") html += '<button class="btn btn-ghost btn-sm" id="reabrirPedBtn" type="button">↺ Reabrir para agregar (local)</button>';
+    if(mode==="recepcion") html += '<button class="btn btn-ghost btn-sm" id="reabrirEnvBtn" type="button">↺ Reabrir envío (fábrica)</button>';
+    if(mode==="resumen" && f.items.some(function(it){ return it.enviado; })) html += '<button class="btn btn-ghost btn-sm" id="reabrirRecBtn" type="button">↺ Reabrir recepción</button>';
+    if(mode==="envio" || mode==="borrador") html += '<button class="btn btn-ghost btn-sm btn-danger-txt" id="rejectBtn" type="button">✕ Rechazar</button>';
+    html += '<button class="btn btn-ghost btn-sm btn-danger-txt" id="deleteBtn" type="button">🗑 Eliminar</button>';
+    html += '<button class="btn btn-ghost btn-sm" id="printBtn" type="button">🖶 Imprimir</button>';
+    html += '</div></div>';
+    html += '<h2 style="margin-top:10px">'+esc(LOCAL_LABEL[p.local]||p.local)+chipTipo(tipoDe(p))+'</h2>';
+    html += '<div class="detail-grid" style="margin-top:8px">';
+    html += '<span><b>Fecha:</b> '+esc(fmtDate(p.fecha))+'</span>';
+    if(p.quienPide) html += '<span><b>Pide:</b> '+esc(p.quienPide)+'</span>';
+    if(p.enviadoPor) html += '<span><b>Envió:</b> '+esc(p.enviadoPor)+'</span>';
+    if(p.recibidoPor) html += '<span><b>Recibió:</b> '+esc(p.recibidoPor)+'</span>';
+    if(p.rechazadoPor) html += '<span><b>Rechazó:</b> '+esc(p.rechazadoPor)+'</span>';
+    html += '<span><b>Cargado:</b> '+esc(fmtDateTime(p.createdAt))+'</span>';
+    html += '<span><span class="badge '+estadoInfo(p.estado).cls+'">'+esc(estadoInfo(p.estado).label)+'</span>'+tip(estadoInfo(p.estado).tip)+'</span>';
+    html += '</div>';
+    if(p.notas) html += '<div class="detail-grid" style="margin-top:6px"><span><b>Notas:</b> '+esc(p.notas)+'</span></div>';
+    if(esViejo(p)) html += '<div class="banner banner-danger" style="margin:12px 0 0">⚠ Este pedido tiene fecha de hace '+diasDesde(p.fecha)+' días y sigue sin cerrar. Si ya se resolvió, eliminalo.</div>';
+    if(mode==="borrador") html += '<div class="banner banner-warn" style="margin:12px 0 0"><b>El local todavía no lo envió a fábrica</b> (lo guardó provisorio o lo reabrió para agregar cosas). Fábrica lo va a poder preparar cuando el local toque «Guardar y enviar final».</div>';
+    if(mode==="envio") html += '<div class="banner" style="margin:12px 0 0"><b>Fábrica:</b> cargá lo que mandás de cada ítem, o marcá «Más tarde» o «Rechazar». Podés ir guardando con «Guardado provisorio»; «Guardar y enviar final» pide todos los ítems completos.</div>';
+    if(mode==="recepcion") html += '<div class="banner" style="margin:12px 0 0"><b>Local:</b> cargá lo que llegó de cada ítem. <b>Si algo no llegó, poné 0.</b> Para cerrar el pedido tocá «Confirmar recepción final».</div>';
+    if(mode==="resumen") html += '<div class="banner banner-ok" style="margin:12px 0 0">Pedido cerrado: está confirmado lo pedido, lo enviado y lo recibido.'+(porMandar(p,true).length?' Quedan <b>'+porMandar(p,true).length+'</b> ítem(s) para mandar más tarde (abajo: «Ya se mandó» o «Ya no se manda»).':'')+'</div>';
+    if(mode==="rechazado") html += '<div class="banner banner-danger" style="margin:12px 0 0">Pedido rechazado'+(p.motivoRechazo?' — <b>'+esc(p.motivoRechazo)+'</b>':'')+'. No se le va a enviar nada.</div>';
+    html += '</div>';
+
+    if(mode==="envio" || mode==="recepcion") html += '<div class="panel-body" style="padding-bottom:0"><div class="progreso" id="progDet"></div></div>';
+
+    catKeys.forEach(function(ck){
+      var list = byCat[ck]||[];
+      if(list.length===0) return;
+      html += '<div class="cat-block">';
+      html += '<div class="cat-title">'+esc(CAT_LABEL[ck]||ck)+'</div>';
+      list.forEach(function(it){
+        var stCls = f.faltan[it.id] ? "st-falta" : ((it.noEnviado || it.rechazado) ? "st-no_enviado" : (String(it.envioCant).trim()!=="" ? "st-enviado" : ""));
+        if(mode==="recepcion" && it.enviado) stCls = f.faltan[it.id] ? "st-falta" : (String(it.recibidoCant).trim()!=="" ? "st-enviado" : "");
+        html += '<div class="item-detail-row '+stCls+'" data-row="'+esc(it.id)+'">';
+        html += '<div class="idr-top">';
+        html += '<div class="idr-name">'+esc(it.name)+(it.isExtra?'<span class="tag-extra">nuevo</span>':'')+'<div class="idr-pedido">Pedido: <span class="mono">'+esc(it.pedidoCant)+'</span></div></div>';
+        html += '</div>';
+
+        if(mode==="envio"){
+          html += '<div class="idr-controls">';
+          html += '<input class="qty-input" type="text" inputmode="decimal" placeholder="cant." data-envio="'+esc(it.id)+'" value="'+esc(it.envioCant)+'" '+((it.noEnviado||it.rechazado)?"disabled":"")+'>';
+          html += '<label class="chk"><input type="checkbox" data-noenv="'+esc(it.id)+'" '+(it.noEnviado?"checked":"")+'> Más tarde</label>'+tip("No se manda ahora pero sí después (por ejemplo, sin stock). Queda a la vista para mandarlo con «Ya se mandó».");
+          html += '<label class="chk"><input type="checkbox" data-rechazar="'+esc(it.id)+'" '+(it.rechazado?"checked":"")+'> Rechazar</label>'+tip("No se va a mandar (por ejemplo, no corresponde). Es definitivo.");
+          html += '</div>';
+          if(it.noEnviado){
+            html += '<div class="idr-motivo">';
+            html += '<input type="text" placeholder="Motivo * (ej: sin stock)" data-motivo="'+esc(it.id)+'" value="'+esc(it.motivo)+'">';
+            html += '<input type="date" title="Fecha estimada (opcional)" data-festimada="'+esc(it.id)+'" value="'+esc(it.fechaEstimada)+'">';
+            html += '</div>';
+          }
+          if(it.rechazado){
+            html += '<div class="idr-motivo" style="grid-template-columns:1fr">';
+            html += '<input type="text" placeholder="Motivo del rechazo * (ej: no corresponde)" data-motivo="'+esc(it.id)+'" value="'+esc(it.motivo)+'">';
+            html += '</div>';
+          }
+        } else if(mode==="recepcion"){
+          if(it.rechazado) html += rechazadoHtml(it);
+          else if(it.noEnviado) html += noEnviadoHtml(it, true);
+          else if(it.enviado){
+            html += '<div class="idr-controls">';
+            html += '<span class="idr-readonly">Enviado: <b>'+esc(it.envioCant)+'</b></span>';
+            html += '<input class="qty-input" type="text" inputmode="decimal" placeholder="cant." data-recibido="'+esc(it.id)+'" value="'+esc(it.recibidoCant)+'">';
+            html += '<span class="idr-readonly">recibido</span> <span class="dif" data-dif="'+esc(it.id)+'"></span>';
+            html += '</div>';
+          } else {
+            html += '<div class="idr-readonly">Sin cargar en el envío.</div>';
+          }
+        } else {
+          if(it.rechazado) html += rechazadoHtml(it);
+          else if(it.noEnviado) html += noEnviadoHtml(it, mode==="resumen");
+          else if(mode==="borrador" || mode==="rechazado") html += it.envioCant ? '<div class="idr-readonly">Fábrica había cargado: <b>'+esc(it.envioCant)+'</b></div>' : '';
+          else {
+            var dif = it.recibidoCant!=="" && it.envioCant!=="" && Number(String(it.recibidoCant).replace(",","."))!==Number(String(it.envioCant).replace(",","."));
+            html += '<div class="idr-readonly">Enviado: <b>'+esc(it.envioCant||"—")+'</b> &nbsp;·&nbsp; Recibido: <b>'+esc(it.recibidoCant||"—")+'</b>'+(dif?' <span class="dif">≠ diferencia</span>':'')+'</div>';
+          }
+        }
+        html += '</div>';
+      });
+      html += '</div>';
+    });
+
+    if(mode==="envio" || mode==="recepcion"){
+      html += '<div class="panel-body" style="border-top:1px dashed var(--border-strong)">';
+      html += fieldInput(mode==="envio"?"¿Quién envía?":"¿Quién recibe?", "quienNombre", "text", f.quienNombre, true);
+      html += '<div class="btn-row">';
+      html += '<button class="btn btn-ghost" id="saveProv" type="button">Guardado provisorio</button>';
+      html += '<button class="btn btn-primary" id="saveFinal" type="button">'+(mode==="envio"?"Guardar y enviar final":"Confirmar recepción final")+'</button>';
+      html += '</div>';
+      html += '<div class="progreso" style="margin:10px 0 0">'+(mode==="envio"
+        ? "«Guardado provisorio» guarda lo cargado sin mandarlo. «Guardar y enviar final» le avisa al local que el pedido va en camino."
+        : "«Guardado provisorio» guarda lo cargado sin cerrar. «Confirmar recepción final» cierra el pedido.")+'</div>';
+      html += '</div>';
+    }
+
+    if(p.registro){
+      html += '<details class="historial"><summary>Historial del pedido</summary>'+
+        String(p.registro).split("\n").map(function(l){ return '<div>'+esc(l)+'</div>'; }).join("")+'</details>';
+    }
+    html += '</div>';
+
+    main.innerHTML = html;
+
+    function progreso(){
+      var el = document.getElementById("progDet");
+      if(!el) return;
+      if(mode==="envio"){
+        var falt = f.items.filter(function(it){ return !it.noEnviado && !it.rechazado && String(it.envioCant).trim()===""; }).length;
+        el.innerHTML = falt ? 'Faltan completar <b>'+falt+'</b> de '+f.items.length+' ítems.' : '✓ Están todos los ítems completos.';
+      } else {
+        var env = f.items.filter(function(it){ return it.enviado; });
+        var falt2 = env.filter(function(it){ return String(it.recibidoCant).trim()===""; }).length;
+        el.innerHTML = falt2 ? 'Faltan completar <b>'+falt2+'</b> de '+env.length+' ítems enviados.' : '✓ Están todos los ítems enviados completos.';
+      }
+    }
+    function marcarDif(it){
+      var el = main.querySelector('[data-dif="'+it.id+'"]');
+      if(!el) return;
+      var r = num(it.recibidoCant), e = num(it.envioCant);
+      el.textContent = (r!=="" && !isNaN(r) && e!=="" && r!==e) ? "≠ enviado" : "";
+    }
+    progreso();
+    f.items.forEach(marcarDif);
+
+    main.querySelector("#backBtn").addEventListener("click", function(){ irA("pedidos"); });
+    main.querySelector("#printBtn").addEventListener("click", function(){ printPedido(p); });
+    main.querySelector("#deleteBtn").addEventListener("click", function(){ eliminarPedido(p); });
+    var b;
+    if((b = main.querySelector("#contBtn"))) b.addEventListener("click", function(){ continuarPedido(p); });
+    if((b = main.querySelector("#reabrirPedBtn"))) b.addEventListener("click", function(){ reabrirPedido(p); });
+    if((b = main.querySelector("#reabrirEnvBtn"))) b.addEventListener("click", function(){ reabrirEnvio(p); });
+    if((b = main.querySelector("#reabrirRecBtn"))) b.addEventListener("click", function(){ reabrirRecepcion(p); });
+    if((b = main.querySelector("#rejectBtn"))) b.addEventListener("click", function(){ rechazarPedido(p); });
+
+    function itemDe(attr, el){ var id = el.getAttribute(attr); return f.items.find(function(x){ return x.id===id; }); }
+    main.querySelectorAll("[data-envio]").forEach(function(inp){
+      inp.addEventListener("input", function(){ var it = itemDe("data-envio", inp); if(it){ it.envioCant = inp.value; delete f.faltan[it.id]; } progreso(); });
+    });
+    main.querySelectorAll("[data-recibido]").forEach(function(inp){
+      inp.addEventListener("input", function(){ var it = itemDe("data-recibido", inp); if(it){ it.recibidoCant = inp.value; delete f.faltan[it.id]; marcarDif(it); } progreso(); });
+    });
+    main.querySelectorAll("[data-noenv]").forEach(function(chk){
+      chk.addEventListener("change", function(){
+        var it = itemDe("data-noenv", chk);
+        if(it){ it.noEnviado = chk.checked; if(chk.checked){ it.envioCant=""; it.rechazado=false; } delete f.faltan[it.id]; }
+        renderDetail(main, state.detailId);
+      });
+    });
+    main.querySelectorAll("[data-rechazar]").forEach(function(chk){
+      chk.addEventListener("change", function(){
+        var it = itemDe("data-rechazar", chk);
+        if(it){ it.rechazado = chk.checked; if(chk.checked){ it.envioCant=""; it.noEnviado=false; it.fechaEstimada=""; } delete f.faltan[it.id]; }
+        renderDetail(main, state.detailId);
+      });
+    });
+    main.querySelectorAll("[data-motivo]").forEach(function(inp){
+      inp.addEventListener("input", function(){ var it = itemDe("data-motivo", inp); if(it){ it.motivo = inp.value; } });
+    });
+    main.querySelectorAll("[data-festimada]").forEach(function(inp){
+      inp.addEventListener("change", function(){ var it = itemDe("data-festimada", inp); if(it) it.fechaEstimada = inp.value; });
+    });
+    var quienInp = main.querySelector("#quienNombre");
+    if(quienInp) quienInp.addEventListener("input", function(e){ f.quienNombre = e.target.value; });
+    if((b = main.querySelector("#saveProv"))) b.addEventListener("click", function(e){ (mode==="envio"?guardarEnvio:guardarRecepcion)(p, false, e.currentTarget); });
+    if((b = main.querySelector("#saveFinal"))) b.addEventListener("click", function(e){ (mode==="envio"?guardarEnvio:guardarRecepcion)(p, true, e.currentTarget); });
+
+    main.querySelectorAll("[data-cancelar]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var it = (p.items||[]).find(function(x){ return x.id===btn.getAttribute("data-cancelar"); });
+        if(it) cancelarItem(p, it);
+      });
+    });
+    main.querySelectorAll("[data-reenviar]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var it = (p.items||[]).find(function(x){ return x.id===btn.getAttribute("data-reenviar"); });
+        if(it) reenviarItem(p, it);
+      });
+    });
+  }
+
+  function noEnviadoHtml(it, conBoton){
+    var html = '<div class="idr-readonly">Para más tarde'+(it.motivo?' — <b>'+esc(it.motivo)+'</b>':'')+(it.fechaEstimada?' (estimado: '+esc(fmtDate(it.fechaEstimada))+')':'')+'</div>';
+    if(conBoton){
+      html += '<div class="idr-controls" style="margin-top:8px"><button class="btn btn-ghost btn-sm" data-reenviar="'+esc(it.id)+'" type="button">Ya se mandó</button>'+
+        tip("Cuando fábrica lo mande, tocá acá y cargá la cantidad. El pedido vuelve a «Esperando recepción» para que el local confirme ese ítem.")+
+        '<button class="btn btn-ghost btn-sm btn-danger-txt" data-cancelar="'+esc(it.id)+'" type="button">Ya no se manda</button>'+
+        tip("Si al final no se va a mandar (por ejemplo, se reemplazó por otra cosa), dalo de baja para que deje de figurar como pendiente.")+'</div>';
+    }
+    return html;
+  }
+  function rechazadoHtml(it){
+    return '<div class="idr-readonly">Rechazado'+(it.motivo?' — <b>'+esc(it.motivo)+'</b>':'')+'</div>';
+  }
+
+  /* ---------- guardar envío (fábrica) ---------- */
+  function guardarEnvio(p, final, btn){
+    var f = state.editForm, main = el("main");
+    var quien = (f.quienNombre||"").trim();
+    if(!quien){ avisar("Falta un dato", "Completá «¿Quién envía?»."); var q = document.getElementById("quienNombre"); if(q) q.focus(); return; }
+
+    var malos = [], faltan = [], sinMotivo = [], ceros = [], demas = [];
+    var items = f.items.map(function(it){
+      var estado = "pendiente", cant = "";
+      if(it.rechazado) estado = "rechazado";
+      else if(it.noEnviado) estado = "no_enviado";
+      else if(String(it.envioCant).trim()!==""){
+        cant = num(it.envioCant);
+        if(isNaN(cant)) malos.push(it);
+        else { estado = "enviado"; if(cant===0) ceros.push(it); var pc = num(it.pedidoCant); if(pc!=="" && !isNaN(pc) && cant>pc) demas.push(it); }
+      }
+      if(estado==="pendiente") faltan.push(it);
+      if((estado==="no_enviado"||estado==="rechazado") && !String(it.motivo).trim()) sinMotivo.push(it);
+      var o = {id:it.id, s:estado};
+      if(estado==="enviado") o.e = String(cant);
+      if(estado==="no_enviado"||estado==="rechazado"){ if(String(it.motivo).trim()) o.m = it.motivo.trim(); }
+      if(estado==="no_enviado" && it.fechaEstimada) o.f = it.fechaEstimada;
+      return o;
+    });
+
+    f.faltan = {};
+    if(malos.length){
+      malos.forEach(function(it){ f.faltan[it.id]=true; });
+      renderDetail(main, p.id);
+      avisar("Hay cantidades que no son números", "Poné solo números (por ejemplo 2 o 1,5). Revisá:"+lista(malos.map(function(it){ return it.name+": «"+it.envioCant+"»"; })));
+      return;
+    }
+    var pasos = Promise.resolve(true);
+    if(final){
+      if(faltan.length){
+        faltan.forEach(function(it){ f.faltan[it.id]=true; });
+        renderDetail(main, p.id);
+        avisar("No se puede enviar todavía",
+          "Faltan completar <b>"+faltan.length+"</b> ítem(s) (marcados en el pedido):"+lista(faltan.map(function(it){ return it.name; }))+
+          "Cargá lo que mandás, o marcá «Más tarde» o «Rechazar». Si querés seguir después, tocá «Guardado provisorio».");
+        return;
+      }
+      if(sinMotivo.length){
+        sinMotivo.forEach(function(it){ f.faltan[it.id]=true; });
+        renderDetail(main, p.id);
+        avisar("Falta el motivo", "Completá el motivo de los ítems marcados «Más tarde» o «Rechazar»:"+lista(sinMotivo.map(function(it){ return it.name; })));
+        return;
+      }
+      if(ceros.length) pasos = pasos.then(function(ok){ return ok && confirmar("Ítems con 0", "Pusiste 0 en:"+lista(ceros.map(function(it){ return it.name; }))+"¿No sería «Más tarde» o «Rechazar»?", "Enviar igual", "Volver a revisar"); });
+      if(demas.length) pasos = pasos.then(function(ok){ return ok && confirmar("Más de lo pedido", "Mandás más de lo que pidieron en:"+lista(demas.map(function(it){ return it.name+" (pidieron "+it.pedidoCant+", mandás "+it.envioCant+")"; }))+"¿Está bien?", "Sí, está bien", "Volver a revisar"); });
+      pasos = pasos.then(function(ok){
+        if(!ok) return false;
+        var nE = items.filter(function(x){ return x.s==="enviado"; }).length;
+        var nT = items.filter(function(x){ return x.s==="no_enviado"; }).length;
+        var nR = items.filter(function(x){ return x.s==="rechazado"; }).length;
+        var txt = "Mandás <b>"+nE+"</b> ítem(s)"+(nT?", <b>"+nT+"</b> quedan para más tarde":"")+(nR?", <b>"+nR+"</b> rechazados":"")+".<br><br>";
+        txt += nE ? "El local va a tener que confirmar lo que recibe." : "Como no se manda nada ahora, el pedido queda cerrado y los ítems «más tarde» siguen a la vista.";
+        return confirmar("¿Enviar el pedido?", txt, "Enviar", "Volver");
+      });
+    }
+    pasos.then(function(ok){
+      if(!ok) return;
+      correr("updatePedidoEnvio", {pedidoId:p.id, items:items, nombre:quien, final:final}, {
+        btn: btn,
+        verificar: final ? function(ps){ var x = ps.find(function(y){ return y.id===p.id; }); return !!x && (x.estado==="enviado"||x.estado==="cerrado"); } : null
+      }).then(function(res){
+        if(!res) return;
+        lsSet("dc_quien_envia", quien);
+        toast(final ? "Envío guardado y enviado ✓" : "Guardado provisorio ✓ — el pedido sigue pendiente.");
+        state.editForm = null;
+        loadData(true);
+      });
+    });
+  }
+
+  /* ---------- guardar recepción (local) ---------- */
+  function guardarRecepcion(p, final, btn){
+    var f = state.editForm, main = el("main");
+    var quien = (f.quienNombre||"").trim();
+    if(!quien){ avisar("Falta un dato", "Completá «¿Quién recibe?»."); var q = document.getElementById("quienNombre"); if(q) q.focus(); return; }
+    var enviados = f.items.filter(function(it){ return it.enviado; });
+    var malos = [], faltan = [], difs = [];
+    var items = enviados.map(function(it){
+      var r = num(it.recibidoCant);
+      if(String(it.recibidoCant).trim()==="") faltan.push(it);
+      else if(isNaN(r)) malos.push(it);
+      else if(r!==num(it.envioCant)) difs.push(it);
+      return {id:it.id, r: (r===""||isNaN(r)) ? "" : String(r)};
+    });
+    f.faltan = {};
+    if(malos.length){
+      malos.forEach(function(it){ f.faltan[it.id]=true; });
+      renderDetail(main, p.id);
+      avisar("Hay cantidades que no son números", "Poné solo números. Revisá:"+lista(malos.map(function(it){ return it.name+": «"+it.recibidoCant+"»"; })));
+      return;
+    }
+    var pasos = Promise.resolve(true);
+    if(final){
+      if(faltan.length){
+        faltan.forEach(function(it){ f.faltan[it.id]=true; });
+        renderDetail(main, p.id);
+        avisar("No se puede confirmar todavía",
+          "Faltan completar <b>"+faltan.length+"</b> ítem(s) (marcados en el pedido):"+lista(faltan.map(function(it){ return it.name; }))+
+          "<b>Si algo no llegó, poné 0.</b> Si querés seguir después, tocá «Guardado provisorio».");
+        return;
+      }
+      if(difs.length) pasos = pasos.then(function(ok){ return ok && confirmar("Lo recibido no coincide", "En estos ítems llegó distinto de lo enviado:"+lista(difs.map(function(it){ return it.name+" (enviado "+it.envioCant+", recibido "+it.recibidoCant+")"; }))+"¿Confirmar igual?", "Sí, confirmar", "Volver a revisar"); });
+      pasos = pasos.then(function(ok){
+        return ok && confirmar("¿Confirmar la recepción?", "Se cierra el pedido con lo que cargaste. Si después hay que corregir algo, se puede reabrir.", "Confirmar", "Volver");
+      });
+    }
+    pasos.then(function(ok){
+      if(!ok) return;
+      correr("updatePedidoRecepcion", {pedidoId:p.id, items:items, nombre:quien, final:final}, {
+        btn: btn,
+        verificar: final ? function(ps){ var x = ps.find(function(y){ return y.id===p.id; }); return !!x && x.estado==="cerrado"; } : null
+      }).then(function(res){
+        if(!res) return;
+        lsSet("dc_quien_recibe", quien);
+        toast(final ? "Recepción confirmada ✓ — pedido cerrado." : "Guardado provisorio ✓ — falta confirmar la recepción.");
+        state.editForm = null;
+        loadData(true);
+      });
+    });
+  }
+
+  /* ---------- reabrir / reenviar / rechazar / eliminar ---------- */
+  function reabrirEnvio(p){
+    var hayRecibido = (p.items||[]).some(function(it){ return String(it.recibidoCant||"").trim()!==""; });
+    pedirNombre("Reabrir el envío",
+      'El pedido vuelve a «Pendiente» para que fábrica corrija lo que mandó. El local no va a poder confirmar la recepción hasta que fábrica lo vuelva a enviar.'+
+      (hayRecibido?'<br><br><b>Ojo:</b> el local ya cargó parte de la recepción; eso se mantiene.':''),
+      "dc_quien_envia", "Reabrir envío").then(function(v){
+      if(!v) return;
+      correr("reabrirEnvio", {pedidoId:p.id, nombre:v.nombre}).then(function(res){
+        if(!res) return;
+        toast("Envío reabierto."); state.editForm = null; loadData(true);
+      });
+    });
+  }
+
+  function reabrirRecepcion(p){
+    pedirNombre("Reabrir la recepción",
+      'El pedido vuelve a «Esperando recepción» para corregir lo que se cargó como recibido.',
+      "dc_quien_recibe", "Reabrir recepción").then(function(v){
+      if(!v) return;
+      correr("reabrirRecepcion", {pedidoId:p.id, nombre:v.nombre}).then(function(res){
+        if(!res) return;
+        toast("Recepción reabierta."); state.editForm = null; loadData(true);
+      });
+    });
+  }
+
+  function reenviarItem(p, it){
+    pedirNombre("Mandar ítem pendiente",
+      '<b>'+esc(it.name)+'</b> (pedido: '+esc(it.pedidoCant)+'). Había quedado para más tarde'+(it.motivo?' — '+esc(it.motivo):'')+'.<br>El pedido vuelve a «Esperando recepción» para que el local confirme este ítem.',
+      "dc_quien_envia", "Ya se mandó",
+      [{id:"cant", label:"Cantidad que se manda", value:String(it.pedidoCant||""), required:true, numeric:true, requiredMsg:"Cargá la cantidad que se manda."}]
+    ).then(function(v){
+      if(!v) return;
+      correr("reenviarItem", {pedidoId:p.id, itemId:it.id, envioCant:String(num(v.cant)), nombre:v.nombre}).then(function(res){
+        if(!res) return;
+        toast("Ítem enviado. El pedido vuelve a esperar recepción."); state.editForm = null; loadData(true);
+      });
+    });
+  }
+
+  function cancelarItem(p, it){
+    pedirNombre("Dar de baja el ítem",
+      '<b>'+esc(it.name)+'</b> había quedado para más tarde'+(it.motivo?' — '+esc(it.motivo):'')+'. Si ya no se va a mandar, queda como rechazado y deja de figurar como pendiente.',
+      "dc_quien_envia", "Dar de baja",
+      [{id:"motivo", label:"Motivo", required:true, requiredMsg:"Falta el motivo.", placeholder:"ej: se mandó otra cosa / ya no hace falta"}], true
+    ).then(function(v){
+      if(!v) return;
+      correr("cancelarItemPendiente", {pedidoId:p.id, itemId:it.id, motivo:v.motivo, nombre:v.nombre}).then(function(res){
+        if(!res) return;
+        toast("Ítem dado de baja."); state.editForm = null; loadData(true);
+      });
+    });
+  }
+
+  var MOTIVOS_RECHAZO = ["Pedido duplicado", "Ya se mandó en otro pedido", "Cargado por error", "Otro"];
+  function rechazarPedido(p){
+    pedirNombre("Rechazar el pedido",
+      'No se le va a enviar nada a <b>'+esc(LOCAL_LABEL[p.local]||p.local)+'</b> por este pedido y sale de Pendientes. El registro queda (con el motivo).',
+      "dc_quien_envia", "Rechazar pedido",
+      [{id:"motivo", label:"Motivo", type:"select", options:MOTIVOS_RECHAZO, required:true, requiredMsg:"Elegí el motivo del rechazo."},
+       {id:"detalle", label:"Detalle (obligatorio si elegís «Otro»)", placeholder:"ej: es igual al del martes"}], true
+    ).then(function(v){
+      if(!v) return;
+      if(v.motivo==="Otro" && !v.detalle){ avisar("Falta el detalle", "Si el motivo es «Otro», escribí cuál."); return; }
+      var motivo = v.motivo + (v.detalle ? ": "+v.detalle : "");
+      correr("rechazarPedido", {pedidoId:p.id, motivo:motivo, nombre:v.nombre}).then(function(res){
+        if(!res) return;
+        toast("Pedido rechazado."); irA("pedidos"); loadData(true);
+      });
+    });
+  }
+
+  var MOTIVOS_ELIMINAR = ["Pedido viejo que quedó sin cerrar", "Pedido duplicado", "Cargado por error", "Prueba", "Otro"];
+  function eliminarPedido(p){
+    var extra = p.estado==="cerrado" ? '<br><br><b>Ojo: este pedido está cerrado</b> (ya se envió y se recibió). Si lo eliminás deja de figurar en el historial.' : '';
+    pedirNombre("Eliminar el pedido",
+      'Se borra el pedido de <b>'+esc(LOCAL_LABEL[p.local]||p.local)+'</b> del '+esc(fmtCorta(p.fecha))+' ('+(p.items||[]).length+' ítems): deja de aparecer en la lista y en el CSV. '+
+      'Queda una copia en la solapa «Eliminados» de la planilla.'+extra,
+      "dc_quien_accion", "Eliminar",
+      [{id:"motivo", label:"Motivo", type:"select", options:MOTIVOS_ELIMINAR, required:true, requiredMsg:"Elegí el motivo."},
+       {id:"detalle", label:"Detalle (obligatorio si elegís «Otro»)", placeholder:""}], true
+    ).then(function(v){
+      if(!v) return;
+      if(v.motivo==="Otro" && !v.detalle){ avisar("Falta el detalle", "Si el motivo es «Otro», escribí cuál."); return; }
+      correr("eliminarPedido", {pedidoId:p.id, nombre:v.nombre, motivo:v.motivo+(v.detalle?": "+v.detalle:"")}).then(function(res){
+        if(!res) return;
+        if(state.newOrderForm && state.newOrderForm.pedidoId===p.id) state.newOrderForm = null;
+        toast("Pedido eliminado.");
+        if(state.tab==="pedidos") state.detailId = null;
+        state.editForm = null;
+        loadData(true);
+      });
+    });
+  }
+
+  /* ---------- imprimir ---------- */
+  function printPedido(p){
+    var byCat = groupByCategory(p.items||[]);
+    var html = '<h1>Pedido de '+esc(TIPO_LABEL[tipoDe(p)])+' — '+esc(LOCAL_LABEL[p.local]||p.local)+'</h1>';
+    html += '<div class="ps-meta">Fecha: '+esc(fmtDate(p.fecha))+(p.quienPide?' &nbsp;·&nbsp; Pide: '+esc(p.quienPide):'')+'</div>';
+    if(p.notas) html += '<div class="ps-meta">Notas: '+esc(p.notas)+'</div>';
+    Object.keys(byCat).forEach(function(ck){
+      var list = (byCat[ck]||[]).filter(function(it){ return it.pedidoCant && String(it.pedidoCant).trim()!==""; });
+      if(list.length===0) return;
+      html += '<div class="ps-cat">'+esc(CAT_LABEL[ck]||ck)+'</div>';
+      list.forEach(function(it){
+        html += '<div class="ps-item"><span class="ps-check"></span><span class="ps-name">'+esc(it.name)+(it.isExtra?' (nuevo)':'')+'</span><span class="ps-qty">'+esc(it.pedidoCant)+'</span></div>';
+      });
+    });
+    html += '<div class="ps-meta" style="margin-top:22px">Preparado por: _______________________ &nbsp;&nbsp; Fecha: ___/___/___</div>';
+    var ps = document.getElementById("pedPrint");
+    if(!ps){ ps = document.createElement("div"); ps.id = "pedPrint"; document.body.appendChild(ps); }
+    ps.innerHTML = html;
+    document.body.classList.add("imprimiendo-ped");
+    var quitar = function(){ document.body.classList.remove("imprimiendo-ped"); window.removeEventListener("afterprint", quitar); };
+    window.addEventListener("afterprint", quitar);
+    window.print();
+    setTimeout(quitar, 1500);
+  }
+
+  /* =====================================================================
+     CATÁLOGO (con clave)
+     ===================================================================== */
+  function permMsg(err, action){
+    if(err && err.message && err.message.indexOf("PERMISO_DENEGADO")!==-1) return "Clave incorrecta: la edición del catálogo está restringida.";
+    return "No se pudo "+action+": "+(err && err.message ? err.message : "probá de nuevo.");
+  }
+  var adminPassword_ = null; // solo en memoria; se pierde al recargar la página
+
+  function renderCatalogo(main){
+    var byCat = groupByCategory(catalogItems);
+    var unlocked = state.adminUnlocked;
+    var html = '';
+    if(!unlocked){
+      html += '<div style="display:flex;justify-content:flex-end;margin-bottom:14px"><button class="btn btn-ghost btn-sm" id="unlockCatalog" type="button">🔒 Editar catálogo</button></div>';
+    } else {
+      html += '<div class="banner" style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap">'+
+        '<span>Modo edición activo. Los cambios aplican a los <b>próximos</b> pedidos; los ya cargados no se modifican.</span>'+
+        '<button class="btn btn-ghost btn-sm" id="lockCatalog" type="button">Salir del modo edición</button></div>';
+    }
+    TIPOS.forEach(function(t){
+      html += '<div class="group-title">'+esc(t.label)+'</div>';
+      catsDeTipo(t.key).forEach(function(c){
+        var list = ordenCatalogo(byCat[c.key]||[]);
+        html += '<div class="panel"><div class="cat-block">';
+        html += '<div class="cat-title">'+esc(c.label)+' <span class="mono" style="font-weight:500;opacity:.7">('+list.length+')</span></div>';
+        list.forEach(function(it, idx){
+          html += '<div class="catalog-item"><div class="ci-name">'+esc(it.name)+'</div>';
+          if(unlocked){
+            html += '<div class="ci-controls">';
+            html += '<button class="rm-btn" data-move-up="'+esc(it.id)+'" title="Subir" type="button" '+(idx===0?"disabled":"")+'>↑</button>';
+            html += '<button class="rm-btn" data-move-down="'+esc(it.id)+'" title="Bajar" type="button" '+(idx===list.length-1?"disabled":"")+'>↓</button>';
+            html += '<select class="ci-cat-select" data-move-cat="'+esc(it.id)+'" title="Cambiar de categoría">';
+            CATEGORIES.forEach(function(c2){ html += '<option value="'+c2.key+'"'+(c2.key===c.key?" selected":"")+'>'+esc(c2.label)+'</option>'; });
+            html += '</select>';
+            html += '<button class="rm-btn" data-del-item="'+esc(it.id)+'" title="Eliminar" type="button">×</button>';
+            html += '</div>';
+          }
+          html += '</div>';
+        });
+        if(unlocked){
+          html += '<div class="catalog-add"><input type="text" placeholder="Nuevo ítem en '+esc(c.label)+'…" data-newcat="'+c.key+'">'+
+                  '<button class="btn btn-ghost btn-sm" data-addcat="'+c.key+'" type="button">+ Agregar</button></div>';
+        }
+        html += '</div></div>';
+      });
+    });
+    main.innerHTML = html;
+
+    var unlockBtn = document.getElementById("unlockCatalog");
+    if(unlockBtn){
+      unlockBtn.addEventListener("click", function(){
+        var pass = window.prompt("Clave para editar el catálogo:");
+        if(pass==null) return;
+        unlockBtn.disabled = true;
+        callServer("checkAdmin", {password:pass}).then(function(res){
+          if(res && res.ok){ adminPassword_ = pass; state.adminUnlocked = true; renderCatalogo(main); }
+          else { toast("Clave incorrecta."); unlockBtn.disabled = false; }
+        }).catch(function(err){ console.error(err); toast("No se pudo verificar la clave."); unlockBtn.disabled=false; });
+      });
+    }
+    var lockBtn = document.getElementById("lockCatalog");
+    if(lockBtn){ lockBtn.addEventListener("click", function(){ adminPassword_ = null; state.adminUnlocked = false; renderCatalogo(main); }); }
+
+    function cat(action, payload, okMsg, verbo){
+      callServer(action, payload).then(function(){ if(okMsg) toast(okMsg); loadData(true); })
+        .catch(function(err){ console.error(err); toast(permMsg(err, verbo)); renderCatalogo(main); });
+    }
+    main.querySelectorAll("[data-del-item]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var id = btn.getAttribute("data-del-item");
+        var it = catalogItems.find(function(x){ return x.id===id; });
+        confirmar("Eliminar ítem del catálogo", "¿Eliminar <b>"+esc(it?it.name:"")+"</b>? Los pedidos ya cargados no cambian.", "Eliminar", "Volver", true).then(function(ok){
+          if(ok) cat("deleteCatalogItem", {id:id, password:adminPassword_}, "Ítem eliminado", "eliminar");
+        });
+      });
+    });
+    main.querySelectorAll("[data-move-up]").forEach(function(btn){
+      btn.addEventListener("click", function(){ if(!btn.disabled) cat("moveCatalogItem", {id:btn.getAttribute("data-move-up"), direction:"up", password:adminPassword_}, "", "mover"); });
+    });
+    main.querySelectorAll("[data-move-down]").forEach(function(btn){
+      btn.addEventListener("click", function(){ if(!btn.disabled) cat("moveCatalogItem", {id:btn.getAttribute("data-move-down"), direction:"down", password:adminPassword_}, "", "mover"); });
+    });
+    main.querySelectorAll("[data-move-cat]").forEach(function(sel){
+      sel.addEventListener("change", function(){ cat("setCatalogItemCategory", {id:sel.getAttribute("data-move-cat"), categoria:sel.value, password:adminPassword_}, "Ítem movido de categoría", "mover"); });
+    });
+    main.querySelectorAll("[data-addcat]").forEach(function(btn){
+      btn.addEventListener("click", function(){
+        var c = btn.getAttribute("data-addcat");
+        var input = main.querySelector('[data-newcat="'+c+'"]');
+        var name = (input.value||"").trim();
+        if(!name){ input.focus(); return; }
+        cat("addCatalogItem", {categoria:c, nombre:name, password:adminPassword_}, "Ítem agregado", "agregar");
+      });
+    });
+  }
+
+  /* ---------- abrir la sección (27/11/2026) ---------- */
+  function abrir(contenedor, opciones){
+    ROOT = contenedor; OPC = opciones || {};
+    ROOT.classList.add("ped-app");
+    var verTabs = OPC.modo === "local" || OPC.modo === "todo";
+    ROOT.innerHTML =
+      '<div class="wrap-ped">'+
+      '<div class="ped-bar"><span class="sub" style="font-size:12.5px;color:var(--ink-soft)">'+esc(OPC.subtitulo||"")+'</span>'+
+      '<button class="refresh" data-ped="refreshBtn" type="button">⟳ Actualizar</button></div>'+
+      (verTabs ? '<nav class="ped-tabs" data-ped="tabs">'+
+        '<button data-tab="nuevo">Nuevo pedido</button>'+
+        '<button data-tab="pedidos">'+(OPC.modo==="local"?"Mis pedidos":"Pedidos y envíos")+' <span class="count" data-ped="pendingCount" style="display:none">0</span></button>'+
+        (OPC.modo==="todo" ? '<button data-tab="catalogo">Catálogo</button>' : '')+
+      '</nav>' : '')+
+      '<main class="ped-main" data-ped="main"><div class="empty"><div class="big">🧾</div>Cargando…</div></main>'+
+      '<div class="toast" data-ped="toast"></div><div class="ped-tipbox" data-ped="tipBox"></div>'+
+      '</div>';
+    state.detailId = null; state.editForm = null; state.exito = null; state.adminUnlocked = false;
+    state.tab = OPC.vista === "catalogo" ? "catalogo" : (OPC.vista === "nuevo" ? "nuevo" : "pedidos");
+    state.filterTipo = OPC.tipo || "TODOS";
+    state.filterLocal = OPC.local || "TODOS";
+    state.filterEstado = OPC.estado || (OPC.modo === "local" ? "todos" : "pendiente");
+    if(OPC.local && state.newOrderForm && !state.newOrderForm.existe) state.newOrderForm.local = OPC.local;
+    var tabs = el("tabs");
+    if(tabs) tabs.addEventListener("click", function(e){
+      var btn = e.target.closest("button[data-tab]");
+      if(!btn) return;
+      state.tab = btn.getAttribute("data-tab");
+      state.exito = null;
+      if(state.tab!=="pedidos"){ state.detailId=null; }
+      state.editForm = null;
+      render();
+    });
+    el("refreshBtn").addEventListener("click", function(){
+      loadData(false).then(function(){ toast("Actualizado"); });
+    });
+    el("main").addEventListener("click", accionesAviso);
+    if(loaded) render();          // lo último que se vio, al instante
+    return loadData(loaded);      // y se actualiza
+  }
+  // cuántos pedidos hay para preparar, por tipo (para las solapas de Despacho)
+  function contar(){
+    var r = { INSUMOS: 0, INGREDIENTES: 0 };
+    pedidos.forEach(function(p){ if(p.estado === "pendiente") r[tipoDe(p)]++; });
+    return r;
+  }
+  // fresco = true: lee la planilla sí o sí (el inicio); si no, sirve lo leído hace menos de 30 s
+  function resumen(fresco){
+    if(!fresco && loaded && Date.now() - ultimaCarga < 30000) return Promise.resolve(contar());
+    return callServer("getData").then(function(data){
+      catalogItems = data.catalog || []; pedidos = data.pedidos || []; loaded = true; ultimaCarga = Date.now();
+      return contar();
+    });
+  }
+  // pedidos que fábrica ya envió y el local todavía no confirmó
+  function porRecibir(local, fresco){
+    var contarLocal = function(){ return pedidos.filter(function(p){ return p.estado === "enviado" && (!local || p.local === local); }).length; };
+    if(!fresco && loaded && Date.now() - ultimaCarga < 30000) return Promise.resolve(contarLocal());
+    return callServer("getData").then(function(data){
+      catalogItems = data.catalog || []; pedidos = data.pedidos || []; loaded = true; ultimaCarga = Date.now();
+      return contarLocal();
+    });
+  }
+  return { abrir: abrir, resumen: resumen, porRecibir: porRecibir };
+})();
+
 
 iniciarApp();
 </script>
