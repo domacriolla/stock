@@ -288,6 +288,10 @@
   .fila-agregar{display:flex;gap:8px;align-items:center;margin:10px 0 4px;flex-wrap:wrap;}
   .fila-agregar select{max-width:340px;}
   .unidad-prod{color:var(--ink-soft);font-size:11.5px;font-weight:400;white-space:nowrap;}
+  .muzza-doble{display:flex;flex-wrap:wrap;gap:4px 10px;align-items:center;font-size:12.5px;}
+  .muzza-doble label{display:flex;align-items:center;gap:4px;font-weight:600;white-space:nowrap;}
+  .muzza-doble input{width:68px !important;min-width:68px;max-width:68px !important;flex:0 0 68px;}
+  .muzza-doble .mz-total{flex-basis:100%;color:var(--ink-soft);font-size:12px;}
   .plan-dia{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;justify-content:space-between;border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:10px 0 14px;font-size:13px;}
   .plan-dia.provisorio{background:#fdf6e3;border-color:#e6cf8f;}
   .plan-dia.confirmado{background:var(--herb-bg);}
@@ -500,6 +504,9 @@
   .split-esp .split-sep{color:var(--ink-soft);}
   .split-esp.reg{justify-content:flex-start;margin-top:4px;}
   .split-esp .sp-cuando{font-weight:400;color:var(--ink-soft);}
+  .aviso-especial .ae-estado{font-size:13px;}
+  .aviso-especial .ae-ok{color:#1d6b33;font-weight:600;}
+  .aviso-especial .ae-mal{color:#b3261e;font-weight:700;}
   .aviso-especial.tarde{background:#fff4e5;border:2px solid #c77700;}
   .aviso-especial.tarde .ae-tit{color:#8a5200;font-size:16px;}
   .nav-bloques{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0 4px;position:sticky;top:0;z-index:5;background:var(--bg, #fff);padding:6px 0;}
@@ -1978,7 +1985,7 @@ async function renderLocal(bloque){
     tr.dataset.item = nombre;
     tr.innerHTML = `
       <td>${esExtra ? `<span class="item-extra">↳ otro lote</span>` : nombre + etiquetaUnidad(nombre, bloque === 'locales' ? 'porciones' : 'kg')}</td>
-      <td><input type="number" min="0" step="${bloque !== 'locales' && ENVIO_EN_KILOS[nombre] ? '0.01' : pasoProd(nombre)}" class="inp-cant" placeholder="—" value="${g.cantidad != null && g.cantidad !== '' ? g.cantidad : ''}"></td>
+      <td>${bloque === 'locales' && ENVIO_EN_KILOS[nombre] ? htmlMuzzaDoble(ENVIO_EN_KILOS[nombre], 'porciones', g.cantidad, 'inp-cant') : `<input type="number" min="0" step="${bloque !== 'locales' && ENVIO_EN_KILOS[nombre] ? '0.01' : pasoProd(nombre)}" class="inp-cant" placeholder="—" value="${g.cantidad != null && g.cantidad !== '' ? g.cantidad : ''}">`}</td>
       <td><input type="date" class="inp-venc" value="${g.vencimiento || ''}"></td>
       <td class="col-add">${esExtra ? '' : '<button type="button" class="add-lote-btn" title="Agregar otro vencimiento para este producto">+</button>'}</td>
       <td class="col-del">${esExtra ? '<button type="button" class="del-btn" title="Quitar">✕</button>' : ''}</td>
@@ -2337,13 +2344,48 @@ function dec(n){ return (Number(n) || 0).toLocaleString('es-AR', { maximumFracti
 // cantidad de un producto: con decimales solo si el producto los usa
 function cantProd(nombre, n){ return esDecimal(nombre) ? dec(n) : ent(n); }
 function pasoProd(nombre){ return esDecimal(nombre) ? '0.01' : '1'; }
+// MUZZARELLA EN LOS LOCALES (28/11/2026, Carolina: "que quede claro para
+// locales que puedan cargar topping o kilos"): en el stock de cierre y en la
+// recepción el local carga TOPPINGS (porciones de 250 g) y/o KG sueltos; la
+// app suma el equivalente en un campo oculto con la clase de siempre
+// (inp-cant en porciones para el stock, inp-recibido en kg para la recepción),
+// así el resto del guardado no cambia. Fábrica sigue mandando en kg.
+function htmlMuzzaDoble(kgPorcion, base, valor, claseOculta){
+  const v = valor === '' || valor == null ? '' : Math.round(Number(valor) * 100) / 100;
+  const top = v === '' ? '' : (base === 'porciones' ? v : '');
+  const kg = v === '' ? '' : (base === 'kg' ? v : '');
+  return `<div class="muzza-doble" data-kgp="${kgPorcion}" data-base="${base}">
+      <label>Toppings <input type="number" min="0" step="any" class="mz-top" value="${top}" placeholder="0"></label>
+      <label>+ kg <input type="number" min="0" step="0.01" class="mz-kg" value="${kg}" placeholder="0"></label>
+      <input type="hidden" class="${claseOculta}" value="${v}">
+      <div class="mz-total">${textoMuzzaTotal(kgPorcion, top, kg)}</div></div>`;
+}
+function textoMuzzaTotal(kgp, top, kg){
+  if(top === '' && kg === '') return 'Cargá toppings, kg o los dos';
+  const porc = (Number(top) || 0) + (Number(kg) || 0) / kgp;
+  return `= <strong>${dec(porc)} toppings</strong> · ${dec(porc * kgp)} kg`;
+}
+document.addEventListener('input', e => {
+  const t = e.target;
+  if(!t.matches || !t.matches('.muzza-doble .mz-top, .muzza-doble .mz-kg')) return;
+  const w = t.closest('.muzza-doble'), kgp = Number(w.dataset.kgp) || 0.25;
+  const top = w.querySelector('.mz-top').value.trim(), kg = w.querySelector('.mz-kg').value.trim();
+  const oculto = w.querySelector('input[type=hidden]');
+  if(top === '' && kg === '') oculto.value = '';
+  else {
+    const porc = (Number(top) || 0) + (Number(kg) || 0) / kgp;
+    oculto.value = String(Math.round((w.dataset.base === 'kg' ? porc * kgp : porc) * 100) / 100);
+  }
+  w.querySelector('.mz-total').innerHTML = textoMuzzaTotal(kgp, top, kg);
+  oculto.dispatchEvent(new Event('input', { bubbles: true }));
+});
 // etiqueta chica al lado del nombre. dondeMuzza: 'kg' (despacho de fábrica) o 'porciones' (local)
 function etiquetaUnidad(nombre, dondeMuzza){
   if(nombre === 'Pastones horno') return ' <span class="unidad-prod">(en pastones, no docenas)</span>';
   if(UNIDAD_PRODUCTO[nombre]) return ` <span class="unidad-prod">(${UNIDAD_PRODUCTO[nombre]})</span>`;
   if(UNIDAD_ENTERA[nombre]) return ` <span class="unidad-prod">(${UNIDAD_ENTERA[nombre]})</span>`;
   if(ENVIO_EN_KILOS[nombre] && dondeMuzza === 'kg') return ' <span class="unidad-prod">(kg)</span>';
-  if(ENVIO_EN_KILOS[nombre] && dondeMuzza === 'porciones') return ` <span class="unidad-prod">(porciones de ${ENVIO_EN_KILOS[nombre] * 1000} g)</span>`;
+  if(ENVIO_EN_KILOS[nombre] && dondeMuzza === 'porciones') return ` <span class="unidad-prod">(toppings de ${ENVIO_EN_KILOS[nombre] * 1000} g y/o kg)</span>`;
   return '';
 }
 // nombre con el que FÁBRICA ve el producto (despacho y qué producir)
@@ -2671,47 +2713,74 @@ function lineaPedidosEsp(det, fmt){
 function cortoPedidosEsp(det, fmt){
   return (det || []).map(x => `${NOMBRE_LOCAL_VISTA[x.local] || x.local} ${fmt(x.kg != null ? x.kg : x.cantidad)} <span class="sp-cuando">(${diaCorto(x.fechaEntrega).slice(0, 6).trim()})</span>`).join(' · ');
 }
+// 28/11/2026: marcas de urgencia y de enfriado del pedido especial
+function marcasEspecial(f){
+  return (f && f.especialUrgente ? ' <span class="tag-alerta">⚠ URGENCIA</span>' : '') + (f && f.especialEnfriar ? ' <span class="tag-alerta">⚠ revisar si se llega a enfriar</span>' : '');
+}
 function htmlSplitEspecial(f){
   if(!(f && f.especial > 0)) return '';
-  return `<div class="split-esp" title="Producción del día + pedido especial (ver el aviso de arriba)"><span class="sp-dia">día ${ent(f.aHacerDia)}</span><span class="split-sep">|</span><span class="sp-esp">★ ${cortoPedidosEsp(f.especialDetalle, ent)}</span></div>`;
+  return `<div class="split-esp" title="Producción del día + pedido especial (ver el aviso de arriba)"><span class="sp-dia">día ${ent(f.aHacerDia)}</span><span class="split-sep">|</span><span class="sp-esp">★ ${cortoPedidosEsp((f.especialDetalle || []).filter(x => x.cantidad > 0), ent)}</span>${marcasEspecial(f)}</div>`;
 }
 function htmlSplitEspecialKg(c){
   if(!(c && c.kilosEspecial > 0)) return '';
-  return `<div class="split-esp" title="Relleno del día + pedido especial (ver el aviso de arriba)"><span class="sp-dia">día <span class="kg-dia">${dec(c.kilosDia)}</span> kg</span><span class="split-sep">|</span><span class="sp-esp">★ ${cortoPedidosEsp(c.especialDetalle, v => dec(v) + ' kg')}</span></div>`;
+  return `<div class="split-esp" title="Relleno del día + pedido especial (ver el aviso de arriba)"><span class="sp-dia">día <span class="kg-dia">${dec(c.kilosDia)}</span> kg</span><span class="split-sep">|</span><span class="sp-esp">★ ${cortoPedidosEsp((c.especialDetalle || []).filter(x => x.kg > 0), v => dec(v) + ' kg')}</span></div>`;
 }
 function diaCorto(iso){ const d = new Date(iso + 'T12:00:00'); return ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'][d.getDay()] + ' ' + fmtFecha(iso).slice(0, 5); }
 // sector: 'produccion' | 'cocina' | 'discos' | 'postres'
+// 28/11/2026 (Carolina): ya no hay "registrado tarde": si no entra en el
+// plan sale como urgencia. Cada pedido de HOY dice cómo se cubre: sumado,
+// "alcanza con stock" (fábrica + el local que pide, después de su venta) o
+// "alcanza con relleno en cámara", y si hay que revisar que llegue a enfriar.
 function htmlAvisosEspeciales(data, sector){
   const e = data && data.especiales && data.especiales[sector];
-  if(!e || (!e.hoy.length && !e.semana.length && !(e.tarde || []).length)) return '';
+  if(!e || (!e.hoy.length && !e.semana.length)) return '';
   const porPedido = lista => {
     const g = {};
     lista.forEach(p => { const k = p.id; (g[k] = g[k] || { local: p.local, fecha: p.fechaEntrega, hora: p.horaEntrega, obs: p.observaciones, carga: p.fechaCarga, items: [] }).items.push(p); });
     return Object.values(g).sort((a, b) => (a.fecha + a.hora).localeCompare(b.fecha + b.hora));
   };
-  const linea = p => p.items.map(x => {
-    let t = `<strong>${x.producto}</strong> ${ent(x.cantidad)}`;
-    if(sector === 'cocina' && x.relleno) t += ` <span class="gris-txt">(relleno ${x.relleno}${x.kg != null ? ` = ${dec(x.kg)} kg` : (x.gramaje ? ` ≈ ${dec(x.cantidad * x.gramaje / 1000)} kg` : '')})</span>`;
-    if(sector === 'discos') t += ` <span class="gris-txt">(≈ ${dec(x.cantidad / 12)} doc.${/COPETIN$/i.test(x.producto) ? (/ F COPETIN$/i.test(x.producto) ? ' copetín frito' : ' copetín horno') : ''}${x.fechaArmado ? ` · se arma el ${diaCorto(x.fechaArmado)}` : ''})</span>`;
-    return t;
-  }).join(' · ');
   const local = l => NOMBRE_LOCAL_VISTA[l] || l;
-  const notaHoy = { produccion: 'Ya está sumado abajo, separado: "día X | ★ pedido especial".', postres: 'Ya está sumado abajo, separado: "día X | ★ pedido especial".', cocina: 'Ya está sumado a los kilos de abajo (separado: "día X kg | ★ pedido especial").', discos: 'Ya está sumado al corte de hoy.' }[sector];
-  const titHoy = { produccion: '🔔 HOY se arma un pedido especial', postres: '🔔 HOY se hace un pedido especial', cocina: '🔔 HOY se cocina el relleno de un pedido especial', discos: '🔔 HOY se cortan los discos de un pedido especial' }[sector];
+  const estado = x => {
+    const c = x.cobertura || {}, t = [];
+    const enStock = (Number(c.cubiertoLocal) || 0) + (Number(c.cubiertoFabrica) || 0);
+    if(enStock > 0){
+      const partes = [];
+      if(c.cubiertoFabrica > 0) partes.push(`fábrica ${ent(c.cubiertoFabrica)}`);
+      if(c.cubiertoLocal > 0) partes.push(`${local(x.local)} ${ent(c.cubiertoLocal)}`);
+      t.push(`<span class="ae-ok">✔ Alcanza con stock${enStock < x.cantidad ? ' en parte' : ''}: ${partes.join(' + ')}</span>`);
+    }
+    if(c.kgCamara > 0) t.push(`<span class="ae-ok">✔ ${dec(c.kgCamara)} kg salen del relleno en cámara</span>`);
+    if(c.neto != null){
+      const hacer = sector === 'cocina' && !x.dip ? `${dec(c.neto)} kg` : ent(c.neto);
+      t.push(c.neto > 0 ? `<span>se suma abajo: <strong>${hacer}</strong></span>` : `<span class="ae-ok">no hace falta hacer más</span>`);
+    }
+    if(x.modo === 'urgencia') t.push(`<span class="ae-mal">⚠ URGENCIA (cargado ${x.fechaCarga ? fmtFecha(x.fechaCarga).slice(0, 5) : '—'}${x.horaCarga ? ' ' + escHtml(x.horaCarga) : ''})</span>`);
+    if(x.modo === 'previo') t.push('<span class="gris-txt">se hace el día anterior a la entrega</span>');
+    if(x.alertaEnfriar) t.push('<span class="ae-mal">⚠ Revisar si se llega a enfriar</span>');
+    return t.length ? ` <span class="ae-estado">${t.join(' · ')}</span>` : '';
+  };
+  const linea = (p, conEstado) => p.items.map(x => {
+    let t = `<strong>${x.producto}</strong> ${ent(x.cantidad)}`;
+    if(sector === 'cocina' && x.preparado) t += ` <span class="gris-txt">(preparado de carne para el relleno ${x.relleno} del ${diaCorto(x.fechaArmado)} ≈ ${dec(x.kg)} kg de relleno)</span>`;
+    else if(sector === 'cocina' && x.dip) t += ' <span class="gris-txt">(dip)</span>';
+    else if(sector === 'cocina' && x.relleno) t += ` <span class="gris-txt">(relleno ${x.relleno}${x.kg != null ? ` = ${dec(x.kg)} kg` : (x.gramaje ? ` ≈ ${dec(x.cantidad * x.gramaje / 1000)} kg` : '')}${x.rellenoPrepCarne ? ', con el preparado de cámara' : ''})</span>`;
+    if(sector === 'discos') t += ` <span class="gris-txt">(≈ ${dec(x.cantidad / 12)} doc.${/COPETIN$/i.test(x.producto) ? (/ F COPETIN$/i.test(x.producto) ? ' copetín frito' : ' copetín horno') : ''}${x.fechaArmado ? ` · se arma el ${diaCorto(x.fechaArmado)}` : ''})</span>`;
+    if(conEstado) t += estado(x);
+    else if(x.modo === 'urgencia') t += ' <span class="ae-mal">⚠ urgencia</span>';
+    return t;
+  }).join('<br>');
+  const notaHoy = { produccion: 'Lo que hay que hacer ya está sumado abajo, separado: "día X | ★ pedido especial".', postres: 'Lo que hay que hacer ya está sumado abajo, separado: "día X | ★ pedido especial".', cocina: 'Lo que hay que hacer ya está sumado abajo (separado: "día X | ★ pedido especial").', discos: 'Ya está sumado al corte de hoy.' }[sector];
+  const titHoy = { produccion: '🔔 HOY se arma un pedido especial', postres: '🔔 HOY se hace un pedido especial', cocina: '🔔 HOY Cocina tiene un pedido especial', discos: '🔔 HOY se cortan los discos de un pedido especial' }[sector];
   let h = '';
   if(e.hoy.length){
     h += `<div class="aviso-especial hoy"><div class="ae-tit">${titHoy}</div>${porPedido(e.hoy).map(p =>
-      `<div class="ae-linea">Local <strong>${local(p.local)}</strong> — entrega <strong>${diaCorto(p.fecha)} ${escHtml(p.hora)} hs</strong>: ${linea(p)}${p.obs ? ` <span class="gris-txt">· ${escHtml(p.obs)}</span>` : ''}</div>`).join('')}
+      `<div class="ae-linea">Local <strong>${local(p.local)}</strong> — entrega <strong>${diaCorto(p.fecha)} ${escHtml(p.hora)} hs</strong>:${p.items.length > 1 ? '<br>' : ' '}${linea(p, sector !== 'discos')}${p.obs ? ` <span class="gris-txt">· ${escHtml(p.obs)}</span>` : ''}</div>`).join('')}
       <div class="ae-nota">${notaHoy}</div></div>`;
-  }
-  if((e.tarde || []).length){
-    h += `<div class="aviso-especial tarde"><div class="ae-tit">⚠ PEDIDO ESPECIAL registrado tarde — NO está sumado</div>${porPedido(e.tarde).map(p =>
-      `<div class="ae-linea">Local <strong>${local(p.local)}</strong> — registrado el <strong>${p.carga ? fmtFecha(p.carga).slice(0, 5) : '—'}</strong>, entrega <strong>${diaCorto(p.fecha)} ${escHtml(p.hora)} hs</strong>: ${linea(p)}</div>`).join('')}
-      <div class="ae-nota">${sector === 'cocina' ? 'Ese relleno ya se cocinó cuando entró el pedido. Si en cámara no alcanza, el día de la entrega aparece como urgencia.' : 'Se cargó cuando ese relleno ya estaba hecho. Armalo si hay relleno en cámara; si no, el día de la entrega aparece como urgencia ("PEDIDO ESPECIAL").'}</div></div>`;
   }
   if(e.semana.length){
     h += `<div class="aviso-especial semana"><div class="ae-tit">📅 Pedido especial esta semana</div>${porPedido(e.semana).map(p =>
-      `<div class="ae-linea">${diaCorto(p.items[0].fechaSector)}${p.items[0].fechaSector !== p.fecha ? ` (entrega ${diaCorto(p.fecha)})` : ''} — Local <strong>${local(p.local)}</strong>, ${escHtml(p.hora)} hs: ${linea(p)}</div>`).join('')}</div>`;
+      `<div class="ae-linea">${diaCorto(p.items[0].fechaSector)}${p.items[0].fechaSector !== p.fecha ? ` (entrega ${diaCorto(p.fecha)})` : ''} — Local <strong>${local(p.local)}</strong>, ${escHtml(p.hora)} hs: ${linea(p, false)}</div>`).join('')}
+      <div class="ae-nota">Si lo adelantan, cárguenlo en el stock de fábrica de la noche: la app lo descuenta y avisa "alcanza con stock".</div></div>`;
   }
   return h;
 }
@@ -2720,6 +2789,12 @@ const HORA_SALE_REPARTO = '13:00';
 // CARTEL DE ENVÍO ESPECIAL (14/11/2026, Carolina): en Despachar envíos y en
 // Confirmar recepción, cuando ese día va un pedido especial a un local.
 // pedidos: lista de listarPedidosEspeciales (una fila por producto)
+// 28/11/2026: de dónde sale cada pedido especial (para Despacho)
+function origenEspecial(el){
+  const quien = el.sector === 'postres' ? 'Postres' : el.sector === 'dips' ? 'Cocina' : 'Producción';
+  const cuando = el.fechaArmado === hoyISO() ? 'hoy' : 'el ' + diaCorto(el.fechaArmado);
+  return `${el.modo === 'urgencia' ? 'urgencia: ' : ''}lo hace ${quien} ${cuando}; si ya había stock, sale del stock`;
+}
 function htmlAvisoEnvioEspecial(pedidos, local, modo){
   const lista = (pedidos || []).filter(p => p.estado !== 'Cancelado' && (!local || p.local === local));
   if(!lista.length) return '';
@@ -2733,7 +2808,7 @@ function htmlAvisoEnvioEspecial(pedidos, local, modo){
   const nota = modo === 'recepcion' ? 'Viene en el envío de hoy, sumado a lo normal. Controlalo al recibir.'
     : `Ya está sumado a la orden de envío (marcado "pedido especial").${temprano ? ' <strong>Ojo: lo piden antes de que salga el reparto — sale aparte, a la hora pedida.</strong>' : ' Que llegue antes de la hora pedida.'}`;
   return `<div class="aviso-especial hoy"><div class="ae-tit">${tit}</div>${peds.map(p =>
-    `<div class="ae-linea">${modo === 'recepcion' ? '' : `Local <strong>${nombre(p.local)}</strong> — `}para las <strong>${escHtml(p.hora)} hs</strong>: ${p.items.map(x => `<strong>${escHtml(x.producto)}</strong> ${ent(x.cantidad)}`).join(' · ')}${p.obs ? ` <span class="gris-txt">· ${escHtml(p.obs)}</span>` : ''}${p.quien ? ` <span class="gris-txt">(pidió ${escHtml(p.quien)})</span>` : ''}</div>`).join('')}
+    `<div class="ae-linea">${modo === 'recepcion' ? '' : `Local <strong>${nombre(p.local)}</strong> — `}para las <strong>${escHtml(p.hora)} hs</strong>: ${p.items.map(x => `<strong>${escHtml(x.producto)}</strong> ${ent(x.cantidad)}${modo !== 'recepcion' && x.elabora ? ` <span class="gris-txt">(${origenEspecial(x.elabora)})</span>` : ''}`).join(' · ')}${p.obs ? ` <span class="gris-txt">· ${escHtml(p.obs)}</span>` : ''}${p.quien ? ` <span class="gris-txt">(pidió ${escHtml(p.quien)})</span>` : ''}</div>`).join('')}
     <div class="ae-nota">${nota}</div></div>`;
 }
 // sectorNombre: 'Producción' | 'Postres'
@@ -2841,7 +2916,7 @@ function tablaSimpleCocina(data, rubro, titulo){
             <tr>
               <td>${f.sabor}${f.especial > 0 ? ' <span class="badge-especial">★ pedido especial</span>' : ''}</td>
               <td class="num">${ent(f.objetivoUnidades)}</td>
-              <td class="num">${ent(f.stockFabricaUnidades)}</td>
+              <td class="num">${ent(f.stockFabricaUnidades)}${f.salsaCamaraUnidades > 0 ? `<div style="font-size:11px;color:var(--ink-soft);">+ salsa en cámara ${dec(f.salsaCamaraKg)} kg = ${ent(f.salsaCamaraUnidades)} dips</div>` : ''}</td>
               <td class="num">≈ ${ent(f.stockLocalesUnidades)}<div style="font-size:11px;color:var(--ink-soft);">${ent(f.stockLocalesCargado)} cargado − ${ent(f.ventaHoyEstimada)} venta de hoy</div></td>
               <td class="num"><strong>${ent(f.aHacerUnidades)}</strong>${htmlSplitEspecial(f)}</td>
             </tr>`).join('')}
@@ -2929,7 +3004,9 @@ function ordenarCocina(cocina, urg){
   });
   const b1 = cocina.filter(f => f.mismoDia).sort((x, y) => ((y.enfriar ? 2 : 0) + (y.prepCarne ? 1 : 0)) - ((x.enfriar ? 2 : 0) + (x.prepCarne ? 1 : 0)));
   const resto = cocina.filter(f => !f.mismoDia);
-  const b2 = aparte.concat(resto.filter(f => f.kgUrgente > 0)).concat(resto.filter(f => !(f.kgUrgente > 0)));
+  // 28/11/2026: el relleno de un pedido especial que entra como urgencia también va arriba, como alerta
+  const conAlerta = f => f.kgUrgente > 0 || f.especialUrgente;
+  const b2 = aparte.concat(resto.filter(conAlerta)).concat(resto.filter(f => !conAlerta(f)));
   return { b1, b2 };
 }
 function cantMedida(c, m){
@@ -2953,8 +3030,9 @@ function htmlPrepCarneDetalle(f){
 }
 let COCINA_VISTA = null; // { data, ollas } para repintar la tabla cuando llegan las urgencias
 function filaCocinaHtml(f, bloque){
-  const alerta = bloque === 2 && f.kgUrgente > 0;
+  const alerta = bloque === 2 && (f.kgUrgente > 0 || f.especialUrgente);
   const enfr = bloque === 1 && f.enfriar;
+  const kgHoy = (Number(f.kgUrgente) || 0) + (f.especialUrgente ? Number(f.kilosEspecial) || 0 : 0);
   const base = f.aparte ? 0 : (f.kilosEspecial > 0 ? f.kilosDia : f.kgPlan);
   const esp = (Number(f.kilosEspecial) || 0) + (Number(f.kgUrgente) || 0);
   const para = f.aparte ? f.sabores.map(s => `${s.sabor} ${ent(s.unidades)}`).join(' · ') : (f.sabores || []).map(s => s.sabor).join(', ');
@@ -2962,12 +3040,14 @@ function filaCocinaHtml(f, bloque){
     <tr class="${enfr ? 'fila-enfriar' : ''}${alerta ? ' fila-alerta' : ''}" data-kilos-base="${base}" data-kilos-esp="${esp}" data-relleno="${escHtml(f.relleno)}">
       <td><strong>${f.prepCarne ? `${f.relleno} — pedido ${dec(f.kilosDeRelleno)} kg` : f.relleno}</strong>${f.kilosEspecial > 0 ? ' <span class="badge-especial">★ pedido especial</span>' : ''}
         ${enfr ? '<div class="tag-enfriar">PRIORIDAD: SE TIENE QUE ENFRIAR</div>' : ''}
-        ${alerta ? '<div class="tag-alerta">⚠ ALERTA: SE NECESITA DE ESTE RELLENO PARA HOY</div>' : ''}
+        ${alerta ? `<div class="tag-alerta">⚠ ALERTA: SE NECESITA DE ESTE RELLENO PARA HOY${f.especialUrgente ? ' — PEDIDO ESPECIAL' : ''}</div>` : ''}
+        ${bloque === 1 && f.especialUrgente && !alerta ? '<div class="tag-alerta">⚠ PEDIDO ESPECIAL URGENTE</div>' : ''}
+        ${f.especialEnfriar ? '<div class="tag-alerta">⚠ Revisar si se llega a enfriar antes de la entrega</div>' : ''}
         ${htmlPrepCarneDetalle(f)}</td>
       <td style="color:var(--ink-soft);font-size:12.5px;">${para}</td>
       <td style="color:var(--ink-soft);font-size:12.5px;">${f.diasQueCubre || ''}</td>
       <td class="num" style="font-size:12.5px;">${f.aparte ? '' : celdaSobrante(f.sobrante)}</td>
-      <td class="num kg-relleno">${alerta ? '<div class="lbl-tot">Total producción</div>' : ''}<strong></strong>${alerta ? `<div class="kg-hoy">Necesarios para hoy <strong>${dec(f.kgUrgente)}</strong> kg</div>` : ''}${htmlSplitEspecialKg(f)}</td>
+      <td class="num kg-relleno">${alerta ? '<div class="lbl-tot">Total producción</div>' : ''}<strong></strong>${alerta ? `<div class="kg-hoy">Necesarios para hoy <strong>${dec(kgHoy)}</strong> kg</div>` : ''}${htmlSplitEspecialKg(f)}</td>
       <td class="num ollas-relleno">—</td>
     </tr>`;
 }
@@ -6017,12 +6097,12 @@ async function cargarPendientesRecepcion(){
                 const aKg = v => Math.round(Number(v) * kg * 100) / 100;
                 if(kg) return `
                 <tr data-id="${p.ID}" data-kg-porcion="${kg}" data-enviado="${aKg(p.Cantidad_Enviada)}">
-                  <td>${nombreFabrica(p.Sabor)}${etiquetaUnidad(p.Sabor, 'kg')}</td>
+                  <td>${nombreFabrica(p.Sabor)}${etiquetaUnidad(p.Sabor, 'porciones')}</td>
                   <td><span style="color:var(--ink-soft);">Fábrica${Number(p.NroEnvio) > 1 ? ` · <strong>envío ${p.NroEnvio}</strong>` : ''}</span></td>
                   <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Fecha_envio)}</td>
                   <td class="num" style="color:var(--ink-soft);">${dec(aKg(p.Cantidad_Enviada))}</td>
                   <td style="color:var(--ink-soft);font-size:12.5px;">${fmtFecha(p.Vencimiento)}</td>
-                  <td><input type="number" min="0" step="0.25" class="inp-recibido" style="max-width:90px;" value="${aKg(p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? p.Cantidad_Recibida : p.Cantidad_Enviada)}"></td>
+                  <td>${htmlMuzzaDoble(kg, 'kg', aKg(p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? p.Cantidad_Recibida : p.Cantidad_Enviada), 'inp-recibido')}</td>
                   <td class="dif-rec"></td>
                   <td class="celda-estado" style="white-space:nowrap;">${p.Cantidad_Recibida !== '' && p.Cantidad_Recibida != null ? '<span class="sello-guardado">✓ Guardado</span>' : ''}</td>
                 </tr>`;
@@ -6284,7 +6364,7 @@ async function renderPedidosEspeciales(){
     <div id="peLista" class="loading">Cargando…</div>`;
   let productos = {};
   const tbody = document.querySelector('#peItems tbody');
-  const opciones = () => '<option value="">— Elegir —</option>' + ['Empanadas Horno', 'Empanadas Frito', 'Copetín', 'Postres'].filter(g => productos[g]).map(g => `<optgroup label="${g}">${productos[g].map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('')}</optgroup>`).join('');
+  const opciones = () => '<option value="">— Elegir —</option>' + ['Empanadas Horno', 'Empanadas Frito', 'Copetín', 'Postres', 'Dips'].filter(g => productos[g]).map(g => `<optgroup label="${g}">${productos[g].map(n => `<option value="${escHtml(n)}">${escHtml(n)}</option>`).join('')}</optgroup>`).join('');
   const agregarFila = () => {
     const tr = document.createElement('tr');
     tr.innerHTML = `<td><select class="pe-prod" style="min-width:230px;">${opciones()}</select></td><td><input type="number" min="1" step="1" class="pe-cant" style="width:90px;"></td><td class="col-del"><button type="button" class="del-btn" title="Quitar">✕</button></td>`;
@@ -6307,7 +6387,7 @@ async function renderPedidosEspeciales(){
       if(!lista.length){ cont.innerHTML = '<div class="empty">No hay pedidos especiales cargados para los próximos días.</div>'; return; }
       cont.innerHTML = `<table class="prod"><thead><tr><th>Para</th><th>Local</th><th>Productos</th><th>Pidió</th><th></th></tr></thead><tbody>${lista.map(p => `
         <tr class="${p.estado === 'Cancelado' ? 'pe-cancelado' : ''}"><td><strong>${diaCorto(p.fechaEntrega)}</strong> ${p.horaEntrega} hs</td><td>${NOMBRE_LOCAL_VISTA[p.local] || p.local}</td>
-        <td>${p.items.map(x => `${escHtml(x.producto)} <strong>${ent(x.cantidad)}</strong>${x.elabora && p.estado !== 'Cancelado' ? `<div class="gris-txt" style="font-size:11.5px;">${x.elabora.sector === 'postres' ? 'Postres lo hace' : 'Producción lo arma'} el ${diaCorto(x.elabora.fechaArmado)}${x.elabora.fechaCocina && x.elabora.fechaCocina !== x.elabora.fechaArmado ? ` · Cocina el ${diaCorto(x.elabora.fechaCocina)}` : ''}${x.elabora.aTiempo ? '' : ' · <span class="mal-txt">entró tarde: sale como urgencia</span>'}</div>` : ''}`).join('<br>')}${p.observaciones ? `<div class="gris-txt" style="font-size:12px;">${escHtml(p.observaciones)}</div>` : ''}</td>
+        <td>${p.items.map(x => `${escHtml(x.producto)} <strong>${ent(x.cantidad)}</strong>${x.elabora && p.estado !== 'Cancelado' ? `<div class="gris-txt" style="font-size:11.5px;">${x.elabora.sector === 'postres' ? 'Postres lo hace' : x.elabora.sector === 'dips' ? 'Cocina hace el dip' : 'Producción lo arma'} el ${diaCorto(x.elabora.fechaArmado)}${x.elabora.fechaPreparado ? ` · preparado de carne el ${diaCorto(x.elabora.fechaPreparado)}` : ''}${x.elabora.sector === 'produccion' && x.elabora.fechaCocina && x.elabora.fechaCocina !== x.elabora.fechaArmado ? ` · Cocina el ${diaCorto(x.elabora.fechaCocina)}` : ''}${x.elabora.modo === 'urgencia' ? ' · <span class="mal-txt">no entra en una tanda: sale como urgencia</span>' : x.elabora.modo === 'previo' ? ' · el día anterior a la entrega' : ''}${x.elabora.alertaEnfriar ? ' · <span class="mal-txt">revisar si se llega a enfriar</span>' : ''}</div>` : ''}`).join('<br>')}${p.observaciones ? `<div class="gris-txt" style="font-size:12px;">${escHtml(p.observaciones)}</div>` : ''}</td>
         <td style="font-size:12px;">${escHtml(p.responsable)}<br><span class="gris-txt">${fmtFecha(p.fechaCarga).slice(0, 5)} ${p.horaCarga}</span></td>
         <td>${p.estado === 'Cancelado' ? '<span class="gris-txt">Cancelado</span>' : `<button type="button" class="btn secondary pe-cancelar" data-id="${p.id}" style="font-size:12px;padding:5px 9px;">Cancelar</button>`}</td></tr>`).join('')}</tbody></table>`;
       cont.querySelectorAll('.pe-cancelar').forEach(b => b.onclick = async () => {
@@ -7789,14 +7869,19 @@ const PedidosApp = (function(){
   // cada producto; la primera vez va en blanco y es obligatoria para enviar;
   // después queda la última que usó ese local (se puede cambiar). Fábrica
   // manda por defecto en la unidad del pedido y la puede cambiar.
-  var UNIDADES_PED = ["unidad", "kg", "gramos", "litros", "paquete", "caja", "bolsa", "bidón"];
+  // 28/11/2026: la lista viene de la solapa "Unidades" de la planilla de
+  // Pedidos (en MAYÚSCULAS; getData la manda). Esta es la de respaldo.
+  var UNIDADES_PED = ["UNIDAD", "KG", "GRAMOS", "LITROS", "PAQUETE", "CAJA", "BOLSA", "BIDÓN", "LATA", "ATADO"];
   function selUnidad(attr, id, val, falta){
+    val = String(val || "").toUpperCase();
+    var lista = UNIDADES_PED.slice();
+    if(val && lista.indexOf(val) === -1) lista.push(val); // una unidad vieja que ya no está en la lista
     var h = '<select class="unit-sel'+(falta?' unit-falta':'')+'" '+attr+'="'+esc(id)+'" title="Unidad">';
-    h += '<option value=""'+(!val?' selected':'')+'>elegir…</option>';
-    UNIDADES_PED.forEach(function(u){ h += '<option value="'+u+'"'+(u===val?' selected':'')+'>'+u+'</option>'; });
+    h += '<option value=""'+(!val?' selected':'')+'>ELEGIR…</option>';
+    lista.forEach(function(u){ h += '<option value="'+esc(u)+'"'+(u===val?' selected':'')+'>'+esc(u)+'</option>'; });
     return h + '</select>';
   }
-  function conU(cant, u){ cant = String(cant==null?"":cant); return cant && u ? cant+' '+u : cant; }
+  function conU(cant, u){ cant = String(cant==null?"":cant); return cant && u ? cant+' '+String(u).toUpperCase() : cant; }
   // última unidad que usó ese local para ese producto (pedidos viene del más nuevo al más viejo)
   function ultimaUnidad(local, itemId, excluirId){
     if(!local) return "";
@@ -8141,6 +8226,7 @@ const PedidosApp = (function(){
     return callServer("getData").then(function(data){
       catalogItems = data.catalog || [];
       pedidos = data.pedidos || [];
+      if(data.unidades && data.unidades.length) UNIDADES_PED = data.unidades;
       loaded = true;
       ultimaCarga = Date.now();
       if(abierto()) render();
@@ -9343,7 +9429,7 @@ const PedidosApp = (function(){
   function resumen(fresco){
     if(!fresco && loaded && Date.now() - ultimaCarga < 30000) return Promise.resolve(contar());
     return callServer("getData").then(function(data){
-      catalogItems = data.catalog || []; pedidos = data.pedidos || []; loaded = true; ultimaCarga = Date.now();
+      catalogItems = data.catalog || []; pedidos = data.pedidos || []; if(data.unidades && data.unidades.length) UNIDADES_PED = data.unidades; loaded = true; ultimaCarga = Date.now();
       return contar();
     });
   }
@@ -9352,7 +9438,7 @@ const PedidosApp = (function(){
     var contarLocal = function(){ return pedidos.filter(function(p){ return p.estado === "enviado" && (!local || p.local === local); }).length; };
     if(!fresco && loaded && Date.now() - ultimaCarga < 30000) return Promise.resolve(contarLocal());
     return callServer("getData").then(function(data){
-      catalogItems = data.catalog || []; pedidos = data.pedidos || []; loaded = true; ultimaCarga = Date.now();
+      catalogItems = data.catalog || []; pedidos = data.pedidos || []; if(data.unidades && data.unidades.length) UNIDADES_PED = data.unidades; loaded = true; ultimaCarga = Date.now();
       return contarLocal();
     });
   }
